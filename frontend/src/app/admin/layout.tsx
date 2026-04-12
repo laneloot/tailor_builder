@@ -164,7 +164,7 @@ export default function AdminLayout({
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
-                  Skills
+                  Skill Library
                 </Link>
                 <Link
                   href="/admin/settings"

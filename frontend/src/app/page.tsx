@@ -15,9 +15,12 @@ import {
 } from '@/lib/api';
 import ProfileSelector from '@/components/ProfileSelector';
 import ResumePreview from '@/components/ResumePreview';
+import SheetsImportModal, { ImportedSheetJob } from '@/components/SheetsImportModal';
 import { applyTheme, getStoredTheme, setStoredDefaultTheme } from '@/lib/theme';
 
 type GenerateMode = 'single' | 'multiple';
+type BuilderMode = 'manual' | 'sheets';
+type SheetsTargetMode = 'single' | 'all' | 'group';
 
 type UnconfirmedSkill = { original: string; value: string };
 
@@ -33,10 +36,14 @@ type MultiplePreview = {
 export default function Home() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [builderMode, setBuilderMode] = useState<BuilderMode>('manual');
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [generateMode, setGenerateMode] = useState<GenerateMode>('single');
   const [multipleTarget, setMultipleTarget] = useState<'all' | 'group'>('group');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+  const [sheetsTargetMode, setSheetsTargetMode] = useState<SheetsTargetMode>('single');
+  const [selectedSheetsProfileId, setSelectedSheetsProfileId] = useState<string | null>(null);
+  const [selectedSheetsGroupId, setSelectedSheetsGroupId] = useState<string>('');
   const [companyName, setCompanyName] = useState('');
   const [role, setRole] = useState('');
   const [jobDescription, setJobDescription] = useState('');
@@ -66,6 +73,7 @@ export default function Home() {
   const [multiplePreviewTailored, setMultiplePreviewTailored] = useState(false);
   const [multiplePreviewIndex, setMultiplePreviewIndex] = useState(0);
   const [autoGenerate, setAutoGenerate] = useState(false);
+  const [isSheetsImportOpen, setIsSheetsImportOpen] = useState(false);
 
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -99,7 +107,7 @@ export default function Home() {
 
   useEffect(() => {
     resetGenerationOutputs();
-  }, [companyName, role, jobDescription, selectedProfileId, selectedModel, generateMode, resetGenerationOutputs]);
+  }, [builderMode, companyName, role, jobDescription, selectedProfileId, selectedModel, generateMode, resetGenerationOutputs]);
 
   const loadInitialData = async () => {
     try {
@@ -140,22 +148,31 @@ export default function Home() {
 
       if (enabledProfiles.length > 0) {
         const defaultProfileExists = enabledProfiles.some((profile) => profile.id === modelData.defaultProfileId);
-        setSelectedProfileId(defaultProfileExists ? modelData.defaultProfileId : enabledProfiles[0].id);
+        const initialProfileId = defaultProfileExists ? modelData.defaultProfileId : enabledProfiles[0].id;
+        setSelectedProfileId(initialProfileId);
+        setSelectedSheetsProfileId(initialProfileId);
       }
 
       if (modelData.defaultResumeSelection === 'single') {
         setGenerateMode('single');
         setMultipleTarget('group');
         setSelectedGroupId('');
+        setSheetsTargetMode('single');
+        setSelectedSheetsGroupId('');
       } else if (modelData.defaultResumeSelection === 'all') {
         setGenerateMode('multiple');
         setMultipleTarget('all');
         setSelectedGroupId('');
+        setSheetsTargetMode('all');
+        setSelectedSheetsGroupId('');
       } else {
         const defaultGroupExists = groupsData.some((group) => group.id === modelData.defaultGroupId);
         setGenerateMode('multiple');
         setMultipleTarget('group');
-        setSelectedGroupId(defaultGroupExists ? modelData.defaultGroupId : '');
+        const initialGroupId = defaultGroupExists ? modelData.defaultGroupId : '';
+        setSelectedGroupId(initialGroupId);
+        setSheetsTargetMode('group');
+        setSelectedSheetsGroupId(initialGroupId);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -171,6 +188,38 @@ export default function Home() {
     format: (modelSettings.defaultResumeDocxEnabled ? 'both' : 'pdf') as 'both' | 'pdf',
     includeCoverLetterDocx: modelSettings.defaultCoverLetterDocxEnabled,
   });
+
+  const getSelectedProfilesForSheetsBuilder = () => {
+    if (sheetsTargetMode === 'single') {
+      if (!selectedSheetsProfileId) {
+        throw new Error('Please select a profile before importing from Sheets.');
+      }
+      const profile = profiles.find((item) => item.id === selectedSheetsProfileId);
+      if (!profile) {
+        throw new Error('Selected profile could not be found.');
+      }
+      return [profile];
+    }
+
+    if (sheetsTargetMode === 'all') {
+      if (!profiles.length) {
+        throw new Error('No profiles available for batch generation.');
+      }
+      return profiles;
+    }
+
+    const selectedGroup = groups.find((group) => group.id === selectedSheetsGroupId);
+    if (!selectedGroup) {
+      throw new Error('Please select a group before importing from Sheets.');
+    }
+
+    const selectedProfiles = profiles.filter((profile) => selectedGroup.profileIds.includes(profile.id));
+    if (!selectedProfiles.length) {
+      throw new Error('Selected group has no enabled profiles.');
+    }
+
+    return selectedProfiles;
+  };
 
   const aggregateUnconfirmedFromPreviews = (previews: MultiplePreview[]) => {
     const hardMap = new Map<string, string>();
@@ -190,6 +239,90 @@ export default function Home() {
       hard: toUnconfirmedItems(Array.from(hardMap.values())),
       soft: toUnconfirmedItems(Array.from(softMap.values())),
     };
+  };
+
+  const handleImportJobsFromSheets = async (
+    importedJobs: ImportedSheetJob[],
+    meta: { skippedRows: number }
+  ) => {
+    const selectedProfiles = getSelectedProfilesForSheetsBuilder();
+    const fallbackRole = role.trim();
+    const normalizedJobs = importedJobs.map((job) => ({
+      ...job,
+      jobTitle: job.jobTitle.trim() || fallbackRole,
+    }));
+    const missingRoleRow = normalizedJobs.find((job) => !job.jobTitle.trim());
+    if (missingRoleRow) {
+      throw new Error(
+        `Row ${missingRoleRow.sourceRowNumber} has no job title. Map a job_title column or fill the Builder Role field as a fallback.`
+      );
+    }
+
+    setIsGenerating(true);
+    setError('');
+    setSuccessMessage('');
+    resetGenerationOutputs();
+
+    const failures: string[] = [];
+    const totalBuilds = selectedProfiles.length * normalizedJobs.length;
+    let completedBuilds = 0;
+
+    try {
+      for (let jobIndex = 0; jobIndex < normalizedJobs.length; jobIndex += 1) {
+        const job = normalizedJobs[jobIndex];
+        const trimmedJobDescription = job.jobDescription.trim();
+        const analysis =
+          trimmedJobDescription.length >= 50
+            ? await resumeApi.analyze(trimmedJobDescription, selectedModel)
+            : undefined;
+
+        if (jobIndex === 0 && analysis) {
+          setJobAnalysis(analysis);
+        }
+
+        for (let profileIndex = 0; profileIndex < selectedProfiles.length; profileIndex += 1) {
+          const profile = selectedProfiles[profileIndex];
+          completedBuilds += 1;
+          setGenerationStep(
+            `Generating ${completedBuilds}/${totalBuilds}: ${profile.name} x ${job.companyName}`
+          );
+
+          try {
+            await resumeApi.generate({
+              profileId: profile.id,
+              templateId: profile.preferredTemplate || 'default',
+              jobDescription: trimmedJobDescription,
+              jobAnalysis: analysis,
+              companyName: job.companyName.trim(),
+              role: job.jobTitle.trim(),
+              model: selectedModel,
+              ...getDefaultGenerationOptions(),
+            });
+          } catch (err) {
+            failures.push(
+              `Row ${job.sourceRowNumber} / ${profile.name}: ${err instanceof Error ? err.message : 'Generation failed'}`
+            );
+          }
+        }
+      }
+
+      const generatedCount = totalBuilds - failures.length;
+      const skippedNote = meta.skippedRows
+        ? ` Skipped ${meta.skippedRows} imported row(s) with missing required values.`
+        : '';
+      setSuccessMessage(
+        `Generated ${generatedCount} build(s) from ${normalizedJobs.length} imported job(s) across ${selectedProfiles.length} profile(s).${skippedNote}`
+      );
+
+      if (failures.length) {
+        setError(
+          `Some builds failed (${failures.length}/${totalBuilds}). ${failures.slice(0, 3).join(' | ')}${failures.length > 3 ? ' | ...' : ''}`
+        );
+      }
+    } finally {
+      setIsGenerating(false);
+      setGenerationStep('');
+    }
   };
 
   const handleGenerate = async () => {
@@ -1074,225 +1207,376 @@ export default function Home() {
           </div>
         )}
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
-
-
+        <div className="mb-6 grid gap-4 md:grid-cols-2">
           <button
-            onClick={handleGenerate}
+            type="button"
+            onClick={() => setBuilderMode('manual')}
             disabled={isGenerating}
-            className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isGenerating ? (
-              <>
-                <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
-                {generationStep || 'Generating...'}
-              </>
-            ) : (
-              generateMode === 'single'
-                ? autoGenerate
-                  ? 'Generate Resume'
-                  : 'Analyze & Preview'
-                : autoGenerate
-                  ? `Generate All (${profiles.length} profiles)`
-                  : 'Analyze & Preview'
-            )}
-          </button>
-          {/* Generate mode: single or multiple */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Generate mode
-            </label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="generateMode"
-                  value="single"
-                  checked={generateMode === 'single'}
-                  onChange={() => setGenerateMode('single')}
-                  disabled={isGenerating}
-                  className="w-4 h-4 text-blue-600"
-                />
-                <span>Single (one profile)</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="generateMode"
-                  value="multiple"
-                  checked={generateMode === 'multiple'}
-                  onChange={() => setGenerateMode('multiple')}
-                  disabled={isGenerating}
-                  className="w-4 h-4 text-blue-600"
-                />
-                <span>Multiple (all profiles)</span>
-              </label>
-            </div>
-          </div>
-
-          {generateMode === 'single' && (
-            <ProfileSelector
-              profiles={profiles}
-              selectedId={selectedProfileId}
-              onChange={setSelectedProfileId}
-              isLoading={false}
-            />
-          )}
-
-          {generateMode === 'multiple' && (
-            <div className="space-y-4 border border-gray-200 rounded-lg p-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Target</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="multipleTarget"
-                      value="all"
-                      checked={multipleTarget === 'all'}
-                      onChange={() => setMultipleTarget('all')}
-                      disabled={isGenerating}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <span>All profiles</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="multipleTarget"
-                      value="group"
-                      checked={multipleTarget === 'group'}
-                      onChange={() => setMultipleTarget('group')}
-                      disabled={isGenerating}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <span>Specific group</span>
-                  </label>
-                </div>
-              </div>
-
-              {multipleTarget === 'group' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Group</label>
-                  <select
-                    value={selectedGroupId}
-                    onChange={(e) => setSelectedGroupId(e.target.value)}
-                    disabled={isGenerating}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Choose a group...</option>
-                    {groups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name} ({group.profileIds.length})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Company Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              disabled={isGenerating}
-              placeholder="Enter company name"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Role <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              disabled={isGenerating}
-              placeholder="Enter job role/title"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Job Description <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              disabled={isGenerating}
-              placeholder="Paste the job description (min 50 characters)"
-              rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
-            <p className="text-sm text-gray-500 mt-1">{jobDescription.length} characters</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">AI Model</label>
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value as AIProvider)}
-              disabled={isGenerating}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {modelSettings.openaiEnabled && <option value="openai">OpenAI</option>}
-              {modelSettings.claudeEnabled && <option value="claude">Claude</option>}
-              {modelSettings.openrouterEnabled && <option value="openrouter">OpenRouter</option>}
-            </select>
-          </div>
-
-          <div
-            className={`flex items-center justify-between border rounded-lg p-4 transition-colors ${
-              autoGenerate ? 'border-blue-200 bg-blue-50' : 'border-red-200 bg-red-50'
+            className={`rounded-xl border px-6 py-6 text-left transition ${
+              builderMode === 'manual'
+                ? 'border-blue-300 bg-blue-50 shadow-sm'
+                : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
             }`}
           >
-            <div>
-              <div className="text-sm font-semibold text-gray-800">
-                {autoGenerate ? 'Auto-generate (On)' : 'Preview mode (On)'}
-              </div>
-              <div className="text-xs text-gray-600">
-                {autoGenerate
-                  ? 'Analyze + generate in one step.'
-                  : 'Analyze + preview first. Generate manually.'}
-              </div>
+            <div className="text-lg font-semibold text-gray-900">Building Manually</div>
+            <div className="mt-2 text-sm text-gray-600">
+              Original builder flow. Enter company, role, and job description manually, then preview or generate.
             </div>
-            <label className="inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoGenerate}
-                onChange={(e) => setAutoGenerate(e.target.checked)}
-                disabled={isGenerating}
-                className="sr-only"
-              />
-              <span
-                className={`relative w-11 h-6 rounded-full peer-focus:outline-none transition-colors ${
-                  autoGenerate ? 'bg-blue-600' : 'bg-red-500'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 h-5 w-5 bg-white rounded-full transition-transform ${
-                    autoGenerate ? 'translate-x-5' : ''
-                  }`}
-                />
-              </span>
-            </label>
-          </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setBuilderMode('sheets')}
+            disabled={isGenerating}
+            className={`rounded-xl border px-6 py-6 text-left transition ${
+              builderMode === 'sheets'
+                ? 'border-blue-300 bg-blue-50 shadow-sm'
+                : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <div className="text-lg font-semibold text-gray-900">Building Automatically from Google Sheet</div>
+            <div className="mt-2 text-sm text-gray-600">
+              Import jobs from Google Sheets, map columns once, then generate every selected profile against every imported row.
+            </div>
+          </button>
         </div>
 
-        {generateMode === 'multiple' && autoGenerate && unconfirmedPanel && (
+        {builderMode === 'manual' ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isGenerating ? (
+                <>
+                  <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
+                  {generationStep || 'Generating...'}
+                </>
+              ) : (
+                generateMode === 'single'
+                  ? autoGenerate
+                    ? 'Generate Resume'
+                    : 'Analyze & Preview'
+                  : autoGenerate
+                    ? `Generate All (${profiles.length} profiles)`
+                    : 'Analyze & Preview'
+              )}
+            </button>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Generate mode
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="generateMode"
+                    value="single"
+                    checked={generateMode === 'single'}
+                    onChange={() => setGenerateMode('single')}
+                    disabled={isGenerating}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span>Single (one profile)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="generateMode"
+                    value="multiple"
+                    checked={generateMode === 'multiple'}
+                    onChange={() => setGenerateMode('multiple')}
+                    disabled={isGenerating}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span>Multiple (all profiles)</span>
+                </label>
+              </div>
+            </div>
+
+            {generateMode === 'single' && (
+              <ProfileSelector
+                profiles={profiles}
+                selectedId={selectedProfileId}
+                onChange={setSelectedProfileId}
+                isLoading={false}
+              />
+            )}
+
+            {generateMode === 'multiple' && (
+              <div className="space-y-4 border border-gray-200 rounded-lg p-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Target</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="multipleTarget"
+                        value="all"
+                        checked={multipleTarget === 'all'}
+                        onChange={() => setMultipleTarget('all')}
+                        disabled={isGenerating}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span>All profiles</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="multipleTarget"
+                        value="group"
+                        checked={multipleTarget === 'group'}
+                        onChange={() => setMultipleTarget('group')}
+                        disabled={isGenerating}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span>Specific group</span>
+                    </label>
+                  </div>
+                </div>
+
+                {multipleTarget === 'group' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Select Group</label>
+                    <select
+                      value={selectedGroupId}
+                      onChange={(e) => setSelectedGroupId(e.target.value)}
+                      disabled={isGenerating}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Choose a group...</option>
+                      {groups.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name} ({group.profileIds.length})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Company Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                disabled={isGenerating}
+                placeholder="Enter company name"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Role <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                disabled={isGenerating}
+                placeholder="Enter job role/title"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Job Description <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
+                disabled={isGenerating}
+                placeholder="Paste the job description (min 50 characters)"
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+              <p className="text-sm text-gray-500 mt-1">{jobDescription.length} characters</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">AI Model</label>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value as AIProvider)}
+                disabled={isGenerating}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {modelSettings.openaiEnabled && <option value="openai">OpenAI</option>}
+                {modelSettings.claudeEnabled && <option value="claude">Claude</option>}
+                {modelSettings.openrouterEnabled && <option value="openrouter">OpenRouter</option>}
+              </select>
+            </div>
+
+            <div
+              className={`flex items-center justify-between border rounded-lg p-4 transition-colors ${
+                autoGenerate ? 'border-blue-200 bg-blue-50' : 'border-red-200 bg-red-50'
+              }`}
+            >
+              <div>
+                <div className="text-sm font-semibold text-gray-800">
+                  {autoGenerate ? 'Auto-generate (On)' : 'Preview mode (On)'}
+                </div>
+                <div className="text-xs text-gray-600">
+                  {autoGenerate
+                    ? 'Analyze + generate in one step.'
+                    : 'Analyze + preview first. Generate manually.'}
+                </div>
+              </div>
+              <label className="inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoGenerate}
+                  onChange={(e) => setAutoGenerate(e.target.checked)}
+                  disabled={isGenerating}
+                  className="sr-only"
+                />
+                <span
+                  className={`relative w-11 h-6 rounded-full peer-focus:outline-none transition-colors ${
+                    autoGenerate ? 'bg-blue-600' : 'bg-red-500'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 h-5 w-5 bg-white rounded-full transition-transform ${
+                      autoGenerate ? 'translate-x-5' : ''
+                    }`}
+                  />
+                </span>
+              </label>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              Import a Google Sheet range where each row is one job. After column mapping, the builder will generate every selected profile against every imported row.
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Build target
+              </label>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="sheetsTargetMode"
+                    value="single"
+                    checked={sheetsTargetMode === 'single'}
+                    onChange={() => setSheetsTargetMode('single')}
+                    disabled={isGenerating}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span>Single profile</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="sheetsTargetMode"
+                    value="all"
+                    checked={sheetsTargetMode === 'all'}
+                    onChange={() => setSheetsTargetMode('all')}
+                    disabled={isGenerating}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span>All profiles</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="sheetsTargetMode"
+                    value="group"
+                    checked={sheetsTargetMode === 'group'}
+                    onChange={() => setSheetsTargetMode('group')}
+                    disabled={isGenerating}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span>Specific group</span>
+                </label>
+              </div>
+            </div>
+
+            {sheetsTargetMode === 'single' && (
+              <ProfileSelector
+                profiles={profiles}
+                selectedId={selectedSheetsProfileId}
+                onChange={setSelectedSheetsProfileId}
+                isLoading={false}
+              />
+            )}
+
+            {sheetsTargetMode === 'group' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Group</label>
+                <select
+                  value={selectedSheetsGroupId}
+                  onChange={(e) => setSelectedSheetsGroupId(e.target.value)}
+                  disabled={isGenerating}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Choose a group...</option>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name} ({group.profileIds.length})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Fallback Role
+              </label>
+              <input
+                type="text"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                disabled={isGenerating}
+                placeholder="Optional fallback if a sheet row has no mapped job title"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Leave this blank if your imported rows already include a mapped job title column.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">AI Model</label>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value as AIProvider)}
+                disabled={isGenerating}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {modelSettings.openaiEnabled && <option value="openai">OpenAI</option>}
+                {modelSettings.claudeEnabled && <option value="claude">Claude</option>}
+                {modelSettings.openrouterEnabled && <option value="openrouter">OpenRouter</option>}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsSheetsImportOpen(true)}
+              disabled={isGenerating}
+              className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
+            >
+              {isGenerating ? generationStep || 'Generating...' : 'Import from Google Sheet'}
+            </button>
+          </div>
+        )}
+
+        {builderMode === 'manual' && generateMode === 'multiple' && autoGenerate && unconfirmedPanel && (
           <div className="mt-6">{unconfirmedPanel}</div>
         )}
 
-        {generateMode === 'multiple' && !autoGenerate && multiplePreviews.length > 0 && activeMultiplePreview && (
+        {builderMode === 'manual' && generateMode === 'multiple' && !autoGenerate && multiplePreviews.length > 0 && activeMultiplePreview && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm">
             <div className="absolute inset-4 bg-white rounded-xl shadow-2xl flex flex-col">
               <div className="flex items-center justify-between px-6 py-4 border-b">
@@ -1390,7 +1674,7 @@ export default function Home() {
           </div>
         )}
 
-        {generateMode === 'single' && previewHtml && (
+        {builderMode === 'manual' && generateMode === 'single' && previewHtml && (
           <ResumePreview
             html={previewHtml}
             onGenerate={handleFinalizeGenerate}
@@ -1433,7 +1717,7 @@ export default function Home() {
           />
         )}
 
-        {generateMode === 'single' && previewHtml && !isSinglePreviewOpen && (
+        {builderMode === 'manual' && generateMode === 'single' && previewHtml && !isSinglePreviewOpen && (
           <div className="mt-4">
             <button
               type="button"
@@ -1445,6 +1729,13 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      <SheetsImportModal
+        isOpen={isSheetsImportOpen}
+        isSubmitting={isGenerating}
+        onClose={() => setIsSheetsImportOpen(false)}
+        onConfirm={handleImportJobsFromSheets}
+      />
 
       {/* Footer */}
       <footer className="mt-auto py-6 text-center text-sm text-gray-500">

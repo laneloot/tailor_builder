@@ -8,7 +8,7 @@ export default function AdminGoogleSheetsPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Google Sheets</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Import a specific range from a Google Sheet by spreadsheet ID, tab name, and numeric row and column bounds.
+          Import a specific range from a Google Sheet by spreadsheet ID, tab name, numeric row bounds, and letter-based column bounds.
         </p>
       </div>
 

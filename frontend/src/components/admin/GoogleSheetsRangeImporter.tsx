@@ -24,8 +24,8 @@ const DEFAULT_SHEETS_IMPORT_FORM: SheetsImportFormState = {
   tabName: '',
   fromRow: '1',
   toRow: '10',
-  fromCol: '1',
-  toCol: '5',
+  fromCol: 'A',
+  toCol: 'E',
 };
 
 function parsePositiveWholeNumber(label: string, value: string): number {
@@ -34,6 +34,23 @@ function parsePositiveWholeNumber(label: string, value: string): number {
     throw new Error(`${label} must be a positive whole number.`);
   }
   return parsed;
+}
+
+function parseSpreadsheetColumnInput(label: string, value: string): number {
+  const normalized = value.trim().toUpperCase();
+  if (!normalized) {
+    throw new Error(`${label} is required.`);
+  }
+  if (!/^[A-Z]+$/.test(normalized)) {
+    throw new Error(`${label} must use spreadsheet letters like A, B, or AA.`);
+  }
+
+  let columnNumber = 0;
+  for (const character of normalized) {
+    columnNumber = (columnNumber * 26) + (character.charCodeAt(0) - 64);
+  }
+
+  return columnNumber;
 }
 
 function toSpreadsheetColumnLabel(columnNumber: number): string {
@@ -219,13 +236,15 @@ export default function GoogleSheetsRangeImporter() {
     }
 
     try {
+      const parsedFromCol = parseSpreadsheetColumnInput('From column', sheetsForm.fromCol);
+      const parsedToCol = parseSpreadsheetColumnInput('To column', sheetsForm.toCol);
       const payload = {
         sheetId,
         tabName: sheetsForm.tabName.trim(),
         fromRow: parsePositiveWholeNumber('From row', sheetsForm.fromRow),
         toRow: parsePositiveWholeNumber('To row', sheetsForm.toRow),
-        fromCol: parsePositiveWholeNumber('From column', sheetsForm.fromCol),
-        toCol: parsePositiveWholeNumber('To column', sheetsForm.toCol),
+        fromCol: parsedFromCol,
+        toCol: parsedToCol,
       };
 
       setIsImportingSheetRange(true);
@@ -312,7 +331,7 @@ export default function GoogleSheetsRangeImporter() {
       <div>
         <h2 className="text-lg font-semibold text-gray-900">Google Sheets Range Importer</h2>
         <p className="text-sm text-gray-600">
-          Load spreadsheet tabs by Sheet ID, then import a numeric row and column range through the backend service account.
+          Load spreadsheet tabs by Sheet ID, then import a numeric row range and spreadsheet-letter column range through the backend service account.
         </p>
       </div>
 
@@ -383,7 +402,7 @@ export default function GoogleSheetsRangeImporter() {
           </select>
         </div>
         <div className="rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-          Column numbers map directly to Sheets columns: `1 = A`, `2 = B`, `27 = AA`.
+          Enter columns using spreadsheet letters like `A`, `B`, or `AA`. Uppercase and lowercase both work.
         </div>
       </div>
 
@@ -415,24 +434,22 @@ export default function GoogleSheetsRangeImporter() {
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-900">From column</label>
           <input
-            type="number"
-            min="1"
-            step="1"
+            type="text"
             value={sheetsForm.fromCol}
             onChange={(e) => setSheetsField('fromCol', e.target.value)}
             disabled={isImportingSheetRange}
+            placeholder="A"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-900">To column</label>
           <input
-            type="number"
-            min="1"
-            step="1"
+            type="text"
             value={sheetsForm.toCol}
             onChange={(e) => setSheetsField('toCol', e.target.value)}
             disabled={isImportingSheetRange}
+            placeholder="E"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>

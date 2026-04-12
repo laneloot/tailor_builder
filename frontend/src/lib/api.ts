@@ -336,6 +336,14 @@ export const adminApi = {
     }),
 };
 
+export const importApi = {
+  fetchGoogleSheetRange: (data: GoogleSheetsRangeRequest) =>
+    apiFetch<GoogleSheetsRangeResponse>('/import', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
 // Profile types
 export interface Contact {
   phone: string;

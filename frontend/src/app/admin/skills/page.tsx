@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { resumeApi } from '@/lib/api';
 
 type SkillType = 'hard' | 'soft';
+type SortOption = 'az' | 'za';
 
 type EditingState = {
   type: SkillType;
@@ -12,12 +13,21 @@ type EditingState = {
 } | null;
 
 const normalize = (value: string) => value.trim().toLowerCase();
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
 export default function SkillsPage() {
   const [techSkills, setTechSkills] = useState<string[]>([]);
   const [softSkills, setSoftSkills] = useState<string[]>([]);
   const [newTech, setNewTech] = useState('');
   const [newSoft, setNewSoft] = useState('');
+  const [techQuery, setTechQuery] = useState('');
+  const [softQuery, setSoftQuery] = useState('');
+  const [techSort, setTechSort] = useState<SortOption>('az');
+  const [softSort, setSoftSort] = useState<SortOption>('az');
+  const [techPage, setTechPage] = useState(1);
+  const [softPage, setSoftPage] = useState(1);
+  const [techPageSize, setTechPageSize] = useState(10);
+  const [softPageSize, setSoftPageSize] = useState(10);
   const [editing, setEditing] = useState<EditingState>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -66,9 +76,11 @@ export default function SkillsPage() {
       if (type === 'hard') {
         setTechSkills((prev) => [...prev, cleaned]);
         setNewTech('');
+        setTechPage(1);
       } else {
         setSoftSkills((prev) => [...prev, cleaned]);
         setNewSoft('');
+        setSoftPage(1);
       }
       setSuccess(`Added "${cleaned}".`);
     } catch (err) {
@@ -117,8 +129,10 @@ export default function SkillsPage() {
       const remove = (items: string[]) => items.filter((item) => item !== skill);
       if (type === 'hard') {
         setTechSkills(remove);
+        setTechPage(1);
       } else {
         setSoftSkills(remove);
+        setSoftPage(1);
       }
       if (editing && editing.original === skill) {
         setEditing(null);
@@ -131,12 +145,102 @@ export default function SkillsPage() {
     }
   };
 
-  const renderList = (type: SkillType, skills: string[]) => (
-    <div className="space-y-3">
-      {skills.length === 0 && (
+  const buildVisibleSkills = (skills: string[], query: string, sort: SortOption) => {
+    const filtered = skills.filter((skill) => normalize(skill).includes(normalize(query)));
+    filtered.sort((left, right) =>
+      sort === 'az'
+        ? left.localeCompare(right, undefined, { sensitivity: 'base' })
+        : right.localeCompare(left, undefined, { sensitivity: 'base' })
+    );
+    return filtered;
+  };
+
+  const techVisibleSkills = buildVisibleSkills(techSkills, techQuery, techSort);
+  const softVisibleSkills = buildVisibleSkills(softSkills, softQuery, softSort);
+  const techTotalPages = Math.max(1, Math.ceil(techVisibleSkills.length / techPageSize));
+  const softTotalPages = Math.max(1, Math.ceil(softVisibleSkills.length / softPageSize));
+  const safeTechPage = Math.min(techPage, techTotalPages);
+  const safeSoftPage = Math.min(softPage, softTotalPages);
+  const techPageItems = techVisibleSkills.slice((safeTechPage - 1) * techPageSize, safeTechPage * techPageSize);
+  const softPageItems = softVisibleSkills.slice((safeSoftPage - 1) * softPageSize, safeSoftPage * softPageSize);
+
+  const renderList = (
+    type: SkillType,
+    allSkills: string[],
+    visibleSkills: string[],
+    pageItems: string[],
+    query: string,
+    sort: SortOption,
+    page: number,
+    totalPages: number,
+    pageSize: number
+  ) => (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px_120px]">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => {
+            if (type === 'hard') {
+              setTechQuery(e.target.value);
+              setTechPage(1);
+            } else {
+              setSoftQuery(e.target.value);
+              setSoftPage(1);
+            }
+          }}
+          placeholder="Filter skills"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+        />
+        <select
+          value={sort}
+          onChange={(e) => {
+            const nextSort = e.target.value as SortOption;
+            if (type === 'hard') {
+              setTechSort(nextSort);
+              setTechPage(1);
+            } else {
+              setSoftSort(nextSort);
+              setSoftPage(1);
+            }
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+        >
+          <option value="az">Sort: A to Z</option>
+          <option value="za">Sort: Z to A</option>
+        </select>
+        <select
+          value={String(pageSize)}
+          onChange={(e) => {
+            const nextPageSize = Number(e.target.value);
+            if (type === 'hard') {
+              setTechPageSize(nextPageSize);
+              setTechPage(1);
+            } else {
+              setSoftPageSize(nextPageSize);
+              setSoftPage(1);
+            }
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+        >
+          {PAGE_SIZE_OPTIONS.map((option) => (
+            <option key={`${type}-page-size-${option}`} value={option}>
+              {option}/page
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <span>{visibleSkills.length} matching skills</span>
+        <span>{allSkills.length} total</span>
+      </div>
+
+      {visibleSkills.length === 0 && (
         <div className="text-sm text-gray-500">No skills yet.</div>
       )}
-      {skills.map((skill) => {
+
+      {pageItems.map((skill) => {
         const isEditing = editing?.type === type && editing?.original === skill;
         return (
           <div key={`${type}-${skill}`} className="flex items-center gap-2">
@@ -192,13 +296,45 @@ export default function SkillsPage() {
           </div>
         );
       })}
+
+      {visibleSkills.length > 0 && (
+        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+          <div className="text-xs text-gray-500">
+            Page {page} of {totalPages}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (type === 'hard') setTechPage((current) => Math.max(1, current - 1));
+                else setSoftPage((current) => Math.max(1, current - 1));
+              }}
+              disabled={page <= 1}
+              className="px-3 py-1.5 text-xs bg-white text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (type === 'hard') setTechPage((current) => Math.min(totalPages, current + 1));
+                else setSoftPage((current) => Math.min(totalPages, current + 1));
+              }}
+              disabled={page >= totalPages}
+              className="px-3 py-1.5 text-xs bg-white text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Skills Library</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Skill Library</h1>
         <button
           type="button"
           onClick={loadSkills}
@@ -244,7 +380,7 @@ export default function SkillsPage() {
                 Add
               </button>
             </div>
-            {renderList('hard', techSkills)}
+            {renderList('hard', techSkills, techVisibleSkills, techPageItems, techQuery, techSort, safeTechPage, techTotalPages, techPageSize)}
           </section>
 
           <section className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
@@ -268,7 +404,7 @@ export default function SkillsPage() {
                 Add
               </button>
             </div>
-            {renderList('soft', softSkills)}
+            {renderList('soft', softSkills, softVisibleSkills, softPageItems, softQuery, softSort, safeSoftPage, softTotalPages, softPageSize)}
           </section>
         </div>
       )}
