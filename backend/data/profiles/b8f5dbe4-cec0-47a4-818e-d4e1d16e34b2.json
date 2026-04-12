@@ -1,0 +1,88 @@
+{
+  "name": "Justin Young",
+  "title": "Senior Software Engineer",
+  "totalYearsExperience": 6,
+  "preferredTemplate": "dragon-justin",
+  "disabled": false,
+  "contact": {
+    "phone": "(628) 215-0964",
+    "email": "jusyoung1998@gmail.com",
+    "linkedin": "https://linkedin.com/in/justinyoung1998",
+    "github": "",
+    "portfolio": "",
+    "location": "San Francisco, CA"
+  },
+  "summary": "",
+  "experience": [
+    {
+      "title": "Senior Software Engineer",
+      "company": "Samsara",
+      "startDate": "03/2023",
+      "endDate": "Present",
+      "location": "San Francisco, CA",
+      "description": "Design and own backend microservices and lead engineering initiatives for IoT platform serving global fleet management and logistics customers.",
+      "achievements": []
+    },
+    {
+      "title": "Software Engineer P3",
+      "company": "Zillow",
+      "startDate": "05/2022",
+      "endDate": "03/2023",
+      "location": "San Francisco, CA",
+      "description": "Owned development lifecycle of high-traffic listing search features and led technical initiatives for real estate marketplace.",
+      "achievements": []
+    },
+    {
+      "title": "Software Engineer P2",
+      "company": "Zillow",
+      "startDate": "07/2020",
+      "endDate": "05/2022",
+      "location": "San Francisco Bay Area, CA",
+      "description": "Developed and maintained front-end and backend services for property search and mortgage workflows.",
+      "achievements": []
+    },
+    {
+      "title": "Software Engineering Intern",
+      "company": "Trulia",
+      "startDate": "05/2019",
+      "endDate": "08/2019",
+      "location": "San Francisco Bay Area, CA",
+      "description": "Developed new apartment listings filtering features and improved code coverage for search module.",
+      "achievements": []
+    },
+    {
+      "title": "Software Development Contractor",
+      "company": "Vokal",
+      "startDate": "06/2018",
+      "endDate": "08/2018",
+      "location": "Greater Chicago Area, IL",
+      "description": "Delivered client-facing web features and collaborated with designers and project managers at a digital product agency.",
+      "achievements": []
+    },
+    {
+      "title": "Software Engineering Intern",
+      "company": "Chamberlain Group",
+      "startDate": "05/2018",
+      "endDate": "07/2018",
+      "location": "Chicago, IL",
+      "description": "",
+      "achievements": []
+    }
+  ],
+  "strengths": [],
+  "skills": [],
+  "education": [
+    {
+      "degree": "Bachelor of Science, Computer Engineering",
+      "institution": "University of Illinois Urbana-Champaign",
+      "startDate": "08/2016",
+      "endDate": "05/2020",
+      "location": "",
+      "gpa": ""
+    }
+  ],
+  "certifications": [],
+  "id": "b8f5dbe4-cec0-47a4-818e-d4e1d16e34b2",
+  "createdAt": "2026-02-22T23:52:34.236Z",
+  "updatedAt": "2026-03-24T15:19:44.585Z"
+}

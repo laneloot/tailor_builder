@@ -1,0 +1,17 @@
+You are an expert cover letter writer. Write a professional cover letter BODY for the following candidate applying to a job.
+
+PROFILE:
+[[profileJson]]
+
+APPLICATION:
+- Company: [[companyName]]
+- Role: [[role]]
+
+INSTRUCTIONS:
+- Write 2-4 short paragraphs expressing interest in the role and company
+- Connect the candidate's experience and skills to the role
+- Mention 1-2 specific relevant achievements
+- Keep tone professional, concise, and confident
+- Do NOT include "Dear Hiring Manager", "Best regards", or any salutation/sign-off - ONLY the body paragraphs
+
+Return ONLY the cover letter body text, no JSON or other formatting.

@@ -1,0 +1,96 @@
+{
+  "name": "Tirath Shah",
+  "title": "Senior Software Engineer",
+  "totalYearsExperience": 13,
+  "preferredTemplate": "two-column-john",
+  "disabled": true,
+  "contact": {
+    "phone": "(510) 397-8594",
+    "email": "tirathshah27@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/tirath/",
+    "github": "",
+    "portfolio": "",
+    "location": "San Francisco, CA"
+  },
+  "summary": "",
+  "experience": [
+    {
+      "title": "Senior Software Engineer",
+      "company": "Roku Inc.",
+      "startDate": "11/2021",
+      "endDate": "Present",
+      "location": "San Francisco Bay Area",
+      "description": "Licensing, Audio, Operating System for TV, Streaming Players and Smart TVs, Smart Home, Streaming Platform, Content Distribution, OTT Advertising, Advertising, Home Entertainment, Streaming Media, and Original Programming",
+      "achievements": []
+    },
+    {
+      "title": "Senior Software Engineer",
+      "company": "PlayStation",
+      "startDate": "11/2019",
+      "endDate": "10/2021",
+      "location": "San Francisco, CA",
+      "description": "Sony Interactive Entertainment, the company behind PlayStation, pushes the boundaries of entertainment and innovation, starting from the launch of the original PlayStation in Japan in 1994. Today, we continue to deliver innovative and thrilling experiences to a global audience through our PlayStation line of products and services that include generation-defining hardware, pioneering network services, and award-winning games.",
+      "achievements": []
+    },
+    {
+      "title": "Software Engineer II",
+      "company": "PlayStation",
+      "startDate": "01/2016",
+      "endDate": "11/2019",
+      "location": "San Francisco, CA",
+      "description": "Sony Interactive Entertainment, the company behind PlayStation, pushes the boundaries of entertainment and innovation, starting from the launch of the original PlayStation in Japan in 1994. Today, we continue to deliver innovative and thrilling experiences to a global audience through our PlayStation line of products and services that include generation-defining hardware, pioneering network services, and award-winning games.",
+      "achievements": []
+    },
+    {
+      "title": "Front End Engineer",
+      "company": "Gap Inc.",
+      "startDate": "02/2015",
+      "endDate": "01/2016",
+      "location": "San Francisco Bay Area",
+      "description": "Fashion & Apparel, IT/E-Commerce, Retail, Supply Chain, Inventory Management, and Design & Merchandising",
+      "achievements": []
+    },
+    {
+      "title": "Application Engineer",
+      "company": "PayPal",
+      "startDate": "05/2014",
+      "endDate": "01/2015",
+      "location": "San Francisco Bay Area",
+      "description": "Online Payments, Mobile Commerce, Payment Security, Money Transfers, Payment Processing, Monetization for Developers, and E-commerce",
+      "achievements": []
+    },
+    {
+      "title": "Network Engineer",
+      "company": "Pioneer Investcorp",
+      "startDate": "07/2011",
+      "endDate": "06/2012",
+      "location": "Mumbai Metropolitan Region",
+      "description": "Pioneer Investcorp (PINC) is one of India’s leading investment Bankers and Institutional Brokers. PINC over the last two decades have developed expertise in its research and investment strategies.",
+      "achievements": []
+    }
+  ],
+  "strengths": [],
+  "skills": [],
+  "education": [
+    {
+      "degree": "Master's Degree",
+      "institution": "University of Pittsburgh",
+      "startDate": "2012",
+      "endDate": "2013",
+      "location": "",
+      "gpa": ""
+    },
+    {
+      "degree": "Bachelor's Degree",
+      "institution": "K. J. Somaiya Institute of Technology",
+      "startDate": "2007",
+      "endDate": "2011",
+      "location": "",
+      "gpa": ""
+    }
+  ],
+  "certifications": [],
+  "id": "3d8357ee-b106-48fd-a556-2d2a11f68f56",
+  "createdAt": "2026-04-01T15:29:04.101Z",
+  "updatedAt": "2026-04-09T13:49:46.644Z"
+}

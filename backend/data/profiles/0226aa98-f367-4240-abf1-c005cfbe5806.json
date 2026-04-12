@@ -1,0 +1,69 @@
+{
+  "name": "Liang Rao",
+  "title": "Senior Software Engineer",
+  "totalYearsExperience": 8,
+  "preferredTemplate": "m/one-column-clean",
+  "disabled": false,
+  "contact": {
+    "phone": "(202) 656-8065",
+    "email": "liang.rao00i@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/liang-rao/",
+    "github": "",
+    "portfolio": "",
+    "location": "Jersey City, NJ"
+  },
+  "summary": "",
+  "experience": [
+    {
+      "title": "Senior Software Engineer",
+      "company": "Robinhood",
+      "startDate": "11/2021",
+      "endDate": "Present",
+      "location": "Jersey City, NJ",
+      "description": "",
+      "achievements": []
+    },
+    {
+      "title": "Software Engineer",
+      "company": "Bloomberg LP",
+      "startDate": "08/2018",
+      "endDate": "11/2021",
+      "location": "Jersey City, NJ",
+      "description": "",
+      "achievements": []
+    },
+    {
+      "title": "Software Engineer Internship",
+      "company": "HC International, Inc",
+      "startDate": "07/2016",
+      "endDate": "12/2016",
+      "location": "Beijing, China",
+      "description": "",
+      "achievements": []
+    }
+  ],
+  "strengths": [],
+  "skills": [],
+  "education": [
+    {
+      "degree": "Mater's degree in Electronic and Computer Engineering",
+      "institution": "Carnegie Mellon University",
+      "startDate": "2016",
+      "endDate": "2018",
+      "location": "",
+      "gpa": ""
+    },
+    {
+      "degree": "Bachelor's degree in Electronic Engineering",
+      "institution": "Chongqing University",
+      "startDate": "2012",
+      "endDate": "2016",
+      "location": "",
+      "gpa": ""
+    }
+  ],
+  "certifications": [],
+  "id": "0226aa98-f367-4240-abf1-c005cfbe5806",
+  "createdAt": "2026-04-01T13:58:46.644Z",
+  "updatedAt": "2026-04-10T00:33:41.726Z"
+}

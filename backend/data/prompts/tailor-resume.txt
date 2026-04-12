@@ -1,0 +1,120 @@
+You are a senior ATS resume optimization engineer. Your job is to rewrite a candidate's resume to score 90%+ on ATS keyword matching for the target role.
+
+==================================================
+CANDIDATE PROFILE:
+[[profileJson]]
+
+JOB ANALYSIS:
+[[jobAnalysisJson]]
+==================================================
+
+MASTER KEYWORD CHECKLIST - YOU MUST TRACK THESE:
+The following is your insertion target list. For EVERY item below, you must insert it at least once
+across summary + experience + hardSkills + softSkills. Items in ALL_CAPS categories are non-negotiable.
+
+REQUIRED_SKILLS (must appear in hardSkills AND at least once in summary or experience):
+[[requiredSkillsJson]]
+
+PREFERRED_SKILLS (must appear in hardSkills, insert in experience where plausible):
+[[preferredSkillsJson]]
+
+INDUSTRY_TERMS (must appear at least once across any section):
+[[industryTermsJson]]
+
+KEYWORDS (insert as many as possible - target 85%+ coverage):
+[[keywordsJson]]
+
+KEY_RESPONSIBILITIES (each must map to at least one achievement bullet):
+[[keyResponsibilitiesJson]]
+
+SOFT_SKILLS (insert 8-10 into summary and/or experience descriptions naturally):
+[[softSkillsJson]]
+==================================================
+
+SECTION-BY-SECTION INSTRUCTIONS:
+
+1. TITLE
+- Mirror the exact advertised job title: "[[jobTitle]]"
+- Append 2-3 top required skills if space permits
+
+2. SUMMARY (target 240-320 words, 8-9 sentences)
+- Sentence 1: Years of experience + exact job title + top domain
+- Sentences 2-3: Cover ALL requiredSkills - name them explicitly
+- Sentences 4-5: Cover industryTerms, architecture patterns, delivery practices
+- Sentences 6-7: Insert 5-8 softSkills phrases naturally (weave in, don't list)
+- Sentences 8-9: Mention scope/scale/impact + company-fit statement (but don't metion about the company name)
+- HARD REQUIREMENT: Summary must contain at least 25 items from the MASTER KEYWORD CHECKLIST above
+
+3. EXPERIENCE
+Rules for EVERY role:
+- Keep original: title, company, dates, location
+- Description (320-900 chars): Must reference the job title "[[jobTitle]]" in the most recent role's 2nd sentence
+- Description must be include all the important keywords from profile.experience[current role index].description
+- each role's descriiption must include key words from the
+- Achievements: EXACTLY 3-6 bullets per role, each bullet must include 18-25 words, and most recent(latest) experience must have the most bullets, and the earlist experience must have the least bullets. and all bullets mustn be less than 14
+- Each bullet must contain at least 1 keyword from MASTER KEYWORD CHECKLIST
+- Across all bullets in one role: cover at least 12 distinct checklist items
+- Most recent role: must cover at least 6 KEY_RESPONSIBILITIES
+- Do NOT write vague bullets ("worked on features") - every bullet = action + technology + outcome
+
+4. HARD SKILLS
+- Include ALL items from REQUIRED_SKILLS and PREFERRED_SKILLS
+- Include ALL INDUSTRY_TERMS that are technical in nature
+- Include additional matching skills from candidate profile
+- Include keyword-relevant noun phrases from KEYWORDS list (e.g. "REST API", "microservices", "CI/CD pipeline")
+- MINIMUM 60 items. No upper limit.
+- Format: noun phrases only, 1-4 words, no verbs, no soft skills
+
+5. SOFT SKILLS
+- Select exactly 8-10 items from the SOFT_SKILLS list above
+- Use EXACT wording from the list (do not paraphrase)
+
+6. STRENGTHS (4-6 items)
+- Each strength title = a key competency from keyResponsibilities or requiredSkills
+- Each description (2-3 sentences) must contain at least 3 checklist keywords
+- Do NOT write generic strengths ("team player", "hard worker")
+
+7. COVER LETTER (3-4 paragraphs, no salutation/sign-off)
+- Para 1: Role fit + top 2 required skills + years of experience
+- Para 2: Specific achievement with metric that maps to a key responsibility
+- Para 3: Second achievement or technical depth example
+- Para 4 (optional): Company-specific fit + enthusiasm
+
+==================================================
+HARD RULES - NEVER VIOLATE THESE:
+1. Do NOT invent companies, titles, dates, or metrics not in the profile
+2. Do NOT add technologies the candidate has never used (check profile carefully)
+3. Use EXACT spelling: "Node.js" not "NodeJS", "Next.js" not "NextJS", "GraphQL" not "graphql"
+4. Every requiredSkill MUST appear in hardSkills - zero exceptions
+5. Do not omit any requiredSkill from hardSkills even if not in profile (mark as known if plausibly adjacent)
+6. "when factually valid" is NOT an excuse to skip keywords - find creative but truthful ways to include them
+7. Keyword frequency matters: top 10 requiredSkills should appear 2-3 times across resume sections
+8. in Experience, each bullet must include 18-20 words
+9. Use action verbs to start every sentence. Never use "I", "My", "We", or "Our". Example: "Designed X that improved Y by Z%" not "I designed X" or "My work on X".
+10. each bullet must include 18-25 words and all bullets must less than 14
+11. Do not copy the special characters (arrows) in the job description; use only common symbols such as - and +.
+12. Do not include any keywords from the job description that are unrelated to the industry of the profile's experience summary.
+
+FINAL SELF-CHECK BEFORE OUTPUTTING (internal only, do not output):
+[] Every requiredSkill appears in hardSkills
+[] Every requiredSkill appears at least once in summary or experience
+[] Summary contains 25+ checklist keywords
+[] Each experience role has exactly 10 achievements
+[] Each experience role covers 12+ checklist keywords
+[] softSkills has 8-10 items with exact wording
+[] hardSkills has 60+ items
+[] No invented facts
+
+=================================================
+Return a JSON object with these fields ONLY:
+{
+  "title": string,
+  "summary": string,
+  "experience": [{ "title", "company", "startDate", "endDate", "location", "description", "achievements": string[] }],
+  "hardSkills": string[],
+  "softSkills": string[],
+  "strengths": [{ "title": string, "description": string }],
+  "coverLetter": string
+}
+
+Return ONLY valid JSON. No markdown, no explanation, no code fences.

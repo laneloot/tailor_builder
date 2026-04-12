@@ -1,0 +1,70 @@
+{
+  "name": "William Cheng",
+  "title": "Senior Software Engineer",
+  "totalYearsExperience": 12,
+  "preferredTemplate": "80cdb0e1-7456-4b75-8342-7da7964037aa",
+  "disabled": false,
+  "contact": {
+    "phone": "‪(813) 492-5329‬",
+    "email": "william.cheng2540@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/william-cheng-8abb82b1/",
+    "github": "",
+    "portfolio": "",
+    "location": "New York, NY"
+  },
+  "summary": "",
+  "experience": [
+    {
+      "title": "Senior Software Engineer",
+      "company": "Squarespace",
+      "startDate": "10/2021",
+      "endDate": "Present",
+      "location": "New York, NY",
+      "description": "online publishing, web design, cms, and developer tools",
+      "achievements": []
+    },
+    {
+      "title": "Software Engineer",
+      "company": "LoanStreet Inc.",
+      "startDate": "06/2018",
+      "endDate": "10/2021",
+      "location": "New York, NY",
+      "description": "Loan Syndication, Financial Services, Loan Participation, SaaS, Loan Analytics, Commercial Servicing, Loan Agency, Loan Management, and Reporting",
+      "achievements": []
+    },
+    {
+      "title": "Software Developer",
+      "company": "TrinSoft, LLC",
+      "startDate": "06/2016",
+      "endDate": "02/2018",
+      "location": "Lexington, KY",
+      "description": "Microsoft Dynamics, Microsoft Dynamics NAV, Document Management, Workflow Automation, Microsoft Dynamics GP, Navision, ECM, Micrososft SQL Server, Microsoft Dynamics ERP, Great Plains, ERP, ERP Software, IT Services, Microsoft Power BI, Business Process Automation, and AP Automation",
+      "achievements": []
+    },
+    {
+      "title": "Software Developer",
+      "company": "TriTech Software Systems",
+      "startDate": "08/2013",
+      "endDate": "05/2016",
+      "location": "Lake Mary, Florida",
+      "description": "Public Safety, Computer Software, Business Intelligence, CAD, Mobile Data Communicatoins, Records Management System, Computer Aided Dispatching, Billing, Patient Care Reporting, Jail Management, Analytics and Dashboards, 911, and Saas",
+      "achievements": []
+    }
+  ],
+  "strengths": [],
+  "skills": [],
+  "education": [
+    {
+      "degree": "Bachelor of Science, Computer Science",
+      "institution": "Stony Broook University",
+      "startDate": "2009",
+      "endDate": "2014",
+      "location": "Stony Brook, NY",
+      "gpa": ""
+    }
+  ],
+  "certifications": [],
+  "id": "d7b63cbc-cdc9-45db-9b96-b723407415a4",
+  "createdAt": "2026-04-05T15:50:58.021Z",
+  "updatedAt": "2026-04-05T15:51:43.915Z"
+}

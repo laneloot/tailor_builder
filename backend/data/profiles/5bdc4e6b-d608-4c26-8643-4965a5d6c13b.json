@@ -1,0 +1,82 @@
+{
+  "name": "Kevin Low",
+  "title": "Senior Software Engineer",
+  "totalYearsExperience": 8,
+  "preferredTemplate": "two-column-kevin-dragon",
+  "disabled": false,
+  "contact": {
+    "phone": "(628) 236-4311",
+    "email": "kxlow.co@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/kxlow/",
+    "github": "",
+    "portfolio": "",
+    "location": "San Lorenzo, CA"
+  },
+  "summary": "",
+  "experience": [
+    {
+      "title": "Senior Software Engineer",
+      "company": "Atlassian",
+      "startDate": "04/2025",
+      "endDate": "Present",
+      "location": "San Francisco, CA, USA",
+      "description": "Lead engineer working on Jira Software's core issue-tracking engine and modernization of backend services to Kotlin-based microservices on AWS.",
+      "achievements": []
+    },
+    {
+      "title": "Software Engineer II",
+      "company": "Atlassian",
+      "startDate": "04/2022",
+      "endDate": "03/2025",
+      "location": "San Francisco, CA, USA",
+      "description": "Contributed to collaboration features in Confluence, build pipeline optimizations in Bitbucket, and marketplace apps across the Atlassian ecosystem.",
+      "achievements": []
+    },
+    {
+      "title": "Software Engineer III",
+      "company": "IPSY (BFA Industries)",
+      "startDate": "01/2018",
+      "endDate": "03/2022",
+      "location": "San Mateo, CA",
+      "description": "Contributed to build subscription, personalization, and e-commerce systems for IPSY, the world's largest beauty subscription platform.",
+      "achievements": []
+    }
+  ],
+  "strengths": [
+    {
+      "title": "",
+      "description": ""
+    },
+    {
+      "title": "",
+      "description": ""
+    },
+    {
+      "title": "",
+      "description": ""
+    }
+  ],
+  "skills": [],
+  "education": [
+    {
+      "degree": "Bachelor of Science in Computer Science",
+      "institution": "University of California, Davis",
+      "startDate": "2015",
+      "endDate": "2017",
+      "location": "Davis, CA",
+      "gpa": ""
+    },
+    {
+      "degree": "Computer Science (Undergraduate Studies)",
+      "institution": "Chabot College",
+      "startDate": "2012",
+      "endDate": "2015",
+      "location": "Hayward, CA",
+      "gpa": ""
+    }
+  ],
+  "certifications": [],
+  "id": "5bdc4e6b-d608-4c26-8643-4965a5d6c13b",
+  "createdAt": "2026-03-02T00:17:24.419Z",
+  "updatedAt": "2026-04-06T03:38:47.398Z"
+}

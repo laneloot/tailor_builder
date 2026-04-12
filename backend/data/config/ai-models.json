@@ -1,0 +1,41 @@
+{
+  "openaiEnabled": true,
+  "claudeEnabled": true,
+  "openrouterEnabled": true,
+  "defaultMode": "generate",
+  "defaultTheme": "dark",
+  "defaultResumeSelection": "single",
+  "defaultGroupId": "",
+  "defaultProfileId": "09e26808-9d00-484a-bd9c-494996751679",
+  "defaultResumeDocxEnabled": false,
+  "defaultCoverLetterDocxEnabled": false,
+  "outputBaseDir": "/run/user/1000/gvfs/smb-share:server=100.1.11.1,share=free_tailor5",
+  "outputPathTemplate": "/{{date}}/{{profile name}}/{{company name}}",
+  "apiKeys": {
+    "openai": {
+      "activeKeyId": "",
+      "entries": []
+    },
+    "claude": {
+      "activeKeyId": "",
+      "entries": []
+    },
+    "openrouter": {
+      "activeKeyId": "971053c8-0b82-429a-8eca-2ba52e0e1cfa",
+      "entries": [
+        {
+          "id": "971053c8-0b82-429a-8eca-2ba52e0e1cfa",
+          "name": "Primary key",
+          "value": "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",
+          "createdAt": "2026-04-11T14:59:24.303Z"
+        },
+        {
+          "id": "f2f0e5e2-1d91-40f6-800a-f73979704cdf",
+          "name": "sagar_key",
+          "value": "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",
+          "createdAt": "2026-04-12T01:15:12.709Z"
+        }
+      ]
+    }
+  }
+}

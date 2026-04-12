@@ -1,0 +1,61 @@
+Extract structured profile data from this resume text. Be thorough and extract ALL information.
+
+RESUME TEXT:
+[[resumeText]]
+
+Extract and return a JSON object with these EXACT fields:
+{
+  "name": "Full Name",
+  "title": "Professional Title (e.g., Senior Software Engineer)",
+  "contact": {
+    "email": "email@example.com",
+    "phone": "+1234567890",
+    "location": "City, Country",
+    "linkedin": "https://linkedin.com/in/username (or null if not found)"
+  },
+  "summary": "Professional summary paragraph",
+  "experience": [
+    {
+      "title": "Job Title",
+      "company": "Company Name",
+      "startDate": "MM/YYYY",
+      "endDate": "MM/YYYY or Present",
+      "location": "City, Country",
+      "description": "Brief role description",
+      "achievements": ["Achievement 1", "Achievement 2", "..."]
+    }
+  ],
+  "skills": ["Skill1", "Skill2", "..."],
+  "strengths": [
+    {
+      "title": "Strength Name",
+      "description": "Brief description of the strength"
+    }
+  ],
+  "education": [
+    {
+      "degree": "Degree Name (e.g., Bachelor's in Computer Science)",
+      "institution": "University Name",
+      "startDate": "MM/YYYY",
+      "endDate": "MM/YYYY",
+      "location": "City, Country"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "Certification Name",
+      "issuer": "Issuing Organization",
+      "date": "MM/YYYY"
+    }
+  ]
+}
+
+IMPORTANT:
+- Extract ALL experience entries, not just the first one
+- Extract ALL skills mentioned anywhere in the resume
+- Extract ALL achievements/bullet points under each job
+- If a field is not found, use empty string or empty array as appropriate
+- For dates, use MM/YYYY format when possible
+- If strengths section doesn't exist, create 2-3 based on the profile's experience
+
+Return ONLY valid JSON, no other text.
