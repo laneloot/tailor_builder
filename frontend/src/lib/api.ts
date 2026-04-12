@@ -186,6 +186,104 @@ export interface BrowseOutputDirectoryResponse {
   selectedPath: string | null;
 }
 
+export interface GoogleSheetTab {
+  title: string;
+  index: number;
+  sheetId: number;
+}
+
+export interface GoogleSheetColor {
+  red: number;
+  green: number;
+  blue: number;
+  alpha: number;
+}
+
+export interface GoogleSheetBorder {
+  style: string;
+  color: GoogleSheetColor;
+}
+
+export interface GoogleSheetTextFormat {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  strikethrough: boolean;
+  fontSize: number | null;
+  fontFamily: string | null;
+  foregroundColor: GoogleSheetColor | null;
+}
+
+export interface GoogleSheetCellFormat {
+  backgroundColor: GoogleSheetColor | null;
+  textFormat: GoogleSheetTextFormat | null;
+  horizontalAlignment: string | null;
+  verticalAlignment: string | null;
+  wrapStrategy: string | null;
+  borders: {
+    top: GoogleSheetBorder | null;
+    right: GoogleSheetBorder | null;
+    bottom: GoogleSheetBorder | null;
+    left: GoogleSheetBorder | null;
+  };
+}
+
+export interface GoogleSheetCell {
+  value: string;
+  format: GoogleSheetCellFormat | null;
+}
+
+export interface GoogleSheetMergeRange {
+  startRow: number;
+  endRow: number;
+  startCol: number;
+  endCol: number;
+}
+
+export interface GoogleSheetsRangeRequest {
+  sheetId: string;
+  tabName?: string;
+  fromRow?: number;
+  toRow?: number;
+  fromCol?: number;
+  toCol?: number;
+}
+
+export interface GoogleSheetsUpdateRangeRequest extends GoogleSheetsRangeRequest {
+  values: string[][];
+}
+
+export interface GoogleSheetsRangeResponse {
+  spreadsheetId: string;
+  spreadsheetTitle: string;
+  tabs: GoogleSheetTab[];
+  selectedTab?: string;
+  range?: {
+    fromRow: number;
+    toRow: number;
+    fromCol: number;
+    toCol: number;
+    a1Notation: string;
+  };
+  cells?: GoogleSheetCell[][];
+  rowHeights?: number[];
+  columnWidths?: number[];
+  merges?: GoogleSheetMergeRange[];
+  values?: string[][];
+  totalRows?: number;
+  totalColumns?: number;
+}
+
+export interface GoogleSheetsUpdateRangeResponse {
+  spreadsheetId: string;
+  spreadsheetTitle: string;
+  selectedTab: string;
+  updatedRange: string;
+  updatedRows: number;
+  updatedColumns: number;
+  updatedCells: number;
+}
+
 export const adminApi = {
   login: (password: string) =>
     apiFetch<{ token: string; message: string }>('/admin/login', {
@@ -208,6 +306,18 @@ export const adminApi = {
     apiFetch<BrowseOutputDirectoryResponse>('/admin/browse-output-directory', {
       method: 'POST',
       body: JSON.stringify({ currentPath }),
+    }),
+
+  fetchGoogleSheetRange: (data: GoogleSheetsRangeRequest) =>
+    apiFetch<GoogleSheetsRangeResponse>('/admin/google-sheets/range', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateGoogleSheetRange: (data: GoogleSheetsUpdateRangeRequest) =>
+    apiFetch<GoogleSheetsUpdateRangeResponse>('/admin/google-sheets/range', {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
 
   updateSettings: (data: AdminAppSettingsUpdate) =>

@@ -1,2 +1,4 @@
 .env
 generated/
+service-account-key.json
+backend/service-account-key.json

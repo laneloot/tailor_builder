@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const aiModelConfig_1 = require("../services/aiModelConfig");
+const googleSheets_1 = require("../services/googleSheets");
 const nativeDirectoryPicker_1 = require("../services/nativeDirectoryPicker");
 const router = (0, express_1.Router)();
 // Login
@@ -51,6 +52,30 @@ router.post('/browse-output-directory', auth_1.authMiddleware, async (req, res) 
     catch (error) {
         res.status(400).json({
             error: error instanceof Error ? error.message : 'Failed to open native folder picker',
+        });
+    }
+});
+router.post('/google-sheets/range', auth_1.authMiddleware, async (req, res) => {
+    try {
+        const result = await (0, googleSheets_1.fetchGoogleSheetsRange)(req.body ?? {});
+        res.json(result);
+    }
+    catch (error) {
+        const statusCode = error instanceof googleSheets_1.GoogleSheetsRequestError ? error.statusCode : 500;
+        res.status(statusCode).json({
+            error: error instanceof Error ? error.message : 'Failed to fetch Google Sheets data',
+        });
+    }
+});
+router.put('/google-sheets/range', auth_1.authMiddleware, async (req, res) => {
+    try {
+        const result = await (0, googleSheets_1.updateGoogleSheetsRange)(req.body ?? {});
+        res.json(result);
+    }
+    catch (error) {
+        const statusCode = error instanceof googleSheets_1.GoogleSheetsRequestError ? error.statusCode : 500;
+        res.status(statusCode).json({
+            error: error instanceof Error ? error.message : 'Failed to update Google Sheets data',
         });
     }
 });

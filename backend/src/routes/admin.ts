@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { generateToken, validatePassword, invalidateToken, authMiddleware } from '../middleware/auth';
 import { getAdminAppSettings, updateAppSettings } from '../services/aiModelConfig';
+import { fetchGoogleSheetsRange, GoogleSheetsRequestError, updateGoogleSheetsRange } from '../services/googleSheets';
 import { openNativeDirectoryPicker } from '../services/nativeDirectoryPicker';
 
 const router = Router();
@@ -56,6 +57,30 @@ router.post('/browse-output-directory', authMiddleware, async (req: Request, res
   } catch (error) {
     res.status(400).json({
       error: error instanceof Error ? error.message : 'Failed to open native folder picker',
+    });
+  }
+});
+
+router.post('/google-sheets/range', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const result = await fetchGoogleSheetsRange(req.body ?? {});
+    res.json(result);
+  } catch (error) {
+    const statusCode = error instanceof GoogleSheetsRequestError ? error.statusCode : 500;
+    res.status(statusCode).json({
+      error: error instanceof Error ? error.message : 'Failed to fetch Google Sheets data',
+    });
+  }
+});
+
+router.put('/google-sheets/range', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const result = await updateGoogleSheetsRange(req.body ?? {});
+    res.json(result);
+  } catch (error) {
+    const statusCode = error instanceof GoogleSheetsRequestError ? error.statusCode : 500;
+    res.status(statusCode).json({
+      error: error instanceof Error ? error.message : 'Failed to update Google Sheets data',
     });
   }
 });
