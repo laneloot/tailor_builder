@@ -10,6 +10,7 @@ import {
   DefaultResumeSelection,
   Group,
   groupsApi,
+  OutputStorageMode,
   Profile,
   profilesApi,
   ThemeMode,
@@ -41,6 +42,7 @@ type SettingsFormState = {
   defaultProfileId: string;
   defaultResumeDocxEnabled: boolean;
   defaultCoverLetterDocxEnabled: boolean;
+  outputStorageMode: OutputStorageMode;
   outputBaseDir: string;
   outputPathTemplate: string;
   apiKeys: Record<AIProvider, ApiKeyProviderFormState>;
@@ -101,6 +103,7 @@ function toFormState(settings: AdminAppSettings): SettingsFormState {
     defaultProfileId: settings.defaultProfileId,
     defaultResumeDocxEnabled: settings.defaultResumeDocxEnabled,
     defaultCoverLetterDocxEnabled: settings.defaultCoverLetterDocxEnabled,
+    outputStorageMode: settings.outputStorageMode,
     outputBaseDir: settings.outputBaseDir,
     outputPathTemplate: settings.outputPathTemplate,
     apiKeys: toApiKeyFormState(settings.apiKeys),
@@ -115,6 +118,7 @@ function mergeSavedSection(
   if (section === 'output') {
     return {
       ...current,
+      outputStorageMode: updated.outputStorageMode,
       outputBaseDir: updated.outputBaseDir,
       outputPathTemplate: updated.outputPathTemplate,
     };
@@ -260,6 +264,7 @@ export default function AdminSettingsPage() {
     await saveSection(
       'output',
       {
+        outputStorageMode: form.outputStorageMode,
         outputBaseDir: form.outputBaseDir.trim(),
         outputPathTemplate: form.outputPathTemplate.trim(),
       },
@@ -446,13 +451,28 @@ export default function AdminSettingsPage() {
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Output Storage</h2>
             <p className="text-sm text-gray-600">
-              Generated resumes and cover letters are written to this absolute directory. This can be outside the project,
-              including a mounted network drive or shared path available to the backend machine.
+              Choose whether generated resumes use one shared folder or a profile-specific base directory. The folder template is still applied inside the selected base directory.
             </p>
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">Base directory</label>
+            <label className="block text-sm font-medium text-gray-900">Storage mode</label>
+            <select
+              value={form.outputStorageMode}
+              onChange={(e) => setField('outputStorageMode', e.target.value as OutputStorageMode)}
+              disabled={savingSection === 'output'}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="single">Single folder mode</option>
+              <option value="multi">Multi-folder mode</option>
+            </select>
+            <p className="text-xs text-gray-500">
+              Single folder mode uses the shared base directory below. Multi-folder mode uses each profile&apos;s own output directory instead.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-900">Shared base directory</label>
             <div className="flex flex-col gap-3 sm:flex-row">
               <input
                 type="text"
@@ -472,7 +492,7 @@ export default function AdminSettingsPage() {
               </button>
             </div>
             <p className="text-xs text-gray-500">
-              Browse opens the folder picker on the backend machine, so mounted shared drives and network folders are selectable if that machine can access them. You can still paste an absolute path manually if needed.
+              Used when single folder mode is active. Browse opens the folder picker on the backend machine, so mounted shared drives and network folders are selectable if that machine can access them.
             </p>
           </div>
 

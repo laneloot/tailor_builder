@@ -124,6 +124,15 @@ export type AIProvider = 'openai' | 'claude' | 'openrouter';
 export type DefaultMode = 'preview' | 'generate';
 export type ThemeMode = 'light' | 'dark';
 export type DefaultResumeSelection = 'single' | 'all' | 'group';
+export type OutputStorageMode = 'single' | 'multi';
+
+export interface GoogleSheetSource {
+  id: string;
+  name: string;
+  sheetId: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 // Admin API
 export interface PublicAppSettings {
@@ -137,6 +146,9 @@ export interface PublicAppSettings {
   defaultProfileId: string;
   defaultResumeDocxEnabled: boolean;
   defaultCoverLetterDocxEnabled: boolean;
+  outputStorageMode: OutputStorageMode;
+  outputPathUsesJobTitle: boolean;
+  googleSheetsSources: GoogleSheetSource[];
 }
 
 export type AIModelSettings = PublicAppSettings;
@@ -383,6 +395,7 @@ export interface Profile {
   title: string;
   totalYearsExperience?: number;
   preferredTemplate?: string;
+  outputDirectory?: string;
   disabled?: boolean;
   contact: Contact;
   summary: string;
@@ -413,6 +426,7 @@ export interface CreateProfileDTO {
   name?: string;
   title?: string;
   totalYearsExperience?: number;
+  outputDirectory?: string;
   contact?: Partial<Contact>;
   summary?: string;
   experience?: Partial<Experience>[];

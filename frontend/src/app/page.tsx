@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import {
   profilesApi,
   groupsApi,
@@ -13,13 +12,14 @@ import {
   JobAnalysis,
   TailoredContent,
 } from '@/lib/api';
+import AppTopNav from '@/components/AppTopNav';
 import ProfileSelector from '@/components/ProfileSelector';
 import ResumePreview from '@/components/ResumePreview';
 import SheetsImportModal, { ImportedSheetJob } from '@/components/SheetsImportModal';
 import { applyTheme, getStoredTheme, setStoredDefaultTheme } from '@/lib/theme';
 
 type GenerateMode = 'single' | 'multiple';
-type BuilderMode = 'manual' | 'sheets';
+type BuilderMode = 'manual' | 'sheets' | null;
 type SheetsTargetMode = 'single' | 'all' | 'group';
 
 type UnconfirmedSkill = { original: string; value: string };
@@ -36,7 +36,7 @@ type MultiplePreview = {
 export default function Home() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [builderMode, setBuilderMode] = useState<BuilderMode>('manual');
+  const [builderMode, setBuilderMode] = useState<BuilderMode>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [generateMode, setGenerateMode] = useState<GenerateMode>('single');
   const [multipleTarget, setMultipleTarget] = useState<'all' | 'group'>('group');
@@ -44,6 +44,7 @@ export default function Home() {
   const [sheetsTargetMode, setSheetsTargetMode] = useState<SheetsTargetMode>('single');
   const [selectedSheetsProfileId, setSelectedSheetsProfileId] = useState<string | null>(null);
   const [selectedSheetsGroupId, setSelectedSheetsGroupId] = useState<string>('');
+  const [selectedSheetsSourceId, setSelectedSheetsSourceId] = useState<string>('');
   const [companyName, setCompanyName] = useState('');
   const [role, setRole] = useState('');
   const [jobDescription, setJobDescription] = useState('');
@@ -59,6 +60,9 @@ export default function Home() {
     defaultProfileId: '',
     defaultResumeDocxEnabled: true,
     defaultCoverLetterDocxEnabled: true,
+    outputStorageMode: 'single',
+    outputPathUsesJobTitle: true,
+    googleSheetsSources: [],
   });
   const [jobAnalysis, setJobAnalysis] = useState<JobAnalysis | null>(null);
   const [previewHtml, setPreviewHtml] = useState('');
@@ -125,6 +129,9 @@ export default function Home() {
           defaultProfileId: '',
           defaultResumeDocxEnabled: true,
           defaultCoverLetterDocxEnabled: true,
+          outputStorageMode: 'single' as const,
+          outputPathUsesJobTitle: true,
+          googleSheetsSources: [],
         })),
       ]);
       const enabledProfiles = profilesData.filter((p) => !p.disabled);
@@ -152,6 +159,13 @@ export default function Home() {
         setSelectedProfileId(initialProfileId);
         setSelectedSheetsProfileId(initialProfileId);
       }
+
+      setSelectedSheetsSourceId((current) => {
+        if (current && modelData.googleSheetsSources.some((source) => source.id === current)) {
+          return current;
+        }
+        return modelData.googleSheetsSources[0]?.id ?? '';
+      });
 
       if (modelData.defaultResumeSelection === 'single') {
         setGenerateMode('single');
@@ -188,6 +202,7 @@ export default function Home() {
     format: (modelSettings.defaultResumeDocxEnabled ? 'both' : 'pdf') as 'both' | 'pdf',
     includeCoverLetterDocx: modelSettings.defaultCoverLetterDocxEnabled,
   });
+  const shouldShowRoleInput = modelSettings.outputPathUsesJobTitle;
 
   const getSelectedProfilesForSheetsBuilder = () => {
     if (sheetsTargetMode === 'single') {
@@ -246,12 +261,14 @@ export default function Home() {
     meta: { skippedRows: number }
   ) => {
     const selectedProfiles = getSelectedProfilesForSheetsBuilder();
-    const fallbackRole = role.trim();
+    const fallbackRole = shouldShowRoleInput ? role.trim() : '';
     const normalizedJobs = importedJobs.map((job) => ({
       ...job,
       jobTitle: job.jobTitle.trim() || fallbackRole,
     }));
-    const missingRoleRow = normalizedJobs.find((job) => !job.jobTitle.trim());
+    const missingRoleRow = shouldShowRoleInput
+      ? normalizedJobs.find((job) => !job.jobTitle.trim())
+      : undefined;
     if (missingRoleRow) {
       throw new Error(
         `Row ${missingRoleRow.sourceRowNumber} has no job title. Map a job_title column or fill the Builder Role field as a fallback.`
@@ -294,7 +311,7 @@ export default function Home() {
               jobDescription: trimmedJobDescription,
               jobAnalysis: analysis,
               companyName: job.companyName.trim(),
-              role: job.jobTitle.trim(),
+              role: shouldShowRoleInput ? job.jobTitle.trim() : (job.jobTitle.trim() || analysis?.jobTitle?.trim() || ''),
               model: selectedModel,
               ...getDefaultGenerationOptions(),
             });
@@ -330,7 +347,7 @@ export default function Home() {
       setError('Please enter a company name');
       return;
     }
-    if (!role.trim()) {
+    if (shouldShowRoleInput && !role.trim()) {
       setError('Please enter a role');
       return;
     }
@@ -445,7 +462,7 @@ export default function Home() {
           jobDescription,
           jobAnalysis: analysis,
           companyName: companyName.trim(),
-          role: role.trim(),
+          role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
           model: selectedModel,
           ...getDefaultGenerationOptions(),
         });
@@ -459,7 +476,7 @@ export default function Home() {
             jobDescription,
             jobAnalysis: analysis,
             companyName: companyName.trim(),
-            role: role.trim(),
+            role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
             model: selectedModel,
             profileIds: selectedGroup.profileIds,
             ...getDefaultGenerationOptions(),
@@ -473,7 +490,7 @@ export default function Home() {
             jobDescription,
             jobAnalysis: analysis,
             companyName: companyName.trim(),
-            role: role.trim(),
+            role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
             model: selectedModel,
             ...getDefaultGenerationOptions(),
           });
@@ -822,7 +839,7 @@ export default function Home() {
   };
 
   const handleFinalizeGenerate = async () => {
-    if (!companyName.trim() || !role.trim() || jobDescription.trim().length < 50 || !selectedProfileId) {
+    if (!companyName.trim() || (shouldShowRoleInput && !role.trim()) || jobDescription.trim().length < 50 || !selectedProfileId) {
       setError('Please complete the required fields before generating.');
       return;
     }
@@ -850,7 +867,7 @@ export default function Home() {
         jobAnalysis: analysis,
         tailoredContent: tailoredContent || undefined,
         companyName: companyName.trim(),
-        role: role.trim(),
+        role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
         model: selectedModel,
         ...getDefaultGenerationOptions(),
       });
@@ -942,7 +959,7 @@ export default function Home() {
   };
 
   const handleFinalizeGenerateMultiple = async () => {
-    if (!companyName.trim() || !role.trim() || jobDescription.trim().length < 50) {
+    if (!companyName.trim() || (shouldShowRoleInput && !role.trim()) || jobDescription.trim().length < 50) {
       setError('Please complete the required fields before generating.');
       return;
     }
@@ -989,7 +1006,7 @@ export default function Home() {
             jobAnalysis: analysis,
             tailoredContent: preview.tailoredContent,
             companyName: companyName.trim(),
-            role: role.trim(),
+            role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
             model: selectedModel,
             ...getDefaultGenerationOptions(),
           });
@@ -1011,7 +1028,7 @@ export default function Home() {
           jobDescription,
           jobAnalysis: analysis,
           companyName: companyName.trim(),
-          role: role.trim(),
+          role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
           model: selectedModel,
           profileIds: selectedGroup.profileIds,
           ...getDefaultGenerationOptions(),
@@ -1025,7 +1042,7 @@ export default function Home() {
           jobDescription,
           jobAnalysis: analysis,
           companyName: companyName.trim(),
-          role: role.trim(),
+          role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
           model: selectedModel,
           ...getDefaultGenerationOptions(),
         });
@@ -1137,56 +1154,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-12">
-            <div className="flex items-center space-x-6">
-              <h1 className="text-lg font-bold text-gray-900">
-                Tailored Resume Builder
-              </h1>
-              <nav className="hidden md:flex space-x-2">
-                <Link
-                  href="/admin/profiles"
-                  className="px-2 py-1 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                >
-                  Profiles
-                </Link>
-                <Link
-                  href="/admin/templates"
-                  className="px-2 py-1 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                >
-                  Templates
-                </Link>
-                <Link
-                  href="/admin/groups"
-                  className="px-2 py-1 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                >
-                  Groups
-                </Link>
-                <Link
-                  href="/admin/skills"
-                  className="px-2 py-1 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                >
-                  Skills
-                </Link>
-                <Link
-                  href="/admin/settings"
-                  className="px-2 py-1 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                >
-                  Settings
-                </Link>
-              </nav>
-            </div>
-            <Link
-              href="/admin"
-              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
-            >
-              Admin Panel
-            </Link>
-          </div>
-        </div>
-      </header>
+      <AppTopNav />
 
       {/* Main Content */}
       <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -1207,7 +1175,8 @@ export default function Home() {
           </div>
         )}
 
-        <div className="mb-6 grid gap-4 md:grid-cols-2">
+        {builderMode === null && (
+          <div className="mb-6 grid gap-4 md:grid-cols-2">
           <button
             type="button"
             onClick={() => setBuilderMode('manual')}
@@ -1239,10 +1208,24 @@ export default function Home() {
               Import jobs from Google Sheets, map columns once, then generate every selected profile against every imported row.
             </div>
           </button>
-        </div>
+          </div>
+        )}
 
-        {builderMode === 'manual' ? (
+        {builderMode !== null && (builderMode === 'manual' ? (
           <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setBuilderMode(null);
+                  setIsSheetsImportOpen(false);
+                }}
+                disabled={isGenerating}
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Back
+              </button>
+            </div>
             <button
               onClick={handleGenerate}
               disabled={isGenerating}
@@ -1372,19 +1355,21 @@ export default function Home() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Role <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                disabled={isGenerating}
-                placeholder="Enter job role/title"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            {shouldShowRoleInput && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Role <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  disabled={isGenerating}
+                  placeholder="Enter job role/title"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1454,6 +1439,19 @@ export default function Home() {
           </div>
         ) : (
           <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setBuilderMode(null);
+                  setIsSheetsImportOpen(false);
+                }}
+                disabled={isGenerating}
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Back
+              </button>
+            </div>
             <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
               Import a Google Sheet range where each row is one job. After column mapping, the builder will generate every selected profile against every imported row.
             </div>
@@ -1530,22 +1528,24 @@ export default function Home() {
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Fallback Role
-              </label>
-              <input
-                type="text"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                disabled={isGenerating}
-                placeholder="Optional fallback if a sheet row has no mapped job title"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                Leave this blank if your imported rows already include a mapped job title column.
-              </p>
-            </div>
+            {shouldShowRoleInput && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Fallback Role
+                </label>
+                <input
+                  type="text"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  disabled={isGenerating}
+                  placeholder="Optional fallback if a sheet row has no mapped job title"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  Leave this blank if your imported rows already include a mapped job title column.
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">AI Model</label>
@@ -1563,14 +1563,21 @@ export default function Home() {
 
             <button
               type="button"
-              onClick={() => setIsSheetsImportOpen(true)}
-              disabled={isGenerating}
+              onClick={() => {
+                if (!modelSettings.googleSheetsSources.length) {
+                  setError('Save at least one Google Sheet in the Admin Google Sheets panel before importing.');
+                  return;
+                }
+                setError('');
+                setIsSheetsImportOpen(true);
+              }}
+              disabled={isGenerating || modelSettings.googleSheetsSources.length === 0}
               className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
             >
               {isGenerating ? generationStep || 'Generating...' : 'Import from Google Sheet'}
             </button>
           </div>
-        )}
+        ))}
 
         {builderMode === 'manual' && generateMode === 'multiple' && autoGenerate && unconfirmedPanel && (
           <div className="mt-6">{unconfirmedPanel}</div>
@@ -1733,6 +1740,9 @@ export default function Home() {
       <SheetsImportModal
         isOpen={isSheetsImportOpen}
         isSubmitting={isGenerating}
+        sources={modelSettings.googleSheetsSources}
+        selectedSourceId={selectedSheetsSourceId}
+        onSelectSource={setSelectedSheetsSourceId}
         onClose={() => setIsSheetsImportOpen(false)}
         onConfirm={handleImportJobsFromSheets}
       />

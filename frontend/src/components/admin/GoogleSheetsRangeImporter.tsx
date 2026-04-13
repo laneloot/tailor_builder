@@ -1,8 +1,8 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import { useState } from 'react';
-import { adminApi, GoogleSheetCell, GoogleSheetColor, GoogleSheetMergeRange, GoogleSheetTab, GoogleSheetsRangeResponse } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { adminApi, GoogleSheetCell, GoogleSheetColor, GoogleSheetMergeRange, GoogleSheetSource, GoogleSheetTab, GoogleSheetsRangeResponse } from '@/lib/api';
 
 type SheetsImportFormState = {
   sheetId: string;
@@ -19,6 +19,11 @@ type SheetsLookupState = {
   tabs: GoogleSheetTab[];
 };
 
+type SavedSheetFormState = {
+  name: string;
+  sheetId: string;
+};
+
 const DEFAULT_SHEETS_IMPORT_FORM: SheetsImportFormState = {
   sheetId: '',
   tabName: '',
@@ -26,6 +31,11 @@ const DEFAULT_SHEETS_IMPORT_FORM: SheetsImportFormState = {
   toRow: '10',
   fromCol: 'A',
   toCol: 'E',
+};
+
+const DEFAULT_SAVED_SHEET_FORM: SavedSheetFormState = {
+  name: '',
+  sheetId: '',
 };
 
 function parsePositiveWholeNumber(label: string, value: string): number {
@@ -151,14 +161,25 @@ export default function GoogleSheetsRangeImporter() {
   const [sheetsResult, setSheetsResult] = useState<GoogleSheetsRangeResponse | null>(null);
   const [editableValues, setEditableValues] = useState<string[][]>([]);
   const [originalValues, setOriginalValues] = useState<string[][]>([]);
+  const [savedSources, setSavedSources] = useState<GoogleSheetSource[]>([]);
+  const [selectedSavedSourceId, setSelectedSavedSourceId] = useState('');
+  const [savedSheetForm, setSavedSheetForm] = useState<SavedSheetFormState>(DEFAULT_SAVED_SHEET_FORM);
+  const [editingSavedSourceId, setEditingSavedSourceId] = useState('');
   const [sheetsError, setSheetsError] = useState('');
   const [sheetsSuccess, setSheetsSuccess] = useState('');
+  const [isLoadingSavedSources, setIsLoadingSavedSources] = useState(true);
+  const [isSavingSavedSource, setIsSavingSavedSource] = useState(false);
   const [isLoadingSheetTabs, setIsLoadingSheetTabs] = useState(false);
   const [isImportingSheetRange, setIsImportingSheetRange] = useState(false);
   const [isSavingSheetRange, setIsSavingSheetRange] = useState(false);
 
   const setSheetsField = <K extends keyof SheetsImportFormState>(field: K, value: SheetsImportFormState[K]) => {
     setSheetsForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const resetSavedSheetForm = () => {
+    setSavedSheetForm(DEFAULT_SAVED_SHEET_FORM);
+    setEditingSavedSourceId('');
   };
 
   const applySheetsLookup = (response: GoogleSheetsRangeResponse) => {
@@ -177,7 +198,7 @@ export default function GoogleSheetsRangeImporter() {
     setOriginalValues(nextValues);
   };
 
-  const handleSheetIdChange = (value: string) => {
+  const handleSheetIdChange = useCallback((value: string) => {
     setSheetsForm((current) => ({
       ...current,
       sheetId: value,
@@ -189,6 +210,140 @@ export default function GoogleSheetsRangeImporter() {
     setOriginalValues([]);
     setSheetsError('');
     setSheetsSuccess('');
+  }, []);
+
+  useEffect(() => {
+    const loadSavedSources = async () => {
+      try {
+        setIsLoadingSavedSources(true);
+        const settings = await adminApi.getSettings();
+        const nextSources = settings.googleSheetsSources ?? [];
+        setSavedSources(nextSources);
+        const initialSourceId = nextSources[0]?.id ?? '';
+        setSelectedSavedSourceId(initialSourceId);
+        handleSheetIdChange(nextSources[0]?.sheetId ?? '');
+      } catch (err) {
+        setSheetsError(err instanceof Error ? err.message : 'Failed to load saved Google Sheets');
+      } finally {
+        setIsLoadingSavedSources(false);
+      }
+    };
+
+    loadSavedSources();
+  }, [handleSheetIdChange]);
+
+  useEffect(() => {
+    const selectedSource = savedSources.find((source) => source.id === selectedSavedSourceId);
+    handleSheetIdChange(selectedSource?.sheetId ?? '');
+  }, [handleSheetIdChange, selectedSavedSourceId, savedSources]);
+
+  const persistSavedSources = async (nextSources: GoogleSheetSource[], successMessage: string, preferredSourceId?: string) => {
+    const response = await adminApi.updateSettings({ googleSheetsSources: nextSources });
+    const storedSources = response.googleSheetsSources ?? [];
+    setSavedSources(storedSources);
+    const resolvedSourceId =
+      (preferredSourceId && storedSources.some((source) => source.id === preferredSourceId) ? preferredSourceId : '') ||
+      storedSources[0]?.id ||
+      '';
+    setSelectedSavedSourceId(resolvedSourceId);
+    resetSavedSheetForm();
+    setSheetsSuccess(successMessage);
+    setSheetsError('');
+  };
+
+  const handleSaveSavedSource = async () => {
+    const name = savedSheetForm.name.trim();
+    const sheetId = savedSheetForm.sheetId.trim();
+
+    if (!name) {
+      setSheetsError('Saved sheet name is required.');
+      return;
+    }
+    if (!sheetId) {
+      setSheetsError('Google Sheet ID is required.');
+      return;
+    }
+
+    const duplicateName = savedSources.some(
+      (source) => source.id !== editingSavedSourceId && source.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (duplicateName) {
+      setSheetsError('A saved Google Sheet with that name already exists.');
+      return;
+    }
+
+    const duplicateSheetId = savedSources.some(
+      (source) => source.id !== editingSavedSourceId && source.sheetId.trim() === sheetId
+    );
+    if (duplicateSheetId) {
+      setSheetsError('That Google Sheet ID is already saved.');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const existing = savedSources.find((source) => source.id === editingSavedSourceId);
+    const nextSource: GoogleSheetSource = existing
+      ? {
+          ...existing,
+          name,
+          sheetId,
+          updatedAt: now,
+        }
+      : {
+          id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `sheet-${Date.now()}`,
+          name,
+          sheetId,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+    const nextSources = existing
+      ? savedSources.map((source) => (source.id === existing.id ? nextSource : source))
+      : [...savedSources, nextSource];
+
+    try {
+      setIsSavingSavedSource(true);
+      await persistSavedSources(
+        nextSources,
+        existing ? `Updated "${name}".` : `Saved "${name}".`,
+        nextSource.id
+      );
+    } catch (err) {
+      setSheetsError(err instanceof Error ? err.message : 'Failed to save Google Sheet');
+    } finally {
+      setIsSavingSavedSource(false);
+    }
+  };
+
+  const handleEditSavedSource = (source: GoogleSheetSource) => {
+    setEditingSavedSourceId(source.id);
+    setSavedSheetForm({
+      name: source.name,
+      sheetId: source.sheetId,
+    });
+    setSheetsError('');
+    setSheetsSuccess('');
+  };
+
+  const handleDeleteSavedSource = async (source: GoogleSheetSource) => {
+    if (!window.confirm(`Delete saved Google Sheet "${source.name}"?`)) {
+      return;
+    }
+
+    const nextSources = savedSources.filter((item) => item.id !== source.id);
+    const preferredSourceId =
+      selectedSavedSourceId === source.id
+        ? nextSources[0]?.id
+        : selectedSavedSourceId;
+
+    try {
+      setIsSavingSavedSource(true);
+      await persistSavedSources(nextSources, `Deleted "${source.name}".`, preferredSourceId);
+    } catch (err) {
+      setSheetsError(err instanceof Error ? err.message : 'Failed to delete Google Sheet');
+    } finally {
+      setIsSavingSavedSource(false);
+    }
   };
 
   const handleLoadSheetTabs = async () => {
@@ -331,8 +486,119 @@ export default function GoogleSheetsRangeImporter() {
       <div>
         <h2 className="text-lg font-semibold text-gray-900">Google Sheets Range Importer</h2>
         <p className="text-sm text-gray-600">
-          Load spreadsheet tabs by Sheet ID, then import a numeric row range and spreadsheet-letter column range through the backend service account.
+          Save named Google Sheet IDs here, then load tabs and import a numeric row range with spreadsheet-letter column bounds.
         </p>
+      </div>
+
+      <div className="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Saved Google Sheets</h3>
+            <p className="text-sm text-gray-600">Manage reusable spreadsheet IDs for the admin importer and builder.</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+          <div className="space-y-3">
+            {isLoadingSavedSources ? (
+              <div className="rounded-md border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+                Loading saved Google Sheets...
+              </div>
+            ) : savedSources.length === 0 ? (
+              <div className="rounded-md border border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-gray-500">
+                No saved Google Sheets yet.
+              </div>
+            ) : (
+              savedSources.map((source) => (
+                <div
+                  key={source.id}
+                  className={`rounded-lg border px-4 py-3 ${
+                    source.id === selectedSavedSourceId ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSavedSourceId(source.id)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <div className="font-medium text-gray-900">{source.name}</div>
+                      <div className="mt-1 break-all text-xs text-gray-500">{source.sheetId}</div>
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleEditSavedSource(source)}
+                        disabled={isSavingSavedSource || isLoadingSheetTabs || isImportingSheetRange || isSavingSheetRange}
+                        className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSavedSource(source)}
+                        disabled={isSavingSavedSource || isLoadingSheetTabs || isImportingSheetRange || isSavingSheetRange}
+                        className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+            <div className="text-sm font-medium text-gray-900">
+              {editingSavedSourceId ? 'Edit Saved Google Sheet' : 'Add Saved Google Sheet'}
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-900">Name</label>
+                <input
+                  type="text"
+                  value={savedSheetForm.name}
+                  onChange={(e) => setSavedSheetForm((current) => ({ ...current, name: e.target.value }))}
+                  disabled={isSavingSavedSource}
+                  placeholder="Hiring Tracker"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-900">Google Sheet ID</label>
+                <input
+                  type="text"
+                  value={savedSheetForm.sheetId}
+                  onChange={(e) => setSavedSheetForm((current) => ({ ...current, sheetId: e.target.value }))}
+                  disabled={isSavingSavedSource}
+                  placeholder="1abcDEFghIjklMNopQRstuVWxyz1234567890"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSaveSavedSource}
+                disabled={isSavingSavedSource}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-400"
+              >
+                {isSavingSavedSource ? 'Saving...' : editingSavedSourceId ? 'Update Saved Sheet' : 'Save Sheet'}
+              </button>
+              {editingSavedSourceId && (
+                <button
+                  type="button"
+                  onClick={resetSavedSheetForm}
+                  disabled={isSavingSavedSource}
+                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {sheetsError && (
@@ -349,15 +615,25 @@ export default function GoogleSheetsRangeImporter() {
 
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-900">Google Sheet ID</label>
-          <input
-            type="text"
-            value={sheetsForm.sheetId}
-            onChange={(e) => handleSheetIdChange(e.target.value)}
-            disabled={isLoadingSheetTabs || isImportingSheetRange}
-            placeholder="1abcDEFghIjklMNopQRstuVWxyz1234567890"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <label className="block text-sm font-medium text-gray-900">Saved Google Sheet</label>
+          <select
+            value={selectedSavedSourceId}
+            onChange={(e) => setSelectedSavedSourceId(e.target.value)}
+            disabled={isLoadingSavedSources || isLoadingSheetTabs || isImportingSheetRange || savedSources.length === 0}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          >
+            <option value="">
+              {savedSources.length ? 'Select a saved Google Sheet' : 'Save a Google Sheet above first'}
+            </option>
+            {savedSources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.name}
+              </option>
+            ))}
+          </select>
+          {sheetsForm.sheetId && (
+            <div className="break-all text-xs text-gray-500">{sheetsForm.sheetId}</div>
+          )}
         </div>
         <div className="flex items-end">
           <button
@@ -561,7 +837,7 @@ export default function GoogleSheetsRangeImporter() {
                             spellCheck={false}
                             disabled={isSavingSheetRange}
                             rows={1}
-                            className="block w-full resize-none border-0 bg-transparent p-0 focus:outline-none"
+                            className="block w-full resize-none border-0 bg-white p-0 text-inherit focus:outline-none"
                             style={{
                               minHeight: Math.max(cellHeight - 12, 24),
                               whiteSpace: wrapStrategy === 'WRAP' ? 'pre-wrap' : 'pre',

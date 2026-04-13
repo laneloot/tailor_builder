@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { importApi } from '@/lib/api';
+import { GoogleSheetSource, importApi } from '@/lib/api';
 
 export type ImportedSheetJob = {
   companyName: string;
@@ -19,6 +19,9 @@ type ColumnMapping = {
 type Props = {
   isOpen: boolean;
   isSubmitting: boolean;
+  sources: GoogleSheetSource[];
+  selectedSourceId: string;
+  onSelectSource: (sourceId: string) => void;
   onClose: () => void;
   onConfirm: (jobs: ImportedSheetJob[], meta: { skippedRows: number }) => Promise<void>;
 };
@@ -62,10 +65,13 @@ function parseSpreadsheetColumnInput(label: string, value: string): number {
 export default function SheetsImportModal({
   isOpen,
   isSubmitting,
+  sources,
+  selectedSourceId,
+  onSelectSource,
   onClose,
   onConfirm,
 }: Props) {
-  const [sheetId, setSheetId] = useState('');
+  const selectedSource = sources.find((source) => source.id === selectedSourceId) ?? null;
   const [tabName, setTabName] = useState('');
   const [fromRow, setFromRow] = useState('1');
   const [toRow, setToRow] = useState('10');
@@ -80,7 +86,6 @@ export default function SheetsImportModal({
 
   useEffect(() => {
     if (!isOpen) {
-      setSheetId('');
       setTabName('');
       setFromRow('1');
       setToRow('10');
@@ -94,6 +99,16 @@ export default function SheetsImportModal({
       setError('');
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setTabName('');
+    setValues([]);
+    setRangeStartRow(1);
+    setRangeStartCol(1);
+    setMapping(DEFAULT_MAPPING);
+    setError('');
+  }, [isOpen, selectedSource?.id]);
 
   const columnOptions = useMemo(() => {
     if (!values.length) return [];
@@ -116,8 +131,8 @@ export default function SheetsImportModal({
   if (!isOpen) return null;
 
   const handleLoad = async () => {
-    if (!sheetId.trim()) {
-      setError('Spreadsheet ID is required.');
+    if (!selectedSource?.sheetId.trim()) {
+      setError('Select a saved Google Sheet before loading the range.');
       return;
     }
     if (!tabName.trim()) {
@@ -131,7 +146,7 @@ export default function SheetsImportModal({
       setIsLoading(true);
       setError('');
       const response = await importApi.fetchGoogleSheetRange({
-        sheetId: sheetId.trim(),
+        sheetId: selectedSource.sheetId.trim(),
         tabName: tabName.trim(),
         fromRow: Number(fromRow),
         toRow: Number(toRow),
@@ -239,14 +254,25 @@ export default function SheetsImportModal({
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Spreadsheet ID</label>
-                  <input
-                    type="text"
-                    value={sheetId}
-                    onChange={(e) => setSheetId(e.target.value)}
-                    disabled={isLoading || isSubmitting}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Saved Google Sheet</label>
+                  <select
+                    value={selectedSourceId}
+                    onChange={(e) => onSelectSource(e.target.value)}
+                    disabled={isLoading || isSubmitting || sources.length === 0}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    <option value="">
+                      {sources.length ? 'Choose a saved Google Sheet...' : 'No saved Google Sheets available'}
+                    </option>
+                    {sources.map((source) => (
+                      <option key={source.id} value={source.id}>
+                        {source.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedSource && (
+                    <div className="mt-2 break-all text-xs text-gray-500">{selectedSource.sheetId}</div>
+                  )}
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">Sheet Tab Name</label>
@@ -254,7 +280,7 @@ export default function SheetsImportModal({
                     type="text"
                     value={tabName}
                     onChange={(e) => setTabName(e.target.value)}
-                    disabled={isLoading || isSubmitting}
+                    disabled={isLoading || isSubmitting || !selectedSource}
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -311,7 +337,7 @@ export default function SheetsImportModal({
                 <button
                   type="button"
                   onClick={handleLoad}
-                  disabled={isLoading || isSubmitting}
+                  disabled={isLoading || isSubmitting || !selectedSource}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
                 >
                   {isLoading ? 'Loading...' : 'Load Range'}
