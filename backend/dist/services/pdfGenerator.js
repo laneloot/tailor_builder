@@ -486,7 +486,7 @@ async function generateResumePDF(profile, template, tailoredContent, pathInfo, c
         await page.emulateMediaType('print');
         await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
         const pdfFilename = `${pathInfo.profileSlug}.pdf`;
-        const relativePath = `${pathInfo.relativeBase}/${pdfFilename}`;
+        const relativePath = `${pathInfo.storagePathBase}/${pdfFilename}`;
         const filepath = path_1.default.join(pathInfo.absoluteDir, pdfFilename);
         const finalPdf = Buffer.from(await page.pdf({
             format: 'A4',

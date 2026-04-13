@@ -38,6 +38,13 @@ function shouldGenerateCoverLetterDocx(value: unknown): boolean {
   return typeof value === 'boolean' ? value : true;
 }
 
+function resolveGenerationRole(role: unknown, analysis?: import('../types/template').JobAnalysis): string {
+  if (typeof role === 'string' && role.trim()) {
+    return role.trim();
+  }
+  return analysis?.jobTitle?.trim() || '';
+}
+
 // Get enabled AI models
 router.get('/models', async (req: Request, res: Response) => {
   try {
@@ -255,6 +262,7 @@ router.post('/generate-all', async (req: Request, res: Response) => {
     } = req.body;
 
     const settings = await getAIModelSettings();
+    const appSettings = await getPublicAppSettings();
     const selectedModel = resolveAIProvider(model);
     if (!isProviderEnabled(selectedModel, settings)) {
       res.status(400).json({ error: `Selected AI model '${selectedModel}' is disabled by admin` });
@@ -262,10 +270,6 @@ router.post('/generate-all', async (req: Request, res: Response) => {
     }
     if (!companyName?.trim()) {
       res.status(400).json({ error: 'Company name is required' });
-      return;
-    }
-    if (!role?.trim()) {
-      res.status(400).json({ error: 'Role is required' });
       return;
     }
 
@@ -281,6 +285,11 @@ router.post('/generate-all', async (req: Request, res: Response) => {
     const trimmedJobDescription = jobDescription?.trim();
     if (trimmedJobDescription && trimmedJobDescription.length > 50) {
       analysis = jobAnalysis || await analyzeJobDescription(trimmedJobDescription, selectedModel);
+    }
+    const resolvedRole = resolveGenerationRole(role, analysis);
+    if (appSettings.outputPathUsesJobTitle && !resolvedRole) {
+      res.status(400).json({ error: 'Role is required' });
+      return;
     }
 
     const results: { profileId: string; profileName: string; pdf?: string; docx?: string; coverLetterPdf?: string; coverLetterDocx?: string }[] = [];
@@ -321,9 +330,9 @@ router.post('/generate-all', async (req: Request, res: Response) => {
       if (tailoredContent?.coverLetter?.trim()) {
         coverLetterBody = tailoredContent.coverLetter.trim();
       } else {
-        coverLetterBody = await generateCoverLetter(profile, companyName.trim(), role.trim(), selectedModel);
+        coverLetterBody = await generateCoverLetter(profile, companyName.trim(), resolvedRole, selectedModel);
       }
-      const pathInfo = await getGeneratedOutputPath(profile, companyName.trim(), role.trim());
+      const pathInfo = await getGeneratedOutputPath(profile, companyName.trim(), resolvedRole);
       const coverLetterPdfPath = await saveCoverLetter(profile, coverLetterBody, pathInfo);
       const coverLetterDocxPath = generateCoverLetterDocx
         ? await saveCoverLetterDOCX(profile, coverLetterBody, pathInfo)
@@ -337,15 +346,15 @@ router.post('/generate-all', async (req: Request, res: Response) => {
       };
       if (formatNorm === 'both') {
         const [pdfFilename, docxFilename] = await Promise.all([
-          generateResumePDF(profile, template, tailoredContent, pathInfo, companyName.trim(), role.trim()),
-          generateResumeDOCX(profile, tailoredContent, pathInfo, companyName.trim(), role.trim())
+          generateResumePDF(profile, template, tailoredContent, pathInfo, companyName.trim(), resolvedRole),
+          generateResumeDOCX(profile, tailoredContent, pathInfo, companyName.trim(), resolvedRole)
         ]);
         entry.pdf = pdfFilename;
         entry.docx = docxFilename;
       } else {
         const filename = formatNorm === 'docx'
-          ? await generateResumeDOCX(profile, tailoredContent, pathInfo, companyName.trim(), role.trim())
-          : await generateResumePDF(profile, template, tailoredContent, pathInfo, companyName.trim(), role.trim());
+          ? await generateResumeDOCX(profile, tailoredContent, pathInfo, companyName.trim(), resolvedRole)
+          : await generateResumePDF(profile, template, tailoredContent, pathInfo, companyName.trim(), resolvedRole);
         entry[formatNorm] = filename;
       }
       results.push(entry);
@@ -384,6 +393,7 @@ router.post('/preview-all', async (req: Request, res: Response) => {
     };
 
     const settings = await getAIModelSettings();
+    const appSettings = await getPublicAppSettings();
     const selectedModel = resolveAIProvider(model);
     if (!isProviderEnabled(selectedModel, settings)) {
       res.status(400).json({ error: `Selected AI model '${selectedModel}' is disabled by admin` });
@@ -481,6 +491,7 @@ router.post('/generate', async (req: Request, res: Response) => {
       includeCoverLetterDocx,
     }: GenerateResumeRequest = req.body;
     const settings = await getAIModelSettings();
+    const appSettings = await getPublicAppSettings();
     const selectedModel = resolveAIProvider(model);
     if (!isProviderEnabled(selectedModel, settings)) {
       res.status(400).json({ error: `Selected AI model '${selectedModel}' is disabled by admin` });
@@ -494,11 +505,6 @@ router.post('/generate', async (req: Request, res: Response) => {
 
     if (!companyName || !companyName.trim()) {
       res.status(400).json({ error: 'Company name is required' });
-      return;
-    }
-
-    if (!role || !role.trim()) {
-      res.status(400).json({ error: 'Role is required' });
       return;
     }
 
@@ -534,10 +540,16 @@ router.post('/generate', async (req: Request, res: Response) => {
 
     // If job description provided, tailor the resume (unless overridden by manual edits)
     let tailoredContent = (req.body as GenerateResumeRequest).tailoredContent as TailoredContent | undefined;
+    let analysis = jobAnalysis;
     if (!tailoredContent && jobDescription && jobDescription.trim().length > 50) {
       // Analyze job if not already analyzed
-      const analysis = jobAnalysis || await analyzeJobDescription(jobDescription, selectedModel);
+      analysis = jobAnalysis || await analyzeJobDescription(jobDescription, selectedModel);
       tailoredContent = await tailorResume(profile, analysis, selectedModel);
+    }
+    const resolvedRole = resolveGenerationRole(role, analysis);
+    if (appSettings.outputPathUsesJobTitle && !resolvedRole) {
+      res.status(400).json({ error: 'Role is required' });
+      return;
     }
 
     const generateBoth = (format as string) === 'both';
@@ -551,7 +563,7 @@ router.post('/generate', async (req: Request, res: Response) => {
       coverLetterBody = await generateCoverLetter(
         profile,
         companyName.trim(),
-        role.trim(),
+        resolvedRole,
         selectedModel
       );
     }
@@ -559,7 +571,7 @@ router.post('/generate', async (req: Request, res: Response) => {
     const pathInfo = await getGeneratedOutputPath(
       profile,
       companyName.trim(),
-      role.trim()
+      resolvedRole
     );
     const coverLetterPdfPath = await saveCoverLetter(profile, coverLetterBody, pathInfo);
     const coverLetterDocxPath = generateCoverLetterDocx
@@ -568,8 +580,8 @@ router.post('/generate', async (req: Request, res: Response) => {
 
     if (generateBoth) {
       const [pdfFilename, docxFilename] = await Promise.all([
-        generateResumePDF(profile, template, tailoredContent, pathInfo, companyName.trim(), role.trim()),
-        generateResumeDOCX(profile, tailoredContent, pathInfo, companyName.trim(), role.trim()),
+        generateResumePDF(profile, template, tailoredContent, pathInfo, companyName.trim(), resolvedRole),
+        generateResumeDOCX(profile, tailoredContent, pathInfo, companyName.trim(), resolvedRole),
       ]);
       res.json({
         pdf: { filename: pdfFilename, downloadUrl: `/api/resume/download/${pdfFilename}` },
@@ -591,8 +603,8 @@ router.post('/generate', async (req: Request, res: Response) => {
       const formatNorm = format === 'docx' ? 'docx' : 'pdf';
       const filename =
         formatNorm === 'docx'
-          ? await generateResumeDOCX(profile, tailoredContent, pathInfo, companyName.trim(), role.trim())
-          : await generateResumePDF(profile, template, tailoredContent, pathInfo, companyName.trim(), role.trim());
+          ? await generateResumeDOCX(profile, tailoredContent, pathInfo, companyName.trim(), resolvedRole)
+          : await generateResumePDF(profile, template, tailoredContent, pathInfo, companyName.trim(), resolvedRole);
 
       res.json({
         filename,

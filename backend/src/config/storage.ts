@@ -153,6 +153,10 @@ export function buildOutputPathPreview(template: string): string {
   })}`;
 }
 
+export function outputPathTemplateUsesJobTitle(template: string): boolean {
+  return /\{\{\s*(job title|role)\s*\}\}/i.test(normalizeOutputPathTemplate(template));
+}
+
 export function resolveStoredFilePath(baseDir: string, relativePathValue: string): string | null {
   const normalizedBaseDir = path.resolve(baseDir);
   const normalizedRelativePath = relativePathValue

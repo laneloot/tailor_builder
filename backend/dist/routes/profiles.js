@@ -11,6 +11,7 @@ const multer_1 = __importDefault(require("multer"));
 const pdf_parse_1 = __importDefault(require("pdf-parse"));
 const auth_1 = require("../middleware/auth");
 const claude_1 = require("../services/claude");
+const storage_1 = require("../config/storage");
 const router = (0, express_1.Router)();
 const PROFILES_DIR = path_1.default.join(__dirname, '../../data/profiles');
 const UPLOADS_DIR = path_1.default.join(__dirname, '../../uploads');
@@ -133,6 +134,9 @@ function normalizeProfilePayload(data, existing) {
         title: toSafeString(data.title, existing?.title ?? 'Professional'),
         totalYearsExperience: toOptionalPositiveNumber(data.totalYearsExperience, existing?.totalYearsExperience),
         preferredTemplate: toSafeString(data.preferredTemplate, existing?.preferredTemplate ?? ''),
+        outputDirectory: toSafeString(data.outputDirectory)
+            ? (0, storage_1.normalizeOutputBaseDir)(data.outputDirectory)
+            : toSafeString(existing?.outputDirectory ?? ''),
         disabled: typeof data.disabled === 'boolean' ? data.disabled : (existing?.disabled ?? false),
         contact: normalizeContact(data.contact, existing?.contact),
         summary: toSafeString(data.summary, existing?.summary ?? ''),

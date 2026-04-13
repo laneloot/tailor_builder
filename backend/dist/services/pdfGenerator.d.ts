@@ -16,6 +16,7 @@ export declare function prepareResumeRenderData(profile: Profile, tailoredConten
     name: string;
     totalYearsExperience?: number;
     preferredTemplate?: string;
+    outputDirectory?: string;
     disabled?: boolean;
     contact: import("../types/profile").Contact;
     education: import("../types/profile").Education[];

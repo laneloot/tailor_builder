@@ -108,6 +108,14 @@ type SpreadsheetGridResponse = {
 };
 
 type GoogleApiErrorResponse = {
+  error?: string | {
+    message?: string;
+    status?: string;
+  };
+  error_description?: string;
+};
+
+type GoogleApiStructuredError = {
   error?: {
     message?: string;
     status?: string;
@@ -347,11 +355,19 @@ async function getAccessToken(): Promise<string> {
     let errorMessage = 'Failed to authenticate with Google Sheets.';
     try {
       const errorBody = (await response.json()) as GoogleApiErrorResponse;
-      if (errorBody.error?.message) {
+      if (typeof errorBody.error === 'string' && errorBody.error_description) {
+        errorMessage = `${errorBody.error}: ${errorBody.error_description}`;
+      } else if (typeof errorBody.error === 'object' && errorBody.error?.message) {
         errorMessage = errorBody.error.message;
       }
     } catch {
       // Ignore JSON parsing failures and use the fallback message.
+    }
+    if (errorMessage.toLowerCase().includes('user not found')) {
+      errorMessage =
+        `Google service account was not recognized: ${credentials.client_email}. ` +
+        'This usually means the JSON key belongs to a deleted or disabled service account, or the key file does not match the live account. ' +
+        'Create a new key for the current service account and replace backend/service-account-key.json.';
     }
     throw new GoogleSheetsRequestError(response.status, errorMessage);
   }
@@ -369,7 +385,7 @@ async function getAccessToken(): Promise<string> {
   return cachedAccessToken.token;
 }
 
-async function googleSheetsFetch<T>(pathname: string, init?: RequestInit): Promise<T> {
+async function googleSheetsFetch<T>(pathname: string, init?: RequestInit, hasRetried = false): Promise<T> {
   const accessToken = await getAccessToken();
   const response = await fetch(`${SHEETS_API_BASE}${pathname}`, {
     ...init,
@@ -379,10 +395,15 @@ async function googleSheetsFetch<T>(pathname: string, init?: RequestInit): Promi
     },
   });
 
+  if (response.status === 401 && !hasRetried) {
+    cachedAccessToken = null;
+    return googleSheetsFetch<T>(pathname, init, true);
+  }
+
   if (!response.ok) {
     let errorMessage = 'Google Sheets request failed.';
     try {
-      const errorBody = (await response.json()) as GoogleApiErrorResponse;
+      const errorBody = (await response.json()) as GoogleApiStructuredError;
       if (errorBody.error?.message) {
         errorMessage = errorBody.error.message;
       }

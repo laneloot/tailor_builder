@@ -103,7 +103,7 @@ async function generateResumeDOCX(profile, tailoredContent, pathInfo, companyNam
         orientation: 'portrait',
     });
     const docxFilename = `${pathInfo.profileSlug}.docx`;
-    const relativePath = `${pathInfo.relativeBase}/${docxFilename}`;
+    const relativePath = `${pathInfo.storagePathBase}/${docxFilename}`;
     const filepath = path_1.default.join(pathInfo.absoluteDir, docxFilename);
     await promises_1.default.mkdir(path_1.default.dirname(filepath), { recursive: true });
     await promises_1.default.writeFile(filepath, Buffer.from(docxBuffer));

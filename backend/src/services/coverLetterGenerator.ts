@@ -71,7 +71,7 @@ export async function saveCoverLetter(
   pathInfo: GeneratedPathInfo
 ): Promise<string> {
   const filename = `${pathInfo.profileSlug}_cover_letter.pdf`;
-  const relativePath = `${pathInfo.relativeBase}/${filename}`;
+  const relativePath = `${pathInfo.storagePathBase}/${filename}`;
   const filepath = path.join(pathInfo.absoluteDir, filename);
 
   const html = buildCoverLetterHTML(content.trim(), profile.name);
@@ -112,7 +112,7 @@ export async function saveCoverLetterDOCX(
   pathInfo: GeneratedPathInfo
 ): Promise<string> {
   const filename = `${pathInfo.profileSlug}_cover_letter.docx`;
-  const relativePath = `${pathInfo.relativeBase}/${filename}`;
+  const relativePath = `${pathInfo.storagePathBase}/${filename}`;
   const filepath = path.join(pathInfo.absoluteDir, filename);
 
   const html = buildCoverLetterHTMLForDocx(content.trim(), profile.name);

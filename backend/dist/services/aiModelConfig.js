@@ -31,8 +31,10 @@ const DEFAULT_SETTINGS = {
     defaultProfileId: '',
     defaultResumeDocxEnabled: true,
     defaultCoverLetterDocxEnabled: true,
+    outputStorageMode: 'single',
     outputBaseDir: storage_1.DEFAULT_GENERATED_RESUMES_DIR,
     outputPathTemplate: storage_1.DEFAULT_OUTPUT_PATH_TEMPLATE,
+    googleSheetsSources: [],
     apiKeys: {
         openai: { activeKeyId: '', entries: [] },
         claude: { activeKeyId: '', entries: [] },
@@ -47,6 +49,9 @@ function normalizeDefaultMode(value, fallback) {
 }
 function normalizeDefaultResumeSelection(value, fallback) {
     return value === 'single' || value === 'all' || value === 'group' ? value : fallback;
+}
+function normalizeOutputStorageMode(value, fallback) {
+    return value === 'single' || value === 'multi' ? value : fallback;
 }
 function getEnvironmentApiKey(provider) {
     if (provider === 'openai') {
@@ -124,6 +129,43 @@ function normalizeProviderKeyStores(input, fallback) {
         openrouter: normalizeProviderKeyStore(source.openrouter, fallback.openrouter, 'openrouter'),
     };
 }
+function normalizeGoogleSheetSourceName(value, fallback) {
+    return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+function normalizeGoogleSheetsSources(input, fallback) {
+    const rawEntries = Array.isArray(input) ? input : fallback;
+    const seenIds = new Set();
+    return rawEntries
+        .map((entry, index) => {
+        if (typeof entry !== 'object' || entry === null) {
+            return null;
+        }
+        const raw = entry;
+        const sheetId = typeof raw.sheetId === 'string' ? raw.sheetId.trim() : '';
+        if (!sheetId) {
+            return null;
+        }
+        const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : (0, crypto_1.randomUUID)();
+        if (seenIds.has(id)) {
+            return null;
+        }
+        seenIds.add(id);
+        const createdAt = typeof raw.createdAt === 'string' && raw.createdAt.trim()
+            ? raw.createdAt.trim()
+            : new Date().toISOString();
+        const updatedAt = typeof raw.updatedAt === 'string' && raw.updatedAt.trim()
+            ? raw.updatedAt.trim()
+            : createdAt;
+        return {
+            id,
+            name: normalizeGoogleSheetSourceName(raw.name, `Google Sheet ${index + 1}`),
+            sheetId,
+            createdAt,
+            updatedAt,
+        };
+    })
+        .filter((entry) => Boolean(entry));
+}
 function normalizeSettings(input, fallback = DEFAULT_SETTINGS) {
     const source = typeof input === 'object' && input !== null ? input : {};
     return {
@@ -145,8 +187,10 @@ function normalizeSettings(input, fallback = DEFAULT_SETTINGS) {
         defaultCoverLetterDocxEnabled: typeof source.defaultCoverLetterDocxEnabled === 'boolean'
             ? source.defaultCoverLetterDocxEnabled
             : fallback.defaultCoverLetterDocxEnabled,
+        outputStorageMode: normalizeOutputStorageMode(source.outputStorageMode, fallback.outputStorageMode),
         outputBaseDir: (0, storage_1.normalizeOutputBaseDir)(source.outputBaseDir ?? fallback.outputBaseDir),
         outputPathTemplate: (0, storage_1.validateOutputPathTemplate)((0, storage_1.normalizeOutputPathTemplate)(source.outputPathTemplate ?? fallback.outputPathTemplate)),
+        googleSheetsSources: normalizeGoogleSheetsSources(source.googleSheetsSources, fallback.googleSheetsSources),
         apiKeys: normalizeProviderKeyStores(source.apiKeys, fallback.apiKeys),
     };
 }
@@ -171,6 +215,14 @@ function toPublicSettings(settings) {
         defaultProfileId: settings.defaultProfileId,
         defaultResumeDocxEnabled: settings.defaultResumeDocxEnabled,
         defaultCoverLetterDocxEnabled: settings.defaultCoverLetterDocxEnabled,
+        outputStorageMode: settings.outputStorageMode,
+        googleSheetsSources: settings.googleSheetsSources,
+    };
+}
+function toPublicSettingsWithDerived(settings) {
+    return {
+        ...toPublicSettings(settings),
+        outputPathUsesJobTitle: (0, storage_1.outputPathTemplateUsesJobTitle)(settings.outputPathTemplate),
     };
 }
 function maskApiKey(value) {
@@ -189,7 +241,7 @@ function getStoredActiveApiKey(store) {
 }
 function toAdminSettings(settings) {
     return {
-        ...toPublicSettings(settings),
+        ...toPublicSettingsWithDerived(settings),
         outputBaseDir: settings.outputBaseDir,
         outputPathTemplate: settings.outputPathTemplate,
         outputPathPreview: (0, storage_1.buildOutputPathPreview)(settings.outputPathTemplate),
@@ -313,7 +365,7 @@ async function getAppSettings() {
     return readSettings();
 }
 async function getPublicAppSettings() {
-    return toPublicSettings(await readSettings());
+    return toPublicSettingsWithDerived(await readSettings());
 }
 async function getAdminAppSettings() {
     return toAdminSettings(await readSettings());
@@ -336,7 +388,11 @@ async function updateAppSettings(input) {
     if (!next.openaiEnabled && !next.claudeEnabled && !next.openrouterEnabled) {
         throw new Error('At least one AI model must remain enabled');
     }
-    await (0, storage_1.ensureWritableOutputDir)(next.outputBaseDir);
+    const shouldValidateOutputDir = typeof input.outputBaseDir !== 'undefined' ||
+        current.outputBaseDir !== next.outputBaseDir;
+    if (shouldValidateOutputDir) {
+        await (0, storage_1.ensureWritableOutputDir)(next.outputBaseDir);
+    }
     const saved = await writeSettings(next);
     return toAdminSettings(saved);
 }
@@ -360,13 +416,18 @@ async function getProviderApiKey(provider) {
     const settings = await readSettings();
     const activeStoredKey = getStoredActiveApiKey(settings.apiKeys[provider]);
     if (activeStoredKey?.value.trim()) {
-        return activeStoredKey.value.trim();
+        const resolved = activeStoredKey.value.trim();
+        console.log(`[AI_KEY_DEBUG] provider=${provider} source=stored key=${maskApiKey(resolved) ?? 'missing'}`);
+        return resolved;
     }
-    return getEnvironmentApiKey(provider);
+    const environmentKey = getEnvironmentApiKey(provider);
+    console.log(`[AI_KEY_DEBUG] provider=${provider} source=environment key=${maskApiKey(environmentKey) ?? 'missing'}`);
+    return environmentKey;
 }
 async function getOutputStorageSettings() {
     const settings = await readSettings();
     return {
+        outputStorageMode: settings.outputStorageMode,
         outputBaseDir: settings.outputBaseDir,
         outputPathTemplate: settings.outputPathTemplate,
     };

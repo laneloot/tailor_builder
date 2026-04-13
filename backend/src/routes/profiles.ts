@@ -7,6 +7,7 @@ import pdf from 'pdf-parse';
 import { Profile, CreateProfileDTO, Contact, Education, Experience, Strength, Certification } from '../types/profile';
 import { authMiddleware } from '../middleware/auth';
 import { extractProfileFromResume } from '../services/claude';
+import { normalizeOutputBaseDir } from '../config/storage';
 
 const router = Router();
 const PROFILES_DIR = path.join(__dirname, '../../data/profiles');
@@ -133,6 +134,9 @@ function normalizeProfilePayload(data: CreateProfileDTO, existing?: Profile): Om
     title: toSafeString(data.title, existing?.title ?? 'Professional'),
     totalYearsExperience: toOptionalPositiveNumber(data.totalYearsExperience, existing?.totalYearsExperience),
     preferredTemplate: toSafeString(data.preferredTemplate, existing?.preferredTemplate ?? ''),
+    outputDirectory: toSafeString(data.outputDirectory)
+      ? normalizeOutputBaseDir(data.outputDirectory)
+      : toSafeString(existing?.outputDirectory ?? ''),
     disabled: typeof data.disabled === 'boolean' ? data.disabled : (existing?.disabled ?? false),
     contact: normalizeContact(data.contact, existing?.contact),
     summary: toSafeString(data.summary, existing?.summary ?? ''),

@@ -134,7 +134,7 @@ export async function generateResumeDOCX(
   });
 
   const docxFilename = `${pathInfo.profileSlug}.docx`;
-  const relativePath = `${pathInfo.relativeBase}/${docxFilename}`;
+  const relativePath = `${pathInfo.storagePathBase}/${docxFilename}`;
   const filepath = path.join(pathInfo.absoluteDir, docxFilename);
 
   await fs.mkdir(path.dirname(filepath), { recursive: true });

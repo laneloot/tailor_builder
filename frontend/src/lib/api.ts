@@ -177,6 +177,87 @@ export interface AdminAppSettings extends PublicAppSettings {
   apiKeys: Record<AIProvider, AdminApiKeyProviderSettings>;
 }
 
+function normalizeGoogleSheetSources(value: unknown): GoogleSheetSource[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((entry): entry is GoogleSheetSource => typeof entry === 'object' && entry !== null)
+    .map((entry) => ({
+      id: typeof entry.id === 'string' ? entry.id : '',
+      name: typeof entry.name === 'string' ? entry.name : '',
+      sheetId: typeof entry.sheetId === 'string' ? entry.sheetId : '',
+      createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : '',
+      updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : '',
+    }))
+    .filter((entry) => entry.id && entry.name && entry.sheetId);
+}
+
+function normalizePublicAppSettings(value: unknown): PublicAppSettings {
+  const source = (typeof value === 'object' && value !== null ? value : {}) as Partial<PublicAppSettings>;
+
+  return {
+    openaiEnabled: typeof source.openaiEnabled === 'boolean' ? source.openaiEnabled : true,
+    claudeEnabled: typeof source.claudeEnabled === 'boolean' ? source.claudeEnabled : true,
+    openrouterEnabled: typeof source.openrouterEnabled === 'boolean' ? source.openrouterEnabled : true,
+    defaultMode: source.defaultMode === 'generate' ? 'generate' : 'preview',
+    defaultTheme: source.defaultTheme === 'dark' ? 'dark' : 'light',
+    defaultResumeSelection:
+      source.defaultResumeSelection === 'all' || source.defaultResumeSelection === 'group'
+        ? source.defaultResumeSelection
+        : 'single',
+    defaultGroupId: typeof source.defaultGroupId === 'string' ? source.defaultGroupId : '',
+    defaultProfileId: typeof source.defaultProfileId === 'string' ? source.defaultProfileId : '',
+    defaultResumeDocxEnabled:
+      typeof source.defaultResumeDocxEnabled === 'boolean' ? source.defaultResumeDocxEnabled : true,
+    defaultCoverLetterDocxEnabled:
+      typeof source.defaultCoverLetterDocxEnabled === 'boolean' ? source.defaultCoverLetterDocxEnabled : true,
+    outputStorageMode: source.outputStorageMode === 'multi' ? 'multi' : 'single',
+    outputPathUsesJobTitle:
+      typeof source.outputPathUsesJobTitle === 'boolean' ? source.outputPathUsesJobTitle : true,
+    googleSheetsSources: normalizeGoogleSheetSources(source.googleSheetsSources),
+  };
+}
+
+function normalizeAdminAppSettings(value: unknown): AdminAppSettings {
+  const source = (typeof value === 'object' && value !== null ? value : {}) as Partial<AdminAppSettings>;
+
+  return {
+    ...normalizePublicAppSettings(source),
+    outputBaseDir: typeof source.outputBaseDir === 'string' ? source.outputBaseDir : '',
+    outputPathTemplate: typeof source.outputPathTemplate === 'string' ? source.outputPathTemplate : '',
+    outputPathPreview: typeof source.outputPathPreview === 'string' ? source.outputPathPreview : '',
+    apiKeys:
+      typeof source.apiKeys === 'object' && source.apiKeys !== null
+        ? source.apiKeys as Record<AIProvider, AdminApiKeyProviderSettings>
+        : {
+            openai: {
+              configured: false,
+              activeSource: 'none',
+              activeKeyId: null,
+              activePreview: null,
+              environmentPreview: null,
+              entries: [],
+            },
+            claude: {
+              configured: false,
+              activeSource: 'none',
+              activeKeyId: null,
+              activePreview: null,
+              environmentPreview: null,
+              entries: [],
+            },
+            openrouter: {
+              configured: false,
+              activeSource: 'none',
+              activeKeyId: null,
+              activePreview: null,
+              environmentPreview: null,
+              entries: [],
+            },
+          },
+  };
+}
+
 export interface ApiKeyProviderUpdate {
   activeKeyId?: string;
   add?: Array<{
@@ -311,8 +392,8 @@ export const adminApi = {
   verify: () =>
     apiFetch<{ valid: boolean }>('/admin/verify'),
 
-  getSettings: () =>
-    apiFetch<AdminAppSettings>('/admin/settings'),
+  getSettings: async () =>
+    normalizeAdminAppSettings(await apiFetch<AdminAppSettings>('/admin/settings')),
 
   browseOutputDirectory: (currentPath?: string) =>
     apiFetch<BrowseOutputDirectoryResponse>('/admin/browse-output-directory', {
@@ -332,20 +413,20 @@ export const adminApi = {
       body: JSON.stringify(data),
     }),
 
-  updateSettings: (data: AdminAppSettingsUpdate) =>
-    apiFetch<AdminAppSettings>('/admin/settings', {
+  updateSettings: async (data: AdminAppSettingsUpdate) =>
+    normalizeAdminAppSettings(await apiFetch<AdminAppSettings>('/admin/settings', {
       method: 'PUT',
       body: JSON.stringify(data),
-    }),
+    })),
 
-  getAIModels: () =>
-    apiFetch<AdminAppSettings>('/admin/ai-models'),
+  getAIModels: async () =>
+    normalizeAdminAppSettings(await apiFetch<AdminAppSettings>('/admin/ai-models')),
 
-  updateAIModels: (data: AdminAppSettingsUpdate) =>
-    apiFetch<AdminAppSettings>('/admin/ai-models', {
+  updateAIModels: async (data: AdminAppSettingsUpdate) =>
+    normalizeAdminAppSettings(await apiFetch<AdminAppSettings>('/admin/ai-models', {
       method: 'PUT',
       body: JSON.stringify(data),
-    }),
+    })),
 };
 
 export const importApi = {
@@ -760,7 +841,7 @@ export const promptsApi = {
 
 // Resume API
 export const resumeApi = {
-  getModels: () => apiFetch<PublicAppSettings>('/resume/models'),
+  getModels: async () => normalizePublicAppSettings(await apiFetch<PublicAppSettings>('/resume/models')),
 
   analyze: (jobDescription: string, model: AIProvider) =>
     apiFetch<JobAnalysis>('/resume/analyze', {

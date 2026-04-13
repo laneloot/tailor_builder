@@ -2,6 +2,7 @@ import { Profile } from '../types/profile';
 export interface GeneratedPathInfo {
     relativeBase: string;
     absoluteDir: string;
+    storagePathBase: string;
     profileSlug: string;
     companyFolderName: string;
     roleSlug: string;

@@ -68,7 +68,7 @@ function buildCoverLetterHTMLForDocx(content, profileName) {
  */
 async function saveCoverLetter(profile, content, pathInfo) {
     const filename = `${pathInfo.profileSlug}_cover_letter.pdf`;
-    const relativePath = `${pathInfo.relativeBase}/${filename}`;
+    const relativePath = `${pathInfo.storagePathBase}/${filename}`;
     const filepath = path_1.default.join(pathInfo.absoluteDir, filename);
     const html = buildCoverLetterHTML(content.trim(), profile.name);
     const browser = await puppeteer_1.default.launch({
@@ -99,7 +99,7 @@ async function saveCoverLetter(profile, content, pathInfo) {
  */
 async function saveCoverLetterDOCX(profile, content, pathInfo) {
     const filename = `${pathInfo.profileSlug}_cover_letter.docx`;
-    const relativePath = `${pathInfo.relativeBase}/${filename}`;
+    const relativePath = `${pathInfo.storagePathBase}/${filename}`;
     const filepath = path_1.default.join(pathInfo.absoluteDir, filename);
     const html = buildCoverLetterHTMLForDocx(content.trim(), profile.name);
     const docxBuffer = await (0, html_to_docx_1.default)(html, null, {

@@ -111,12 +111,21 @@ async function getAccessToken() {
         let errorMessage = 'Failed to authenticate with Google Sheets.';
         try {
             const errorBody = (await response.json());
-            if (errorBody.error?.message) {
+            if (typeof errorBody.error === 'string' && errorBody.error_description) {
+                errorMessage = `${errorBody.error}: ${errorBody.error_description}`;
+            }
+            else if (typeof errorBody.error === 'object' && errorBody.error?.message) {
                 errorMessage = errorBody.error.message;
             }
         }
         catch {
             // Ignore JSON parsing failures and use the fallback message.
+        }
+        if (errorMessage.toLowerCase().includes('user not found')) {
+            errorMessage =
+                `Google service account was not recognized: ${credentials.client_email}. ` +
+                    'This usually means the JSON key belongs to a deleted or disabled service account, or the key file does not match the live account. ' +
+                    'Create a new key for the current service account and replace backend/service-account-key.json.';
         }
         throw new GoogleSheetsRequestError(response.status, errorMessage);
     }
@@ -130,7 +139,7 @@ async function getAccessToken() {
     };
     return cachedAccessToken.token;
 }
-async function googleSheetsFetch(pathname, init) {
+async function googleSheetsFetch(pathname, init, hasRetried = false) {
     const accessToken = await getAccessToken();
     const response = await fetch(`${SHEETS_API_BASE}${pathname}`, {
         ...init,
@@ -139,6 +148,10 @@ async function googleSheetsFetch(pathname, init) {
             ...(init?.headers ?? {}),
         },
     });
+    if (response.status === 401 && !hasRetried) {
+        cachedAccessToken = null;
+        return googleSheetsFetch(pathname, init, true);
+    }
     if (!response.ok) {
         let errorMessage = 'Google Sheets request failed.';
         try {

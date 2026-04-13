@@ -13,6 +13,7 @@ const templates_1 = __importDefault(require("./routes/templates"));
 const resume_1 = __importDefault(require("./routes/resume"));
 const admin_1 = __importDefault(require("./routes/admin"));
 const groups_1 = __importDefault(require("./routes/groups"));
+const import_1 = __importDefault(require("./routes/import"));
 const prompts_1 = __importDefault(require("./routes/prompts"));
 dotenv_1.default.config({ path: path_1.default.join(__dirname, '../../.env'), override: true });
 const app = (0, express_1.default)();
@@ -64,6 +65,7 @@ app.use('/api/templates', templates_1.default);
 app.use('/api/resume', resume_1.default);
 app.use('/api/admin', admin_1.default);
 app.use('/api/groups', groups_1.default);
+app.use('/api/import', import_1.default);
 app.use('/api/prompts', prompts_1.default);
 // Health check
 app.get('/api/health', (req, res) => {

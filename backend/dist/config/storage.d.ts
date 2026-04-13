@@ -27,6 +27,7 @@ export declare function normalizeOutputPathTemplate(value: unknown): string;
 export declare function validateOutputPathTemplate(value: unknown): string;
 export declare function renderOutputPathTemplate(template: string, variables: OutputPathVariables): string;
 export declare function buildOutputPathPreview(template: string): string;
+export declare function outputPathTemplateUsesJobTitle(template: string): boolean;
 export declare function resolveStoredFilePath(baseDir: string, relativePathValue: string): string | null;
 export {};
 //# sourceMappingURL=storage.d.ts.map

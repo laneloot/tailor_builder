@@ -12,6 +12,7 @@ exports.normalizeOutputPathTemplate = normalizeOutputPathTemplate;
 exports.validateOutputPathTemplate = validateOutputPathTemplate;
 exports.renderOutputPathTemplate = renderOutputPathTemplate;
 exports.buildOutputPathPreview = buildOutputPathPreview;
+exports.outputPathTemplateUsesJobTitle = outputPathTemplateUsesJobTitle;
 exports.resolveStoredFilePath = resolveStoredFilePath;
 const promises_1 = __importDefault(require("fs/promises"));
 const fs_1 = require("fs");
@@ -134,6 +135,9 @@ function buildOutputPathPreview(template) {
         companyName: 'Acme Inc',
         jobTitle: 'Senior Engineer',
     })}`;
+}
+function outputPathTemplateUsesJobTitle(template) {
+    return /\{\{\s*(job title|role)\s*\}\}/i.test(normalizeOutputPathTemplate(template));
 }
 function resolveStoredFilePath(baseDir, relativePathValue) {
     const normalizedBaseDir = path_1.default.resolve(baseDir);

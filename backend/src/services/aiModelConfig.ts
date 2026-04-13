@@ -9,12 +9,14 @@ import {
   ensureWritableOutputDir,
   normalizeOutputBaseDir,
   normalizeOutputPathTemplate,
+  outputPathTemplateUsesJobTitle,
   validateOutputPathTemplate,
 } from '../config/storage';
 
 export type DefaultMode = 'preview' | 'generate';
 export type ThemeMode = 'light' | 'dark';
 export type DefaultResumeSelection = 'single' | 'all' | 'group';
+export type OutputStorageMode = 'single' | 'multi';
 
 type ApiKeyEntry = {
   id: string;
@@ -41,6 +43,14 @@ type ApiKeyUpdate = {
   useEnvironmentFallback?: boolean;
 };
 
+type GoogleSheetSource = {
+  id: string;
+  name: string;
+  sheetId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type AppSettings = {
   openaiEnabled: boolean;
   claudeEnabled: boolean;
@@ -52,8 +62,10 @@ type AppSettings = {
   defaultProfileId: string;
   defaultResumeDocxEnabled: boolean;
   defaultCoverLetterDocxEnabled: boolean;
+  outputStorageMode: OutputStorageMode;
   outputBaseDir: string;
   outputPathTemplate: string;
+  googleSheetsSources: GoogleSheetSource[];
   apiKeys: ProviderKeyStores;
 };
 
@@ -68,9 +80,14 @@ export type PublicAppSettings = AIModelSettings & Pick<
   | 'defaultProfileId'
   | 'defaultResumeDocxEnabled'
   | 'defaultCoverLetterDocxEnabled'
+  | 'outputStorageMode'
+  | 'googleSheetsSources'
 >;
+export type PublicAppSettingsWithDerived = PublicAppSettings & {
+  outputPathUsesJobTitle: boolean;
+};
 
-export type AdminAppSettings = PublicAppSettings & {
+export type AdminAppSettings = PublicAppSettingsWithDerived & {
   outputBaseDir: string;
   outputPathTemplate: string;
   outputPathPreview: string;
@@ -113,8 +130,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultProfileId: '',
   defaultResumeDocxEnabled: true,
   defaultCoverLetterDocxEnabled: true,
+  outputStorageMode: 'single',
   outputBaseDir: DEFAULT_GENERATED_RESUMES_DIR,
   outputPathTemplate: DEFAULT_OUTPUT_PATH_TEMPLATE,
+  googleSheetsSources: [],
   apiKeys: {
     openai: { activeKeyId: '', entries: [] },
     claude: { activeKeyId: '', entries: [] },
@@ -135,6 +154,10 @@ function normalizeDefaultResumeSelection(
   fallback: DefaultResumeSelection
 ): DefaultResumeSelection {
   return value === 'single' || value === 'all' || value === 'group' ? value : fallback;
+}
+
+function normalizeOutputStorageMode(value: unknown, fallback: OutputStorageMode): OutputStorageMode {
+  return value === 'single' || value === 'multi' ? value : fallback;
 }
 
 function getEnvironmentApiKey(provider: AIProvider): string {
@@ -224,6 +247,50 @@ function normalizeProviderKeyStores(input: unknown, fallback: ProviderKeyStores)
   };
 }
 
+function normalizeGoogleSheetSourceName(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function normalizeGoogleSheetsSources(input: unknown, fallback: GoogleSheetSource[]): GoogleSheetSource[] {
+  const rawEntries = Array.isArray(input) ? input : fallback;
+  const seenIds = new Set<string>();
+
+  return rawEntries
+    .map((entry, index) => {
+      if (typeof entry !== 'object' || entry === null) {
+        return null;
+      }
+
+      const raw = entry as Partial<GoogleSheetSource>;
+      const sheetId = typeof raw.sheetId === 'string' ? raw.sheetId.trim() : '';
+      if (!sheetId) {
+        return null;
+      }
+
+      const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : randomUUID();
+      if (seenIds.has(id)) {
+        return null;
+      }
+      seenIds.add(id);
+
+      const createdAt = typeof raw.createdAt === 'string' && raw.createdAt.trim()
+        ? raw.createdAt.trim()
+        : new Date().toISOString();
+      const updatedAt = typeof raw.updatedAt === 'string' && raw.updatedAt.trim()
+        ? raw.updatedAt.trim()
+        : createdAt;
+
+      return {
+        id,
+        name: normalizeGoogleSheetSourceName(raw.name, `Google Sheet ${index + 1}`),
+        sheetId,
+        createdAt,
+        updatedAt,
+      } satisfies GoogleSheetSource;
+    })
+    .filter((entry): entry is GoogleSheetSource => Boolean(entry));
+}
+
 function normalizeSettings(input: unknown, fallback: AppSettings = DEFAULT_SETTINGS): AppSettings {
   const source = typeof input === 'object' && input !== null ? input as Partial<AppSettings> & {
     apiKeys?: unknown;
@@ -252,10 +319,12 @@ function normalizeSettings(input: unknown, fallback: AppSettings = DEFAULT_SETTI
     defaultCoverLetterDocxEnabled: typeof source.defaultCoverLetterDocxEnabled === 'boolean'
       ? source.defaultCoverLetterDocxEnabled
       : fallback.defaultCoverLetterDocxEnabled,
+    outputStorageMode: normalizeOutputStorageMode(source.outputStorageMode, fallback.outputStorageMode),
     outputBaseDir: normalizeOutputBaseDir(source.outputBaseDir ?? fallback.outputBaseDir),
     outputPathTemplate: validateOutputPathTemplate(
       normalizeOutputPathTemplate(source.outputPathTemplate ?? fallback.outputPathTemplate)
     ),
+    googleSheetsSources: normalizeGoogleSheetsSources(source.googleSheetsSources, fallback.googleSheetsSources),
     apiKeys: normalizeProviderKeyStores(source.apiKeys, fallback.apiKeys),
   };
 }
@@ -283,6 +352,15 @@ function toPublicSettings(settings: AppSettings): PublicAppSettings {
     defaultProfileId: settings.defaultProfileId,
     defaultResumeDocxEnabled: settings.defaultResumeDocxEnabled,
     defaultCoverLetterDocxEnabled: settings.defaultCoverLetterDocxEnabled,
+    outputStorageMode: settings.outputStorageMode,
+    googleSheetsSources: settings.googleSheetsSources,
+  };
+}
+
+function toPublicSettingsWithDerived(settings: AppSettings): PublicAppSettingsWithDerived {
+  return {
+    ...toPublicSettings(settings),
+    outputPathUsesJobTitle: outputPathTemplateUsesJobTitle(settings.outputPathTemplate),
   };
 }
 
@@ -302,7 +380,7 @@ function getStoredActiveApiKey(store: ProviderKeyStore): ApiKeyEntry | null {
 
 function toAdminSettings(settings: AppSettings): AdminAppSettings {
   return {
-    ...toPublicSettings(settings),
+    ...toPublicSettingsWithDerived(settings),
     outputBaseDir: settings.outputBaseDir,
     outputPathTemplate: settings.outputPathTemplate,
     outputPathPreview: buildOutputPathPreview(settings.outputPathTemplate),
@@ -437,8 +515,8 @@ export async function getAppSettings(): Promise<AppSettings> {
   return readSettings();
 }
 
-export async function getPublicAppSettings(): Promise<PublicAppSettings> {
-  return toPublicSettings(await readSettings());
+export async function getPublicAppSettings(): Promise<PublicAppSettingsWithDerived> {
+  return toPublicSettingsWithDerived(await readSettings());
 }
 
 export async function getAdminAppSettings(): Promise<AdminAppSettings> {
@@ -469,7 +547,13 @@ export async function updateAppSettings(input: AppSettingsUpdate): Promise<Admin
     throw new Error('At least one AI model must remain enabled');
   }
 
-  await ensureWritableOutputDir(next.outputBaseDir);
+  const shouldValidateOutputDir =
+    typeof input.outputBaseDir !== 'undefined' ||
+    current.outputBaseDir !== next.outputBaseDir;
+
+  if (shouldValidateOutputDir) {
+    await ensureWritableOutputDir(next.outputBaseDir);
+  }
 
   const saved = await writeSettings(next);
   return toAdminSettings(saved);
@@ -497,15 +581,24 @@ export async function getProviderApiKey(provider: AIProvider): Promise<string> {
   const settings = await readSettings();
   const activeStoredKey = getStoredActiveApiKey(settings.apiKeys[provider]);
   if (activeStoredKey?.value.trim()) {
-    return activeStoredKey.value.trim();
+    const resolved = activeStoredKey.value.trim();
+    console.log(
+      `[AI_KEY_DEBUG] provider=${provider} source=stored key=${maskApiKey(resolved) ?? 'missing'}`
+    );
+    return resolved;
   }
 
-  return getEnvironmentApiKey(provider);
+  const environmentKey = getEnvironmentApiKey(provider);
+  console.log(
+    `[AI_KEY_DEBUG] provider=${provider} source=environment key=${maskApiKey(environmentKey) ?? 'missing'}`
+  );
+  return environmentKey;
 }
 
-export async function getOutputStorageSettings(): Promise<Pick<AppSettings, 'outputBaseDir' | 'outputPathTemplate'>> {
+export async function getOutputStorageSettings(): Promise<Pick<AppSettings, 'outputStorageMode' | 'outputBaseDir' | 'outputPathTemplate'>> {
   const settings = await readSettings();
   return {
+    outputStorageMode: settings.outputStorageMode,
     outputBaseDir: settings.outputBaseDir,
     outputPathTemplate: settings.outputPathTemplate,
   };

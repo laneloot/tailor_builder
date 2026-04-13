@@ -9,6 +9,7 @@ import templateRoutes from './routes/templates';
 import resumeRoutes from './routes/resume';
 import adminRoutes from './routes/admin';
 import groupRoutes from './routes/groups';
+import importRoutes from './routes/import';
 import promptRoutes from './routes/prompts';
 
 dotenv.config({ path: path.join(__dirname, '../../.env'), override: true });
@@ -64,6 +65,7 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/groups', groupRoutes);
+app.use('/api/import', importRoutes);
 app.use('/api/prompts', promptRoutes);
 
 // Health check
