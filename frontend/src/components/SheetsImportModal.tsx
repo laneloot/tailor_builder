@@ -19,6 +19,7 @@ type ColumnMapping = {
 type Props = {
   isOpen: boolean;
   isSubmitting: boolean;
+  showJobTitleMapping: boolean;
   sources: GoogleSheetSource[];
   selectedSourceId: string;
   onSelectSource: (sourceId: string) => void;
@@ -65,6 +66,7 @@ function parseSpreadsheetColumnInput(label: string, value: string): number {
 export default function SheetsImportModal({
   isOpen,
   isSubmitting,
+  showJobTitleMapping,
   sources,
   selectedSourceId,
   onSelectSource,
@@ -109,6 +111,11 @@ export default function SheetsImportModal({
     setMapping(DEFAULT_MAPPING);
     setError('');
   }, [isOpen, selectedSource?.id]);
+
+  useEffect(() => {
+    if (showJobTitleMapping) return;
+    setMapping((current) => (current.jobTitle === '' ? current : { ...current, jobTitle: '' }));
+  }, [showJobTitleMapping]);
 
   const columnOptions = useMemo(() => {
     if (!values.length) return [];
@@ -185,7 +192,8 @@ export default function SheetsImportModal({
     }
 
     const companyIndex = Number(mapping.companyName);
-    const jobTitleIndex = mapping.jobTitle === '' ? null : Number(mapping.jobTitle);
+    const jobTitleIndex =
+      showJobTitleMapping && mapping.jobTitle !== '' ? Number(mapping.jobTitle) : null;
     const jobDescriptionIndex = Number(mapping.jobDescription);
     const jobs: ImportedSheetJob[] = [];
     let skippedRows = 0;
@@ -353,7 +361,7 @@ export default function SheetsImportModal({
                     <div className="text-xs text-gray-500">Rows loaded: {values.length}</div>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <div className={`grid gap-4 ${showJobTitleMapping ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
                         company_name <span className="text-red-500">*</span>
@@ -372,22 +380,24 @@ export default function SheetsImportModal({
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700">job_title</label>
-                      <select
-                        value={mapping.jobTitle}
-                        onChange={(e) => setMapping((current) => ({ ...current, jobTitle: e.target.value }))}
-                        disabled={isSubmitting}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Skip</option>
-                        {columnOptions.map((option) => (
-                          <option key={`title-${option.value}`} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {showJobTitleMapping && (
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">job_title</label>
+                        <select
+                          value={mapping.jobTitle}
+                          onChange={(e) => setMapping((current) => ({ ...current, jobTitle: e.target.value }))}
+                          disabled={isSubmitting}
+                          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Skip</option>
+                          {columnOptions.map((option) => (
+                            <option key={`title-${option.value}`} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
                         job_description <span className="text-red-500">*</span>

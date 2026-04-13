@@ -203,6 +203,12 @@ export default function Home() {
     includeCoverLetterDocx: modelSettings.defaultCoverLetterDocxEnabled,
   });
   const shouldShowRoleInput = modelSettings.outputPathUsesJobTitle;
+  const hasGoogleSheetSources = modelSettings.googleSheetsSources.length > 0;
+
+  useEffect(() => {
+    if (hasGoogleSheetSources || !isSheetsImportOpen) return;
+    setIsSheetsImportOpen(false);
+  }, [hasGoogleSheetSources, isSheetsImportOpen]);
 
   const getSelectedProfilesForSheetsBuilder = () => {
     if (sheetsTargetMode === 'single') {
@@ -1561,17 +1567,23 @@ export default function Home() {
               </select>
             </div>
 
+            {!hasGoogleSheetSources && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Save at least one Google Sheet in the Admin Google Sheets panel before importing jobs here.
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => {
-                if (!modelSettings.googleSheetsSources.length) {
+                if (!hasGoogleSheetSources) {
                   setError('Save at least one Google Sheet in the Admin Google Sheets panel before importing.');
                   return;
                 }
                 setError('');
                 setIsSheetsImportOpen(true);
               }}
-              disabled={isGenerating || modelSettings.googleSheetsSources.length === 0}
+              disabled={isGenerating}
               className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
             >
               {isGenerating ? generationStep || 'Generating...' : 'Import from Google Sheet'}
@@ -1740,6 +1752,7 @@ export default function Home() {
       <SheetsImportModal
         isOpen={isSheetsImportOpen}
         isSubmitting={isGenerating}
+        showJobTitleMapping={shouldShowRoleInput}
         sources={modelSettings.googleSheetsSources}
         selectedSourceId={selectedSheetsSourceId}
         onSelectSource={setSelectedSheetsSourceId}
