@@ -1,71 +1,62 @@
 {
-  "name": "Tirath Shah",
-  "title": "Senior Software Engineer",
-  "totalYearsExperience": 13,
-  "preferredTemplate": "two-column-john",
+  "name": "Joseph Jepson",
+  "title": "Elixir Software Engineer",
+  "totalYearsExperience": 10,
+  "preferredTemplate": "5964089f-9c93-44ab-8600-22bca6b0f37b",
   "disabled": true,
   "contact": {
-    "phone": "(510) 397-8594",
-    "email": "tirathshah27@gmail.com",
-    "linkedin": "https://www.linkedin.com/in/tirath/",
+    "phone": "(281) 560-3146",
+    "email": "joseph.jepson.tech@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/josephjepson/",
     "github": "",
     "portfolio": "",
-    "location": "San Francisco, CA"
+    "location": "Portland, Oregon"
   },
   "summary": "",
   "experience": [
     {
-      "title": "Senior Software Engineer",
-      "company": "Roku Inc.",
-      "startDate": "11/2021",
+      "title": "Elixir Software Developer",
+      "company": "Simpli.fi",
+      "startDate": "03/2025",
       "endDate": "Present",
-      "location": "San Francisco Bay Area",
-      "description": "Licensing, Audio, Operating System for TV, Streaming Players and Smart TVs, Smart Home, Streaming Platform, Content Distribution, OTT Advertising, Advertising, Home Entertainment, Streaming Media, and Original Programming",
+      "location": "Fort Worth, Texas",
+      "description": "Programmatic Advertising, Connected TV (CTV), Display Ads, Video Ads, Native Ads, Audio Ads, Demand-Side Platform, Data Management Platform, Political Advertising, DTC/E-Commerce Advertising, Retargeting, Online Attribution, Offline Attribution, Addressable Targeting, Contextual Targeting, Custom Audiences, Digital Advertising, and Advertising Platform",
       "achievements": []
     },
     {
-      "title": "Senior Software Engineer",
-      "company": "PlayStation",
-      "startDate": "11/2019",
-      "endDate": "10/2021",
-      "location": "San Francisco, CA",
-      "description": "Sony Interactive Entertainment, the company behind PlayStation, pushes the boundaries of entertainment and innovation, starting from the launch of the original PlayStation in Japan in 1994. Today, we continue to deliver innovative and thrilling experiences to a global audience through our PlayStation line of products and services that include generation-defining hardware, pioneering network services, and award-winning games.",
+      "title": "Software Engineer",
+      "company": "telefi",
+      "startDate": "03/2022",
+      "endDate": "03/2025",
+      "location": "Scottsdale, Arizona",
+      "description": "Telefi offers names, phone numbers, and addresses screened for DNC in bulk on a map.",
       "achievements": []
     },
     {
-      "title": "Software Engineer II",
-      "company": "PlayStation",
-      "startDate": "01/2016",
-      "endDate": "11/2019",
-      "location": "San Francisco, CA",
-      "description": "Sony Interactive Entertainment, the company behind PlayStation, pushes the boundaries of entertainment and innovation, starting from the launch of the original PlayStation in Japan in 1994. Today, we continue to deliver innovative and thrilling experiences to a global audience through our PlayStation line of products and services that include generation-defining hardware, pioneering network services, and award-winning games.",
+      "title": "Junior Developer",
+      "company": "Streetlight Digital",
+      "startDate": "03/2021",
+      "endDate": "03/2022",
+      "location": "Tucson, Arizona",
+      "description": "Direct Response Marketing, P2P Fundraising Strategy, Annual Giving Campaign Strategy, Multichannel Fundraising Campaigns, Donor Engagement and Retention Programs, Digital Advertising, Email Marketing and Automation, TeamRaiser Customization, Paid and Organic Social Media Strategy, Content Marketing for Nonprofits, Website Optimization for Fundraising, Fundraising Platform Migration and Support, Advocacy Campaign Strategy, Volunteer and Community Engagement, and Nonprofit Brand and Growth Strategy",
       "achievements": []
     },
     {
-      "title": "Front End Engineer",
-      "company": "Gap Inc.",
-      "startDate": "02/2015",
-      "endDate": "01/2016",
-      "location": "San Francisco Bay Area",
-      "description": "Fashion & Apparel, IT/E-Commerce, Retail, Supply Chain, Inventory Management, and Design & Merchandising",
+      "title": "Clinical Laboratory Coordinator",
+      "company": "Donor Network of Arizona",
+      "startDate": "05/2019",
+      "endDate": "03/2021",
+      "location": "Tempe, Arizona",
+      "description": "DNA provides an array of services to promote donation awareness, to implement donation recovery, and to help donor families in Arizona. \nDNA's mission is to make the most of life through the gift of organ and tissue donation.",
       "achievements": []
     },
     {
-      "title": "Application Engineer",
-      "company": "PayPal",
-      "startDate": "05/2014",
-      "endDate": "01/2015",
-      "location": "San Francisco Bay Area",
-      "description": "Online Payments, Mobile Commerce, Payment Security, Money Transfers, Payment Processing, Monetization for Developers, and E-commerce",
-      "achievements": []
-    },
-    {
-      "title": "Network Engineer",
-      "company": "Pioneer Investcorp",
-      "startDate": "07/2011",
-      "endDate": "06/2012",
-      "location": "Mumbai Metropolitan Region",
-      "description": "Pioneer Investcorp (PINC) is one of India’s leading investment Bankers and Institutional Brokers. PINC over the last two decades have developed expertise in its research and investment strategies.",
+      "title": "Tissue Recovery Coordinator",
+      "company": "Donor Network of Arizona",
+      "startDate": "08/2016",
+      "endDate": "04/2019",
+      "location": "Tempe, Arizona",
+      "description": "DNA provides an array of services to promote donation awareness, to implement donation recovery, and to help donor families in Arizona. \nDNA's mission is to make the most of life through the gift of organ and tissue donation.",
       "achievements": []
     }
   ],
@@ -73,24 +64,16 @@
   "skills": [],
   "education": [
     {
-      "degree": "Master's Degree",
-      "institution": "University of Pittsburgh",
-      "startDate": "2012",
-      "endDate": "2013",
-      "location": "",
-      "gpa": ""
-    },
-    {
       "degree": "Bachelor's Degree",
-      "institution": "K. J. Somaiya Institute of Technology",
-      "startDate": "2007",
-      "endDate": "2011",
-      "location": "",
+      "institution": "University of Arizona",
+      "startDate": "05/2012",
+      "endDate": "04/2016",
+      "location": "Tucson, Arizona",
       "gpa": ""
     }
   ],
   "certifications": [],
-  "id": "3d8357ee-b106-48fd-a556-2d2a11f68f56",
-  "createdAt": "2026-04-01T15:29:04.101Z",
-  "updatedAt": "2026-04-09T13:49:46.644Z"
+  "id": "1c6c0cd5-f7ca-4e3c-b939-583179ab8532",
+  "createdAt": "2026-04-11T03:03:51.894Z",
+  "updatedAt": "2026-04-11T04:33:26.533Z"
 }

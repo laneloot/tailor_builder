@@ -28,10 +28,28 @@ function normalizeDialogOutput(raw: string): string | null {
   return path.resolve(trimmed);
 }
 
-function isDialogCancelError(error: unknown): boolean {
+function isDialogCancelError(error: unknown, command: string): boolean {
   if (!(error instanceof Error)) return false;
   const message = error.message.toLowerCase();
-  return message.includes('cancel') || message.includes('canceled') || message.includes('cancelled');
+  if (message.includes('cancel') || message.includes('canceled') || message.includes('cancelled')) {
+    return true;
+  }
+
+  const execError = error as ExecError;
+  const code = execError.code;
+
+  // GUI pickers commonly use exit code 1 for user cancel/close instead of
+  // writing an explicit "cancelled" message to stderr.
+  if (code === 1 || code === '1') {
+    return ['zenity', 'qarma', 'yad', 'kdialog', 'osascript'].includes(command);
+  }
+
+  // YAD can return 252 when the dialog is closed via ESC/window close.
+  if (code === 252 || code === '252') {
+    return command === 'yad';
+  }
+
+  return false;
 }
 
 function isCommandMissingError(error: unknown): boolean {
@@ -150,7 +168,7 @@ async function pickWithCommands(commands: DialogCommand[]): Promise<string | nul
     try {
       return await runDialogCommand(entry.command, entry.args);
     } catch (error) {
-      if (isDialogCancelError(error)) {
+      if (isDialogCancelError(error, entry.command)) {
         return null;
       }
       if (isCommandMissingError(error)) {

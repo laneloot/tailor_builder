@@ -3,10 +3,10 @@
   "title": "Senior QA engineer",
   "totalYearsExperience": 9,
   "preferredTemplate": "750ce261-8304-47af-bd7b-1eab10722910",
-  "disabled": true,
+  "disabled": false,
   "contact": {
     "phone": "(757) 304-0199",
-    "email": "daniel.harris0193@gmail.com",
+    "email": "dani.harris193@gmail.com",
     "linkedin": "https://www.linkedin.com/in/daniel-harris-a410a3a5/",
     "github": "",
     "portfolio": "",
@@ -57,5 +57,5 @@
   "certifications": [],
   "id": "5959cfa6-c874-4e2c-89a9-9725eac3cc7b",
   "createdAt": "2026-04-08T20:23:37.887Z",
-  "updatedAt": "2026-04-10T11:58:17.937Z"
+  "updatedAt": "2026-04-14T00:55:37.092Z"
 }

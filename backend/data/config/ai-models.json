@@ -1,26 +1,17 @@
 {
-  "openaiEnabled": false,
-  "claudeEnabled": false,
+  "openaiEnabled": true,
+  "claudeEnabled": true,
   "openrouterEnabled": true,
   "defaultMode": "generate",
-  "defaultTheme": "dark",
+  "defaultTheme": "light",
   "defaultResumeSelection": "single",
   "defaultGroupId": "",
-  "defaultProfileId": "09e26808-9d00-484a-bd9c-494996751679",
+  "defaultProfileId": "",
   "defaultResumeDocxEnabled": false,
   "defaultCoverLetterDocxEnabled": false,
-  "outputStorageMode": "single",
-  "outputBaseDir": "/run/user/1000/gvfs/smb-share:server=100.1.14.1,share=generated/tailor_test",
+  "outputBaseDir": "/home/adonis/Documents/tailor_resumes",
   "outputPathTemplate": "/{{date}}/{{profile name}}/{{company name}}",
-  "googleSheetsSources": [
-    {
-      "id": "sheet-1776032513798",
-      "name": "Bid History",
-      "sheetId": "1k77xH2jb7zlkgaR7B-oCoJeXoNWiHU2hKaxiq6v-li4",
-      "createdAt": "2026-04-12T22:21:53.798Z",
-      "updatedAt": "2026-04-12T22:21:53.798Z"
-    }
-  ],
+  "googleSheetsSources": [],
   "apiKeys": {
     "openai": {
       "activeKeyId": "",
@@ -31,15 +22,8 @@
       "entries": []
     },
     "openrouter": {
-      "activeKeyId": "971053c8-0b82-429a-8eca-2ba52e0e1cfa",
-      "entries": [
-        {
-          "id": "971053c8-0b82-429a-8eca-2ba52e0e1cfa",
-          "name": "Primary key",
-          "value": "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",
-          "createdAt": "2026-04-11T14:59:24.303Z"
-        }
-      ]
+      "activeKeyId": "",
+      "entries": []
     }
   }
 }

@@ -268,7 +268,9 @@ router.post('/generate-all', async (req, res) => {
             res.status(400).json({ error: 'Role is required' });
             return;
         }
+        const normalizedCompanyName = companyName.trim();
         const results = [];
+        const failures = [];
         const unconfirmedHardMap = new Map();
         const unconfirmedSoftMap = new Map();
         const formatNorm = format === 'both' ? 'both' : format === 'docx' ? 'docx' : 'pdf';
@@ -276,69 +278,83 @@ router.post('/generate-all', async (req, res) => {
         for (const profile of profiles) {
             if (!profile)
                 continue;
-            const profileTemplateId = profile.preferredTemplate ?? templateId ?? 'default';
-            let template = await (0, templateExtractor_1.getTemplateById)(profileTemplateId);
-            if (!template || template.disabled)
-                template = await (0, templateExtractor_1.getTemplateById)('default');
-            if (!template || template.disabled) {
-                res.status(500).json({ error: 'Default template not available' });
-                return;
-            }
-            let tailoredContent;
-            if (analysis) {
-                tailoredContent = await (0, claude_1.tailorResume)(profile, analysis, selectedModel);
-            }
-            if (tailoredContent) {
-                for (const skill of tailoredContent.unconfirmedHardSkills ?? []) {
-                    const key = skill.trim().toLowerCase();
-                    if (key && !unconfirmedHardMap.has(key)) {
-                        unconfirmedHardMap.set(key, skill.trim());
+            try {
+                const profileTemplateId = profile.preferredTemplate ?? templateId ?? 'default';
+                let template = await (0, templateExtractor_1.getTemplateById)(profileTemplateId);
+                if (!template || template.disabled)
+                    template = await (0, templateExtractor_1.getTemplateById)('default');
+                if (!template || template.disabled) {
+                    throw new Error('Default template not available');
+                }
+                let tailoredContent;
+                if (analysis) {
+                    tailoredContent = await (0, claude_1.tailorResume)(profile, analysis, selectedModel);
+                }
+                if (tailoredContent) {
+                    for (const skill of tailoredContent.unconfirmedHardSkills ?? []) {
+                        const key = skill.trim().toLowerCase();
+                        if (key && !unconfirmedHardMap.has(key)) {
+                            unconfirmedHardMap.set(key, skill.trim());
+                        }
+                    }
+                    for (const skill of tailoredContent.unconfirmedSoftSkills ?? []) {
+                        const key = skill.trim().toLowerCase();
+                        if (key && !unconfirmedSoftMap.has(key)) {
+                            unconfirmedSoftMap.set(key, skill.trim());
+                        }
                     }
                 }
-                for (const skill of tailoredContent.unconfirmedSoftSkills ?? []) {
-                    const key = skill.trim().toLowerCase();
-                    if (key && !unconfirmedSoftMap.has(key)) {
-                        unconfirmedSoftMap.set(key, skill.trim());
-                    }
+                let coverLetterBody;
+                if (tailoredContent?.coverLetter?.trim()) {
+                    coverLetterBody = tailoredContent.coverLetter.trim();
                 }
+                else {
+                    coverLetterBody = await (0, claude_1.generateCoverLetter)(profile, normalizedCompanyName, resolvedRole, selectedModel);
+                }
+                const pathInfo = await (0, generatedPath_1.getGeneratedOutputPath)(profile, normalizedCompanyName, resolvedRole);
+                const coverLetterPdfPath = await (0, coverLetterGenerator_1.saveCoverLetter)(profile, coverLetterBody, pathInfo);
+                const coverLetterDocxPath = generateCoverLetterDocx
+                    ? await (0, coverLetterGenerator_1.saveCoverLetterDOCX)(profile, coverLetterBody, pathInfo)
+                    : undefined;
+                const entry = {
+                    profileId: profile.id,
+                    profileName: profile.name,
+                    coverLetterPdf: coverLetterPdfPath,
+                    coverLetterDocx: coverLetterDocxPath,
+                };
+                if (formatNorm === 'both') {
+                    const [pdfFilename, docxFilename] = await Promise.all([
+                        (0, pdfGenerator_1.generateResumePDF)(profile, template, tailoredContent, pathInfo, normalizedCompanyName, resolvedRole),
+                        (0, docxGenerator_1.generateResumeDOCX)(profile, tailoredContent, pathInfo, normalizedCompanyName, resolvedRole)
+                    ]);
+                    entry.pdf = pdfFilename;
+                    entry.docx = docxFilename;
+                }
+                else {
+                    const filename = formatNorm === 'docx'
+                        ? await (0, docxGenerator_1.generateResumeDOCX)(profile, tailoredContent, pathInfo, normalizedCompanyName, resolvedRole)
+                        : await (0, pdfGenerator_1.generateResumePDF)(profile, template, tailoredContent, pathInfo, normalizedCompanyName, resolvedRole);
+                    entry[formatNorm] = filename;
+                }
+                results.push(entry);
             }
-            let coverLetterBody;
-            if (tailoredContent?.coverLetter?.trim()) {
-                coverLetterBody = tailoredContent.coverLetter.trim();
+            catch (profileError) {
+                const message = profileError instanceof Error ? profileError.message : 'Failed to generate resume';
+                console.error(`Error generating resume for profile ${profile.id} (${profile.name}) at ${normalizedCompanyName}:`, profileError);
+                failures.push({
+                    profileId: profile.id,
+                    profileName: profile.name,
+                    companyName: normalizedCompanyName,
+                    error: message,
+                });
             }
-            else {
-                coverLetterBody = await (0, claude_1.generateCoverLetter)(profile, companyName.trim(), resolvedRole, selectedModel);
-            }
-            const pathInfo = await (0, generatedPath_1.getGeneratedOutputPath)(profile, companyName.trim(), resolvedRole);
-            const coverLetterPdfPath = await (0, coverLetterGenerator_1.saveCoverLetter)(profile, coverLetterBody, pathInfo);
-            const coverLetterDocxPath = generateCoverLetterDocx
-                ? await (0, coverLetterGenerator_1.saveCoverLetterDOCX)(profile, coverLetterBody, pathInfo)
-                : undefined;
-            const entry = {
-                profileId: profile.id,
-                profileName: profile.name,
-                coverLetterPdf: coverLetterPdfPath,
-                coverLetterDocx: coverLetterDocxPath,
-            };
-            if (formatNorm === 'both') {
-                const [pdfFilename, docxFilename] = await Promise.all([
-                    (0, pdfGenerator_1.generateResumePDF)(profile, template, tailoredContent, pathInfo, companyName.trim(), resolvedRole),
-                    (0, docxGenerator_1.generateResumeDOCX)(profile, tailoredContent, pathInfo, companyName.trim(), resolvedRole)
-                ]);
-                entry.pdf = pdfFilename;
-                entry.docx = docxFilename;
-            }
-            else {
-                const filename = formatNorm === 'docx'
-                    ? await (0, docxGenerator_1.generateResumeDOCX)(profile, tailoredContent, pathInfo, companyName.trim(), resolvedRole)
-                    : await (0, pdfGenerator_1.generateResumePDF)(profile, template, tailoredContent, pathInfo, companyName.trim(), resolvedRole);
-                entry[formatNorm] = filename;
-            }
-            results.push(entry);
         }
         res.json({
             generated: results.length,
             results,
+            failed: failures.length,
+            failures,
+            failedCompanies: failures.length > 0 ? [normalizedCompanyName] : [],
             tailored: !!analysis,
             unconfirmedHardSkills: Array.from(unconfirmedHardMap.values()),
             unconfirmedSoftSkills: Array.from(unconfirmedSoftMap.values()),
@@ -490,6 +506,8 @@ router.post('/generate', async (req, res) => {
         }
         const generateBoth = format === 'both';
         const generateCoverLetterDocx = shouldGenerateCoverLetterDocx(includeCoverLetterDocx);
+        const unconfirmedHardSkills = tailoredContent?.unconfirmedHardSkills ?? [];
+        const unconfirmedSoftSkills = tailoredContent?.unconfirmedSoftSkills ?? [];
         // Get cover letter body: from tailored content or generate when no job description
         let coverLetterBody;
         if (tailoredContent?.coverLetter?.trim()) {
@@ -523,6 +541,8 @@ router.post('/generate', async (req, res) => {
                         : {}),
                 },
                 tailored: !!tailoredContent,
+                unconfirmedHardSkills,
+                unconfirmedSoftSkills,
             });
         }
         else {
@@ -545,7 +565,9 @@ router.post('/generate', async (req, res) => {
                         : {}),
                 },
                 tailored: !!tailoredContent,
-                format: formatNorm
+                format: formatNorm,
+                unconfirmedHardSkills,
+                unconfirmedSoftSkills,
             });
         }
     }

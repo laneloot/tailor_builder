@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Profile, CreateProfileDTO, Experience, Strength, Education, adminApi, templatesApi, profilesApi, Template } from '@/lib/api';
+import { Profile, CreateProfileDTO, Experience, Strength, Education, templatesApi, profilesApi, Template } from '@/lib/api';
 
 interface ProfileFormProps {
   initialData?: Profile;
@@ -14,7 +14,6 @@ interface ManualProfileFormData {
   title: string;
   totalYearsExperience: string;
   preferredTemplate: string;
-  outputDirectory: string;
   contact: {
     phone: string;
     email: string;
@@ -38,7 +37,6 @@ export default function ProfileForm({
   onCancel,
 }: ProfileFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isBrowsingDirectory, setIsBrowsingDirectory] = useState(false);
   const [error, setError] = useState('');
 
   const initialHardSkills = initialData?.hardSkills || initialData?.skills || [];
@@ -51,7 +49,6 @@ export default function ProfileForm({
         ? String(initialData.totalYearsExperience)
         : '',
     preferredTemplate: initialData?.preferredTemplate || '',
-    outputDirectory: initialData?.outputDirectory || '',
     contact: initialData?.contact || {
       phone: '',
       email: '',
@@ -105,7 +102,6 @@ export default function ProfileForm({
             ? parsedYears
             : undefined,
         preferredTemplate: formData.preferredTemplate || undefined,
-        outputDirectory: formData.outputDirectory.trim() || undefined,
         skills: formData.hardSkills,
       });
     } catch (err) {
@@ -235,21 +231,6 @@ export default function ProfileForm({
     });
   };
 
-  const handleBrowseOutputDirectory = async () => {
-    try {
-      setIsBrowsingDirectory(true);
-      setError('');
-      const result = await adminApi.browseOutputDirectory(formData.outputDirectory);
-      if (result.selectedPath) {
-        setFormData((current) => ({ ...current, outputDirectory: result.selectedPath ?? '' }));
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to open folder picker');
-    } finally {
-      setIsBrowsingDirectory(false);
-    }
-  };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
@@ -331,31 +312,6 @@ export default function ProfileForm({
             </select>
             <p className="mt-1 text-xs text-gray-500">
               When set, this template is used automatically when building resumes for this profile.
-            </p>
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Output Directory
-            </label>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <input
-                type="text"
-                value={formData.outputDirectory}
-                onChange={(e) => setFormData({ ...formData, outputDirectory: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="/mnt/profile-specific-output"
-              />
-              <button
-                type="button"
-                onClick={handleBrowseOutputDirectory}
-                disabled={isSubmitting || isBrowsingDirectory}
-                className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 sm:min-w-32"
-              >
-                {isBrowsingDirectory ? 'Opening...' : 'Browse...'}
-              </button>
-            </div>
-            <p className="mt-1 text-xs text-gray-500">
-              Used when multi-folder output mode is active. Leave blank to keep this profile on the shared output folder in single-folder mode.
             </p>
           </div>
         </div>

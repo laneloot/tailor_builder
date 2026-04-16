@@ -2,7 +2,6 @@ import { AIProvider } from '../types/template';
 export type DefaultMode = 'preview' | 'generate';
 export type ThemeMode = 'light' | 'dark';
 export type DefaultResumeSelection = 'single' | 'all' | 'group';
-export type OutputStorageMode = 'single' | 'multi';
 type ApiKeyEntry = {
     id: string;
     name: string;
@@ -42,14 +41,13 @@ type AppSettings = {
     defaultProfileId: string;
     defaultResumeDocxEnabled: boolean;
     defaultCoverLetterDocxEnabled: boolean;
-    outputStorageMode: OutputStorageMode;
     outputBaseDir: string;
     outputPathTemplate: string;
     googleSheetsSources: GoogleSheetSource[];
     apiKeys: ProviderKeyStores;
 };
 export type AIModelSettings = Pick<AppSettings, 'openaiEnabled' | 'claudeEnabled' | 'openrouterEnabled'>;
-export type PublicAppSettings = AIModelSettings & Pick<AppSettings, 'defaultMode' | 'defaultTheme' | 'defaultResumeSelection' | 'defaultGroupId' | 'defaultProfileId' | 'defaultResumeDocxEnabled' | 'defaultCoverLetterDocxEnabled' | 'outputStorageMode' | 'googleSheetsSources'>;
+export type PublicAppSettings = AIModelSettings & Pick<AppSettings, 'defaultMode' | 'defaultTheme' | 'defaultResumeSelection' | 'defaultGroupId' | 'defaultProfileId' | 'defaultResumeDocxEnabled' | 'defaultCoverLetterDocxEnabled' | 'googleSheetsSources'>;
 export type PublicAppSettingsWithDerived = PublicAppSettings & {
     outputPathUsesJobTitle: boolean;
 };
@@ -86,7 +84,7 @@ export declare function updateAppSettings(input: AppSettingsUpdate): Promise<Adm
 export declare function getAIModelSettings(): Promise<AIModelSettings>;
 export declare function updateAIModelSettings(input: Partial<AIModelSettings>): Promise<AIModelSettings>;
 export declare function getProviderApiKey(provider: AIProvider): Promise<string>;
-export declare function getOutputStorageSettings(): Promise<Pick<AppSettings, 'outputStorageMode' | 'outputBaseDir' | 'outputPathTemplate'>>;
+export declare function getOutputStorageSettings(): Promise<Pick<AppSettings, 'outputBaseDir' | 'outputPathTemplate'>>;
 export declare function isProviderEnabled(provider: AIProvider, settings: AIModelSettings): boolean;
 export declare function getDefaultEnabledProvider(settings: AIModelSettings): AIProvider;
 export {};

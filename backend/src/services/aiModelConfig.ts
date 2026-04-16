@@ -12,11 +12,21 @@ import {
   outputPathTemplateUsesJobTitle,
   validateOutputPathTemplate,
 } from '../config/storage';
+import {
+  countStoredApiKeys,
+  countStoredGoogleSheetRows,
+  ensureSettingsDatabase,
+  readStoredApiKeys,
+  readStoredGoogleSheetRows,
+  replaceStoredApiKeys,
+  replaceStoredGoogleSheetRows,
+  StoredApiKeyRow,
+  StoredGoogleSheetRow,
+} from './settingsDatabase';
 
 export type DefaultMode = 'preview' | 'generate';
 export type ThemeMode = 'light' | 'dark';
 export type DefaultResumeSelection = 'single' | 'all' | 'group';
-export type OutputStorageMode = 'single' | 'multi';
 
 type ApiKeyEntry = {
   id: string;
@@ -62,7 +72,6 @@ type AppSettings = {
   defaultProfileId: string;
   defaultResumeDocxEnabled: boolean;
   defaultCoverLetterDocxEnabled: boolean;
-  outputStorageMode: OutputStorageMode;
   outputBaseDir: string;
   outputPathTemplate: string;
   googleSheetsSources: GoogleSheetSource[];
@@ -80,7 +89,6 @@ export type PublicAppSettings = AIModelSettings & Pick<
   | 'defaultProfileId'
   | 'defaultResumeDocxEnabled'
   | 'defaultCoverLetterDocxEnabled'
-  | 'outputStorageMode'
   | 'googleSheetsSources'
 >;
 export type PublicAppSettingsWithDerived = PublicAppSettings & {
@@ -130,7 +138,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultProfileId: '',
   defaultResumeDocxEnabled: true,
   defaultCoverLetterDocxEnabled: true,
-  outputStorageMode: 'single',
   outputBaseDir: DEFAULT_GENERATED_RESUMES_DIR,
   outputPathTemplate: DEFAULT_OUTPUT_PATH_TEMPLATE,
   googleSheetsSources: [],
@@ -140,6 +147,21 @@ const DEFAULT_SETTINGS: AppSettings = {
     openrouter: { activeKeyId: '', entries: [] },
   },
 };
+
+function createEmptyProviderKeyStores(): ProviderKeyStores {
+  return {
+    openai: { activeKeyId: '', entries: [] },
+    claude: { activeKeyId: '', entries: [] },
+    openrouter: { activeKeyId: '', entries: [] },
+  };
+}
+
+function createDbBackedDefaults(): Pick<AppSettings, 'googleSheetsSources' | 'apiKeys'> {
+  return {
+    googleSheetsSources: [],
+    apiKeys: createEmptyProviderKeyStores(),
+  };
+}
 
 function normalizeThemeMode(value: unknown, fallback: ThemeMode): ThemeMode {
   return value === 'light' || value === 'dark' ? value : fallback;
@@ -154,10 +176,6 @@ function normalizeDefaultResumeSelection(
   fallback: DefaultResumeSelection
 ): DefaultResumeSelection {
   return value === 'single' || value === 'all' || value === 'group' ? value : fallback;
-}
-
-function normalizeOutputStorageMode(value: unknown, fallback: OutputStorageMode): OutputStorageMode {
-  return value === 'single' || value === 'multi' ? value : fallback;
 }
 
 function getEnvironmentApiKey(provider: AIProvider): string {
@@ -319,13 +337,80 @@ function normalizeSettings(input: unknown, fallback: AppSettings = DEFAULT_SETTI
     defaultCoverLetterDocxEnabled: typeof source.defaultCoverLetterDocxEnabled === 'boolean'
       ? source.defaultCoverLetterDocxEnabled
       : fallback.defaultCoverLetterDocxEnabled,
-    outputStorageMode: normalizeOutputStorageMode(source.outputStorageMode, fallback.outputStorageMode),
     outputBaseDir: normalizeOutputBaseDir(source.outputBaseDir ?? fallback.outputBaseDir),
     outputPathTemplate: validateOutputPathTemplate(
       normalizeOutputPathTemplate(source.outputPathTemplate ?? fallback.outputPathTemplate)
     ),
     googleSheetsSources: normalizeGoogleSheetsSources(source.googleSheetsSources, fallback.googleSheetsSources),
     apiKeys: normalizeProviderKeyStores(source.apiKeys, fallback.apiKeys),
+  };
+}
+
+function toStoredApiKeyRows(stores: ProviderKeyStores): StoredApiKeyRow[] {
+  const rows: StoredApiKeyRow[] = [];
+
+  for (const provider of PROVIDERS) {
+    const store = stores[provider];
+    const activeKeyId = store.activeKeyId.trim();
+
+    for (const entry of store.entries) {
+      rows.push({
+        id: entry.id,
+        provider,
+        name: entry.name,
+        keyValue: entry.value,
+        isActive: activeKeyId.length > 0 && entry.id === activeKeyId,
+        createdAt: entry.createdAt,
+      });
+    }
+  }
+
+  return rows;
+}
+
+function fromStoredApiKeyRows(rows: StoredApiKeyRow[]): ProviderKeyStores {
+  const stores = createEmptyProviderKeyStores();
+
+  for (const provider of PROVIDERS) {
+    const providerRows = rows.filter((row) => row.provider === provider);
+    stores[provider] = {
+      activeKeyId: providerRows.find((row) => row.isActive)?.id ?? providerRows[0]?.id ?? '',
+      entries: providerRows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        value: row.keyValue,
+        createdAt: row.createdAt,
+      })),
+    };
+  }
+
+  return stores;
+}
+
+function toStoredGoogleSheetRows(sources: GoogleSheetSource[]): StoredGoogleSheetRow[] {
+  return sources.map((source) => ({
+    id: source.id,
+    name: source.name,
+    sheetId: source.sheetId,
+    createdAt: source.createdAt,
+    updatedAt: source.updatedAt,
+  }));
+}
+
+function fromStoredGoogleSheetRows(rows: StoredGoogleSheetRow[]): GoogleSheetSource[] {
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    sheetId: row.sheetId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }));
+}
+
+function toFileBackedSettings(settings: AppSettings): AppSettings {
+  return {
+    ...settings,
+    ...createDbBackedDefaults(),
   };
 }
 
@@ -352,7 +437,6 @@ function toPublicSettings(settings: AppSettings): PublicAppSettings {
     defaultProfileId: settings.defaultProfileId,
     defaultResumeDocxEnabled: settings.defaultResumeDocxEnabled,
     defaultCoverLetterDocxEnabled: settings.defaultCoverLetterDocxEnabled,
-    outputStorageMode: settings.outputStorageMode,
     googleSheetsSources: settings.googleSheetsSources,
   };
 }
@@ -443,24 +527,65 @@ async function ensureConfigDir(): Promise<void> {
   }
 }
 
-async function readSettings(): Promise<AppSettings> {
+async function readSettingsFile(): Promise<AppSettings> {
   await ensureConfigDir();
   try {
     const raw = await fs.readFile(CONFIG_FILE, 'utf-8');
     const parsed = JSON.parse(raw) as unknown;
     const settings = ensureAtLeastOneProviderEnabled(normalizeSettings(parsed));
-    await fs.writeFile(CONFIG_FILE, JSON.stringify(settings, null, 2));
+    await fs.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(settings), null, 2));
     return settings;
   } catch {
-    await fs.writeFile(CONFIG_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2));
+    await fs.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(DEFAULT_SETTINGS), null, 2));
     return DEFAULT_SETTINGS;
   }
 }
 
+async function ensureSettingsStorageReady(): Promise<void> {
+  await ensureConfigDir();
+  ensureSettingsDatabase();
+
+  const fileSettings = await readSettingsFile();
+  const hasStoredApiKeys = countStoredApiKeys() > 0;
+  const hasStoredGoogleSheetRows = countStoredGoogleSheetRows() > 0;
+
+  let migrated = false;
+
+  if (!hasStoredApiKeys && fileSettings.apiKeys && toStoredApiKeyRows(fileSettings.apiKeys).length > 0) {
+    replaceStoredApiKeys(toStoredApiKeyRows(fileSettings.apiKeys));
+    migrated = true;
+  }
+
+  if (!hasStoredGoogleSheetRows && fileSettings.googleSheetsSources.length > 0) {
+    replaceStoredGoogleSheetRows(toStoredGoogleSheetRows(fileSettings.googleSheetsSources));
+    migrated = true;
+  }
+
+  if (migrated) {
+    await fs.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(fileSettings), null, 2));
+  }
+}
+
+async function readSettings(): Promise<AppSettings> {
+  await ensureSettingsStorageReady();
+  const fileSettings = await readSettingsFile();
+  const apiKeys = fromStoredApiKeyRows(readStoredApiKeys());
+  const googleSheetsSources = fromStoredGoogleSheetRows(readStoredGoogleSheetRows());
+
+  return {
+    ...fileSettings,
+    apiKeys,
+    googleSheetsSources,
+  };
+}
+
 async function writeSettings(settings: AppSettings): Promise<AppSettings> {
   const normalized = ensureAtLeastOneProviderEnabled(normalizeSettings(settings));
+  ensureSettingsDatabase();
+  replaceStoredApiKeys(toStoredApiKeyRows(normalized.apiKeys));
+  replaceStoredGoogleSheetRows(toStoredGoogleSheetRows(normalized.googleSheetsSources));
   await ensureConfigDir();
-  await fs.writeFile(CONFIG_FILE, JSON.stringify(normalized, null, 2));
+  await fs.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(normalized), null, 2));
   return normalized;
 }
 
@@ -595,10 +720,9 @@ export async function getProviderApiKey(provider: AIProvider): Promise<string> {
   return environmentKey;
 }
 
-export async function getOutputStorageSettings(): Promise<Pick<AppSettings, 'outputStorageMode' | 'outputBaseDir' | 'outputPathTemplate'>> {
+export async function getOutputStorageSettings(): Promise<Pick<AppSettings, 'outputBaseDir' | 'outputPathTemplate'>> {
   const settings = await readSettings();
   return {
-    outputStorageMode: settings.outputStorageMode,
     outputBaseDir: settings.outputBaseDir,
     outputPathTemplate: settings.outputPathTemplate,
   };

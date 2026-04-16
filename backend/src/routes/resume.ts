@@ -292,7 +292,9 @@ router.post('/generate-all', async (req: Request, res: Response) => {
       return;
     }
 
+    const normalizedCompanyName = companyName.trim();
     const results: { profileId: string; profileName: string; pdf?: string; docx?: string; coverLetterPdf?: string; coverLetterDocx?: string }[] = [];
+    const failures: Array<{ profileId: string; profileName: string; companyName: string; error: string }> = [];
     const unconfirmedHardMap = new Map<string, string>();
     const unconfirmedSoftMap = new Map<string, string>();
     const formatNorm = (format as string) === 'both' ? 'both' : format === 'docx' ? 'docx' : 'pdf';
@@ -300,69 +302,83 @@ router.post('/generate-all', async (req: Request, res: Response) => {
 
     for (const profile of profiles) {
       if (!profile) continue;
-      const profileTemplateId = profile.preferredTemplate ?? templateId ?? 'default';
-      let template = await getTemplateById(profileTemplateId);
-      if (!template || template.disabled) template = await getTemplateById('default');
-      if (!template || template.disabled) {
-        res.status(500).json({ error: 'Default template not available' });
-        return;
-      }
+      try {
+        const profileTemplateId = profile.preferredTemplate ?? templateId ?? 'default';
+        let template = await getTemplateById(profileTemplateId);
+        if (!template || template.disabled) template = await getTemplateById('default');
+        if (!template || template.disabled) {
+          throw new Error('Default template not available');
+        }
 
-      let tailoredContent;
-      if (analysis) {
-        tailoredContent = await tailorResume(profile, analysis, selectedModel);
-      }
-      if (tailoredContent) {
-        for (const skill of tailoredContent.unconfirmedHardSkills ?? []) {
-          const key = skill.trim().toLowerCase();
-          if (key && !unconfirmedHardMap.has(key)) {
-            unconfirmedHardMap.set(key, skill.trim());
+        let tailoredContent;
+        if (analysis) {
+          tailoredContent = await tailorResume(profile, analysis, selectedModel);
+        }
+        if (tailoredContent) {
+          for (const skill of tailoredContent.unconfirmedHardSkills ?? []) {
+            const key = skill.trim().toLowerCase();
+            if (key && !unconfirmedHardMap.has(key)) {
+              unconfirmedHardMap.set(key, skill.trim());
+            }
+          }
+          for (const skill of tailoredContent.unconfirmedSoftSkills ?? []) {
+            const key = skill.trim().toLowerCase();
+            if (key && !unconfirmedSoftMap.has(key)) {
+              unconfirmedSoftMap.set(key, skill.trim());
+            }
           }
         }
-        for (const skill of tailoredContent.unconfirmedSoftSkills ?? []) {
-          const key = skill.trim().toLowerCase();
-          if (key && !unconfirmedSoftMap.has(key)) {
-            unconfirmedSoftMap.set(key, skill.trim());
-          }
-        }
-      }
-      let coverLetterBody: string;
-      if (tailoredContent?.coverLetter?.trim()) {
-        coverLetterBody = tailoredContent.coverLetter.trim();
-      } else {
-        coverLetterBody = await generateCoverLetter(profile, companyName.trim(), resolvedRole, selectedModel);
-      }
-      const pathInfo = await getGeneratedOutputPath(profile, companyName.trim(), resolvedRole);
-      const coverLetterPdfPath = await saveCoverLetter(profile, coverLetterBody, pathInfo);
-      const coverLetterDocxPath = generateCoverLetterDocx
-        ? await saveCoverLetterDOCX(profile, coverLetterBody, pathInfo)
-        : undefined;
 
-      const entry: (typeof results)[0] = {
-        profileId: profile.id,
-        profileName: profile.name,
-        coverLetterPdf: coverLetterPdfPath,
-        coverLetterDocx: coverLetterDocxPath,
-      };
-      if (formatNorm === 'both') {
-        const [pdfFilename, docxFilename] = await Promise.all([
-          generateResumePDF(profile, template, tailoredContent, pathInfo, companyName.trim(), resolvedRole),
-          generateResumeDOCX(profile, tailoredContent, pathInfo, companyName.trim(), resolvedRole)
-        ]);
-        entry.pdf = pdfFilename;
-        entry.docx = docxFilename;
-      } else {
-        const filename = formatNorm === 'docx'
-          ? await generateResumeDOCX(profile, tailoredContent, pathInfo, companyName.trim(), resolvedRole)
-          : await generateResumePDF(profile, template, tailoredContent, pathInfo, companyName.trim(), resolvedRole);
-        entry[formatNorm] = filename;
+        let coverLetterBody: string;
+        if (tailoredContent?.coverLetter?.trim()) {
+          coverLetterBody = tailoredContent.coverLetter.trim();
+        } else {
+          coverLetterBody = await generateCoverLetter(profile, normalizedCompanyName, resolvedRole, selectedModel);
+        }
+        const pathInfo = await getGeneratedOutputPath(profile, normalizedCompanyName, resolvedRole);
+        const coverLetterPdfPath = await saveCoverLetter(profile, coverLetterBody, pathInfo);
+        const coverLetterDocxPath = generateCoverLetterDocx
+          ? await saveCoverLetterDOCX(profile, coverLetterBody, pathInfo)
+          : undefined;
+
+        const entry: (typeof results)[0] = {
+          profileId: profile.id,
+          profileName: profile.name,
+          coverLetterPdf: coverLetterPdfPath,
+          coverLetterDocx: coverLetterDocxPath,
+        };
+        if (formatNorm === 'both') {
+          const [pdfFilename, docxFilename] = await Promise.all([
+            generateResumePDF(profile, template, tailoredContent, pathInfo, normalizedCompanyName, resolvedRole),
+            generateResumeDOCX(profile, tailoredContent, pathInfo, normalizedCompanyName, resolvedRole)
+          ]);
+          entry.pdf = pdfFilename;
+          entry.docx = docxFilename;
+        } else {
+          const filename = formatNorm === 'docx'
+            ? await generateResumeDOCX(profile, tailoredContent, pathInfo, normalizedCompanyName, resolvedRole)
+            : await generateResumePDF(profile, template, tailoredContent, pathInfo, normalizedCompanyName, resolvedRole);
+          entry[formatNorm] = filename;
+        }
+        results.push(entry);
+      } catch (profileError) {
+        const message = profileError instanceof Error ? profileError.message : 'Failed to generate resume';
+        console.error(`Error generating resume for profile ${profile.id} (${profile.name}) at ${normalizedCompanyName}:`, profileError);
+        failures.push({
+          profileId: profile.id,
+          profileName: profile.name,
+          companyName: normalizedCompanyName,
+          error: message,
+        });
       }
-      results.push(entry);
     }
 
     res.json({
       generated: results.length,
       results,
+      failed: failures.length,
+      failures,
+      failedCompanies: failures.length > 0 ? [normalizedCompanyName] : [],
       tailored: !!analysis,
       unconfirmedHardSkills: Array.from(unconfirmedHardMap.values()),
       unconfirmedSoftSkills: Array.from(unconfirmedSoftMap.values()),
@@ -554,6 +570,8 @@ router.post('/generate', async (req: Request, res: Response) => {
 
     const generateBoth = (format as string) === 'both';
     const generateCoverLetterDocx = shouldGenerateCoverLetterDocx(includeCoverLetterDocx);
+    const unconfirmedHardSkills = tailoredContent?.unconfirmedHardSkills ?? [];
+    const unconfirmedSoftSkills = tailoredContent?.unconfirmedSoftSkills ?? [];
 
     // Get cover letter body: from tailored content or generate when no job description
     let coverLetterBody: string;
@@ -598,6 +616,8 @@ router.post('/generate', async (req: Request, res: Response) => {
             : {}),
         },
         tailored: !!tailoredContent,
+        unconfirmedHardSkills,
+        unconfirmedSoftSkills,
       });
     } else {
       const formatNorm = format === 'docx' ? 'docx' : 'pdf';
@@ -621,7 +641,9 @@ router.post('/generate', async (req: Request, res: Response) => {
             : {}),
         },
         tailored: !!tailoredContent,
-        format: formatNorm
+        format: formatNorm,
+        unconfirmedHardSkills,
+        unconfirmedSoftSkills,
       });
     }
   } catch (error) {

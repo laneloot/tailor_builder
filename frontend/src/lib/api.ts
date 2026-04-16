@@ -1,6 +1,6 @@
 const DEFAULT_LOCAL_API_BASE = 'http://localhost:3001/api';
-const FALLBACK_API_BASE = 'http://100.1.12.1:3001/api';
 const CONFIGURED_API_BASE = process.env.NEXT_PUBLIC_API_URL || DEFAULT_LOCAL_API_BASE;
+const CONFIGURED_FALLBACK_API_BASE = (process.env.NEXT_PUBLIC_FALLBACK_API_URL || '').replace(/\/$/, '');
 let resolvedApiBase = CONFIGURED_API_BASE;
 
 function getBrowserMatchedApiBase(): string | null {
@@ -25,8 +25,8 @@ function buildApiBaseCandidates(): string[] {
 
   candidates.push(CONFIGURED_API_BASE);
 
-  if (!CONFIGURED_API_BASE.includes('100.1.12.1')) {
-    candidates.push(FALLBACK_API_BASE);
+  if (CONFIGURED_FALLBACK_API_BASE) {
+    candidates.push(CONFIGURED_FALLBACK_API_BASE);
   }
   return [...new Set(candidates)];
 }
@@ -124,7 +124,6 @@ export type AIProvider = 'openai' | 'claude' | 'openrouter';
 export type DefaultMode = 'preview' | 'generate';
 export type ThemeMode = 'light' | 'dark';
 export type DefaultResumeSelection = 'single' | 'all' | 'group';
-export type OutputStorageMode = 'single' | 'multi';
 
 export interface GoogleSheetSource {
   id: string;
@@ -146,7 +145,6 @@ export interface PublicAppSettings {
   defaultProfileId: string;
   defaultResumeDocxEnabled: boolean;
   defaultCoverLetterDocxEnabled: boolean;
-  outputStorageMode: OutputStorageMode;
   outputPathUsesJobTitle: boolean;
   googleSheetsSources: GoogleSheetSource[];
 }
@@ -211,7 +209,6 @@ function normalizePublicAppSettings(value: unknown): PublicAppSettings {
       typeof source.defaultResumeDocxEnabled === 'boolean' ? source.defaultResumeDocxEnabled : true,
     defaultCoverLetterDocxEnabled:
       typeof source.defaultCoverLetterDocxEnabled === 'boolean' ? source.defaultCoverLetterDocxEnabled : true,
-    outputStorageMode: source.outputStorageMode === 'multi' ? 'multi' : 'single',
     outputPathUsesJobTitle:
       typeof source.outputPathUsesJobTitle === 'boolean' ? source.outputPathUsesJobTitle : true,
     googleSheetsSources: normalizeGoogleSheetSources(source.googleSheetsSources),
@@ -476,7 +473,6 @@ export interface Profile {
   title: string;
   totalYearsExperience?: number;
   preferredTemplate?: string;
-  outputDirectory?: string;
   disabled?: boolean;
   contact: Contact;
   summary: string;
@@ -507,7 +503,6 @@ export interface CreateProfileDTO {
   name?: string;
   title?: string;
   totalYearsExperience?: number;
-  outputDirectory?: string;
   contact?: Partial<Contact>;
   summary?: string;
   experience?: Partial<Experience>[];
@@ -862,7 +857,14 @@ export const resumeApi = {
     includeCoverLetterDocx?: boolean;
   }) =>
     apiFetch<
-      | { filename: string; downloadUrl: string; tailored: boolean; format?: 'pdf' | 'docx' }
+      | {
+          filename: string;
+          downloadUrl: string;
+          tailored: boolean;
+          format?: 'pdf' | 'docx';
+          unconfirmedHardSkills?: string[];
+          unconfirmedSoftSkills?: string[];
+        }
       | {
           pdf: { filename: string; downloadUrl: string };
           docx: { filename: string; downloadUrl: string };
@@ -871,6 +873,8 @@ export const resumeApi = {
             docx?: { filename: string; downloadUrl: string };
           };
           tailored: boolean;
+          unconfirmedHardSkills?: string[];
+          unconfirmedSoftSkills?: string[];
         }
     >(
       '/resume/generate',
@@ -893,6 +897,7 @@ export const resumeApi = {
   }) =>
     apiFetch<{
       generated: number;
+      failed: number;
       results: Array<{
         profileId: string;
         profileName: string;
@@ -901,6 +906,13 @@ export const resumeApi = {
         coverLetterPdf?: string;
         coverLetterDocx?: string;
       }>;
+      failures: Array<{
+        profileId: string;
+        profileName: string;
+        companyName: string;
+        error: string;
+      }>;
+      failedCompanies: string[];
       tailored: boolean;
       unconfirmedHardSkills?: string[];
       unconfirmedSoftSkills?: string[];

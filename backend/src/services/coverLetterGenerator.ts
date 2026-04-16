@@ -6,6 +6,8 @@ import HTMLtoDOCX from 'html-to-docx';
 import { Profile } from '../types/profile';
 import type { GeneratedPathInfo } from './generatedPath';
 
+const greeting = ['Dear Hiring Manager,', 'Hello Team,', 'Hi Team,', 'Dear HR Manager,']
+
 function esc(s: string): string {
   return String(s ?? '')
     .replace(/&/g, '&amp;')
@@ -33,10 +35,10 @@ function buildCoverLetterHTML(content: string, profileName: string): string {
 <html>
 <head><meta charset="UTF-8"></head>
 <body style="font-family: Arial, sans-serif; font-size: 11pt; color: #1A1A1A; line-height: 1.5;">
-  <p style="margin: 0 0 24pt 0;">Dear Hiring Manager,</p>
+  <p style="margin: 0 0 12pt 0;">${greeting[Math.floor(Math.random() * greeting.length)]}</p>
   ${contentToHtmlParagraphs(content)}
-  <p style="margin: 24pt 0 12pt 0;">Best regards,</p>
-  <p style="margin: 0; font-weight: bold; color: black; font-size: 12pt;">${esc(profileName.trim())}</p>
+  <p style="margin: 12pt 0 6pt 0;">Best regards,</p>
+  <p style="margin: 0; color: black;">${esc(profileName.trim())}</p>
 </body>
 </html>`;
 }

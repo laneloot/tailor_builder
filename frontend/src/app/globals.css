@@ -68,6 +68,20 @@ textarea {
     box-shadow 180ms ease;
 }
 
+button:not(:disabled),
+input[type="button"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="reset"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+input[type="button"]:disabled,
+input[type="submit"]:disabled,
+input[type="reset"]:disabled {
+  cursor: not-allowed;
+}
+
 html.dark .resume-paper-shell {
   background: #ffffff;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);

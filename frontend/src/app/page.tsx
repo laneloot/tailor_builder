@@ -13,6 +13,7 @@ import {
   TailoredContent,
 } from '@/lib/api';
 import AppTopNav from '@/components/AppTopNav';
+import GenerationProgress, { type GenerationProgressState } from '@/components/GenerationProgress';
 import ProfileSelector from '@/components/ProfileSelector';
 import ResumePreview from '@/components/ResumePreview';
 import SheetsImportModal, { ImportedSheetJob } from '@/components/SheetsImportModal';
@@ -32,6 +33,20 @@ type MultiplePreview = {
   draft: string;
   error: string;
 };
+
+type GenerationFailure = {
+  profileId: string;
+  profileName: string;
+  companyName: string;
+  error: string;
+};
+
+function formatCompanySummary(companyNames: string[]): string {
+  const uniqueCompanies = [...new Set(companyNames.map((name) => name.trim()).filter(Boolean))];
+  if (uniqueCompanies.length === 0) return '';
+  if (uniqueCompanies.length <= 3) return uniqueCompanies.join(', ');
+  return `${uniqueCompanies.slice(0, 3).join(', ')}, ...`;
+}
 
 export default function Home() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -60,7 +75,6 @@ export default function Home() {
     defaultProfileId: '',
     defaultResumeDocxEnabled: true,
     defaultCoverLetterDocxEnabled: true,
-    outputStorageMode: 'single',
     outputPathUsesJobTitle: true,
     googleSheetsSources: [],
   });
@@ -82,6 +96,7 @@ export default function Home() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState('');
+  const [generationProgress, setGenerationProgress] = useState<GenerationProgressState | null>(null);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -129,7 +144,6 @@ export default function Home() {
           defaultProfileId: '',
           defaultResumeDocxEnabled: true,
           defaultCoverLetterDocxEnabled: true,
-          outputStorageMode: 'single' as const,
           outputPathUsesJobTitle: true,
           googleSheetsSources: [],
         })),
@@ -262,6 +276,127 @@ export default function Home() {
     };
   };
 
+  const clearGenerationProgress = () => {
+    setGenerationProgress(null);
+  };
+
+  const updateGenerationProgress = (
+    total: number,
+    completed: number,
+    phase: string,
+    currentProfileName?: string,
+    currentCompanyName?: string
+  ) => {
+    setGenerationProgress({
+      total,
+      completed,
+      phase,
+      currentProfileName,
+      currentCompanyName,
+    });
+  };
+
+  const collectUnconfirmedFromGenerateResult = (
+    targetHard: Map<string, string>,
+    targetSoft: Map<string, string>,
+    result: {
+      unconfirmedHardSkills?: string[];
+      unconfirmedSoftSkills?: string[];
+    }
+  ) => {
+    for (const skill of result.unconfirmedHardSkills ?? []) {
+      const key = skill.trim().toLowerCase();
+      if (key && !targetHard.has(key)) {
+        targetHard.set(key, skill.trim());
+      }
+    }
+    for (const skill of result.unconfirmedSoftSkills ?? []) {
+      const key = skill.trim().toLowerCase();
+      if (key && !targetSoft.has(key)) {
+        targetSoft.set(key, skill.trim());
+      }
+    }
+  };
+
+  const getSelectedProfilesForManualBuilder = (): Profile[] => {
+    if (multipleTarget === 'all') {
+      return profiles;
+    }
+
+    const selectedGroup = groups.find((group) => group.id === selectedGroupId);
+    if (!selectedGroup) {
+      throw new Error('Please select a group');
+    }
+
+    const selectedProfiles = profiles.filter((profile) => selectedGroup.profileIds.includes(profile.id));
+    if (!selectedProfiles.length) {
+      throw new Error('Selected group has no enabled profiles.');
+    }
+
+    return selectedProfiles;
+  };
+
+  const generateSequentialResumes = async ({
+    targetProfiles,
+    analysis,
+    targetCompanyName,
+    resolvedRole,
+    tailoredContentByProfileId,
+  }: {
+    targetProfiles: Profile[];
+    analysis: JobAnalysis;
+    targetCompanyName: string;
+    resolvedRole: string;
+    tailoredContentByProfileId?: Map<string, TailoredContent | undefined>;
+  }) => {
+    const failures: GenerationFailure[] = [];
+    const unconfirmedHardMap = new Map<string, string>();
+    const unconfirmedSoftMap = new Map<string, string>();
+    const total = targetProfiles.length;
+    let completed = 0;
+
+    updateGenerationProgress(total, 0, 'Preparing resume generation', undefined, targetCompanyName);
+
+    for (const profile of targetProfiles) {
+      setGenerationStep(`Generating ${completed + 1}/${total}: ${profile.name} x ${targetCompanyName}`);
+      updateGenerationProgress(total, completed, 'Building resumes', profile.name, targetCompanyName);
+
+      try {
+        const result = await resumeApi.generate({
+          profileId: profile.id,
+          templateId: profile.preferredTemplate || 'default',
+          jobDescription,
+          jobAnalysis: analysis,
+          tailoredContent: tailoredContentByProfileId?.get(profile.id),
+          companyName: targetCompanyName,
+          role: resolvedRole,
+          model: selectedModel,
+          ...getDefaultGenerationOptions(),
+        });
+        collectUnconfirmedFromGenerateResult(unconfirmedHardMap, unconfirmedSoftMap, result);
+      } catch (err) {
+        failures.push({
+          profileId: profile.id,
+          profileName: profile.name,
+          companyName: targetCompanyName,
+          error: err instanceof Error ? err.message : 'Generation failed',
+        });
+      } finally {
+        completed += 1;
+        updateGenerationProgress(total, completed, 'Building resumes', profile.name, targetCompanyName);
+      }
+    }
+
+    return {
+      generated: total - failures.length,
+      failed: failures.length,
+      failures,
+      failedCompanies: failures.length > 0 ? [targetCompanyName] : [],
+      unconfirmedHardSkills: Array.from(unconfirmedHardMap.values()),
+      unconfirmedSoftSkills: Array.from(unconfirmedSoftMap.values()),
+    };
+  };
+
   const handleImportJobsFromSheets = async (
     importedJobs: ImportedSheetJob[],
     meta: { skippedRows: number }
@@ -287,17 +422,32 @@ export default function Home() {
     resetGenerationOutputs();
 
     const failures: string[] = [];
+    const failedCompanies = new Set<string>();
     const totalBuilds = selectedProfiles.length * normalizedJobs.length;
     let completedBuilds = 0;
 
     try {
+      updateGenerationProgress(totalBuilds, 0, 'Preparing imported jobs');
       for (let jobIndex = 0; jobIndex < normalizedJobs.length; jobIndex += 1) {
         const job = normalizedJobs[jobIndex];
         const trimmedJobDescription = job.jobDescription.trim();
-        const analysis =
-          trimmedJobDescription.length >= 50
-            ? await resumeApi.analyze(trimmedJobDescription, selectedModel)
-            : undefined;
+        let analysis: JobAnalysis | undefined;
+
+        try {
+          setGenerationStep(`Analyzing ${job.companyName} (${jobIndex + 1}/${normalizedJobs.length})`);
+          updateGenerationProgress(totalBuilds, completedBuilds, 'Analyzing imported job', undefined, job.companyName.trim());
+          analysis =
+            trimmedJobDescription.length >= 50
+              ? await resumeApi.analyze(trimmedJobDescription, selectedModel)
+              : undefined;
+        } catch (err) {
+          failedCompanies.add(job.companyName.trim());
+          failures.push(
+            `Row ${job.sourceRowNumber} / ${job.companyName}: ${err instanceof Error ? err.message : 'Analysis failed'}`
+          );
+          completedBuilds += selectedProfiles.length;
+          continue;
+        }
 
         if (jobIndex === 0 && analysis) {
           setJobAnalysis(analysis);
@@ -305,10 +455,10 @@ export default function Home() {
 
         for (let profileIndex = 0; profileIndex < selectedProfiles.length; profileIndex += 1) {
           const profile = selectedProfiles[profileIndex];
-          completedBuilds += 1;
           setGenerationStep(
-            `Generating ${completedBuilds}/${totalBuilds}: ${profile.name} x ${job.companyName}`
+            `Generating ${completedBuilds + 1}/${totalBuilds}: ${profile.name} x ${job.companyName}`
           );
+          updateGenerationProgress(totalBuilds, completedBuilds, 'Building resumes', profile.name, job.companyName.trim());
 
           try {
             await resumeApi.generate({
@@ -322,9 +472,13 @@ export default function Home() {
               ...getDefaultGenerationOptions(),
             });
           } catch (err) {
+            failedCompanies.add(job.companyName.trim());
             failures.push(
-              `Row ${job.sourceRowNumber} / ${profile.name}: ${err instanceof Error ? err.message : 'Generation failed'}`
+              `Row ${job.sourceRowNumber} / ${job.companyName} / ${profile.name}: ${err instanceof Error ? err.message : 'Generation failed'}`
             );
+          } finally {
+            completedBuilds += 1;
+            updateGenerationProgress(totalBuilds, completedBuilds, 'Building resumes', profile.name, job.companyName.trim());
           }
         }
       }
@@ -338,13 +492,15 @@ export default function Home() {
       );
 
       if (failures.length) {
+        const failedCompanySummary = formatCompanySummary(Array.from(failedCompanies));
         setError(
-          `Some builds failed (${failures.length}/${totalBuilds}). ${failures.slice(0, 3).join(' | ')}${failures.length > 3 ? ' | ...' : ''}`
+          `Some builds failed (${failures.length}/${totalBuilds}). Failed companies: ${failedCompanySummary || 'Unknown'}. ${failures.slice(0, 3).join(' | ')}${failures.length > 3 ? ' | ...' : ''}`
         );
       }
     } finally {
       setIsGenerating(false);
       setGenerationStep('');
+      clearGenerationProgress();
     }
   };
 
@@ -395,6 +551,7 @@ export default function Home() {
 
     try {
       setGenerationStep('Analyzing job description...');
+      clearGenerationProgress();
       const analysis = await resumeApi.analyze(jobDescription, selectedModel);
       setJobAnalysis(analysis);
 
@@ -459,10 +616,11 @@ export default function Home() {
 
 
       if (generateMode === 'single') {
-        setGenerationStep('Generating resume...');
         const profile = profiles.find((p) => p.id === selectedProfileId);
         const templateId = profile?.preferredTemplate || 'default';
-        await resumeApi.generate({
+        updateGenerationProgress(1, 0, 'Building resume', profile?.name, companyName.trim());
+        setGenerationStep(`Generating 1/1: ${profile?.name ?? 'Selected profile'} x ${companyName.trim()}`);
+        const result = await resumeApi.generate({
           profileId: selectedProfileId!,
           templateId,
           jobDescription,
@@ -472,44 +630,39 @@ export default function Home() {
           model: selectedModel,
           ...getDefaultGenerationOptions(),
         });
+        updateGenerationProgress(1, 1, 'Building resume', profile?.name, companyName.trim());
         setSuccessMessage('Resume generated successfully.');
         setIsSinglePreviewOpen(false);
+        setUnconfirmedHardSkills(toUnconfirmedItems(result.unconfirmedHardSkills));
+        setUnconfirmedSoftSkills(toUnconfirmedItems(result.unconfirmedSoftSkills));
       } else {
+        const targetProfiles = getSelectedProfilesForManualBuilder();
+        const res = await generateSequentialResumes({
+          targetProfiles,
+          analysis,
+          targetCompanyName: companyName.trim(),
+          resolvedRole: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
+        });
         if (multipleTarget === 'group') {
           const selectedGroup = groups.find((group) => group.id === selectedGroupId)!;
-          setGenerationStep(`Generating for group "${selectedGroup.name}"...`);
-          const res = await resumeApi.generateAll({
-            jobDescription,
-            jobAnalysis: analysis,
-            companyName: companyName.trim(),
-            role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
-            model: selectedModel,
-            profileIds: selectedGroup.profileIds,
-            ...getDefaultGenerationOptions(),
-          });
           setSuccessMessage(`Generated ${res.generated} resume(s) for group "${selectedGroup.name}".`);
-          setUnconfirmedHardSkills(toUnconfirmedItems(res.unconfirmedHardSkills));
-          setUnconfirmedSoftSkills(toUnconfirmedItems(res.unconfirmedSoftSkills));
         } else {
-          setGenerationStep(`Generating for ${profiles.length} profile(s)...`);
-          const res = await resumeApi.generateAll({
-            jobDescription,
-            jobAnalysis: analysis,
-            companyName: companyName.trim(),
-            role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
-            model: selectedModel,
-            ...getDefaultGenerationOptions(),
-          });
           setSuccessMessage(`Generated ${res.generated} resume(s) successfully.`);
-          setUnconfirmedHardSkills(toUnconfirmedItems(res.unconfirmedHardSkills));
-          setUnconfirmedSoftSkills(toUnconfirmedItems(res.unconfirmedSoftSkills));
         }
+        if (res.failed > 0) {
+          setError(
+            `Skipped ${res.failed} build(s). Failed companies: ${formatCompanySummary(res.failedCompanies) || companyName.trim()}. ${res.failures.slice(0, 3).map((failure) => `${failure.profileName}: ${failure.error}`).join(' | ')}${res.failures.length > 3 ? ' | ...' : ''}`
+          );
+        }
+        setUnconfirmedHardSkills(toUnconfirmedItems(res.unconfirmedHardSkills));
+        setUnconfirmedSoftSkills(toUnconfirmedItems(res.unconfirmedSoftSkills));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate resume');
     } finally {
       setIsGenerating(false);
       setGenerationStep('');
+      clearGenerationProgress();
     }
   };
 
@@ -863,10 +1016,11 @@ export default function Home() {
       if (!jobAnalysis) {
         setJobAnalysis(analysis);
       }
-      setGenerationStep('Generating resume...');
       const profile = profiles.find((p) => p.id === selectedProfileId);
       const templateId = profile?.preferredTemplate || 'default';
-      await resumeApi.generate({
+      updateGenerationProgress(1, 0, 'Building resume', profile?.name, companyName.trim());
+      setGenerationStep(`Generating 1/1: ${profile?.name ?? 'Selected profile'} x ${companyName.trim()}`);
+      const result = await resumeApi.generate({
         profileId: selectedProfileId!,
         templateId,
         jobDescription,
@@ -877,13 +1031,17 @@ export default function Home() {
         model: selectedModel,
         ...getDefaultGenerationOptions(),
       });
+      updateGenerationProgress(1, 1, 'Building resume', profile?.name, companyName.trim());
       setSuccessMessage('Resume generated successfully.');
       setIsSinglePreviewOpen(false);
+      setUnconfirmedHardSkills(toUnconfirmedItems(result.unconfirmedHardSkills));
+      setUnconfirmedSoftSkills(toUnconfirmedItems(result.unconfirmedSoftSkills));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate resume');
     } finally {
       setIsGenerating(false);
       setGenerationStep('');
+      clearGenerationProgress();
     }
   };
 
@@ -999,12 +1157,20 @@ export default function Home() {
             ? profiles.filter((p) => p.id &&
                 groups.find((g) => g.id === selectedGroupId)?.profileIds.includes(p.id))
             : profiles;
+        const profilesToGenerate = targetProfiles.filter((profile) => previewMap.get(profile.id)?.tailoredContent);
+        if (!profilesToGenerate.length) {
+          throw new Error('No preview content available to generate.');
+        }
+        const total = profilesToGenerate.length;
+        let completed = 0;
 
-        setGenerationStep(`Generating for ${targetProfiles.length} profile(s)...`);
-        for (const profile of targetProfiles) {
+        updateGenerationProgress(total, 0, 'Preparing resume generation', undefined, companyName.trim());
+        for (const profile of profilesToGenerate) {
           const preview = previewMap.get(profile.id);
           if (!preview?.tailoredContent) continue;
           const templateId = profile.preferredTemplate || 'default';
+          setGenerationStep(`Generating ${completed + 1}/${total}: ${profile.name} x ${companyName.trim()}`);
+          updateGenerationProgress(total, completed, 'Building resumes', profile.name, companyName.trim());
           await resumeApi.generate({
             profileId: profile.id,
             templateId,
@@ -1016,8 +1182,10 @@ export default function Home() {
             model: selectedModel,
             ...getDefaultGenerationOptions(),
           });
+          completed += 1;
+          updateGenerationProgress(total, completed, 'Building resumes', profile.name, companyName.trim());
         }
-        setSuccessMessage(`Generated ${targetProfiles.length} resume(s) successfully.`);
+        setSuccessMessage(`Generated ${profilesToGenerate.length} resume(s) successfully.`);
         const aggregated = aggregateUnconfirmedFromPreviews(multiplePreviews);
         setUnconfirmedHardSkills(aggregated.hard);
         setUnconfirmedSoftSkills(aggregated.soft);
@@ -1027,40 +1195,32 @@ export default function Home() {
         return;
       }
 
+      const targetProfiles = getSelectedProfilesForManualBuilder();
+      const res = await generateSequentialResumes({
+        targetProfiles,
+        analysis,
+        targetCompanyName: companyName.trim(),
+        resolvedRole: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
+      });
       if (multipleTarget === 'group') {
         const selectedGroup = groups.find((group) => group.id === selectedGroupId)!;
-        setGenerationStep(`Generating for group "${selectedGroup.name}"...`);
-        const res = await resumeApi.generateAll({
-          jobDescription,
-          jobAnalysis: analysis,
-          companyName: companyName.trim(),
-          role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
-          model: selectedModel,
-          profileIds: selectedGroup.profileIds,
-          ...getDefaultGenerationOptions(),
-        });
         setSuccessMessage(`Generated ${res.generated} resume(s) for group "${selectedGroup.name}".`);
-        setUnconfirmedHardSkills(toUnconfirmedItems(res.unconfirmedHardSkills));
-        setUnconfirmedSoftSkills(toUnconfirmedItems(res.unconfirmedSoftSkills));
       } else {
-        setGenerationStep(`Generating for ${profiles.length} profile(s)...`);
-        const res = await resumeApi.generateAll({
-          jobDescription,
-          jobAnalysis: analysis,
-          companyName: companyName.trim(),
-          role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
-          model: selectedModel,
-          ...getDefaultGenerationOptions(),
-        });
         setSuccessMessage(`Generated ${res.generated} resume(s) successfully.`);
-        setUnconfirmedHardSkills(toUnconfirmedItems(res.unconfirmedHardSkills));
-        setUnconfirmedSoftSkills(toUnconfirmedItems(res.unconfirmedSoftSkills));
       }
+      if (res.failed > 0) {
+        setError(
+          `Skipped ${res.failed} build(s). Failed companies: ${formatCompanySummary(res.failedCompanies) || companyName.trim()}. ${res.failures.slice(0, 3).map((failure) => `${failure.profileName}: ${failure.error}`).join(' | ')}${res.failures.length > 3 ? ' | ...' : ''}`
+        );
+      }
+      setUnconfirmedHardSkills(toUnconfirmedItems(res.unconfirmedHardSkills));
+      setUnconfirmedSoftSkills(toUnconfirmedItems(res.unconfirmedSoftSkills));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate resume');
     } finally {
       setIsGenerating(false);
       setGenerationStep('');
+      clearGenerationProgress();
     }
   };
 
@@ -1179,6 +1339,10 @@ export default function Home() {
           <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
             {successMessage}
           </div>
+        )}
+
+        {isGenerating && generationProgress && (
+          <GenerationProgress progress={generationProgress} className="mb-6" />
         )}
 
         {builderMode === null && (
@@ -1650,6 +1814,9 @@ export default function Home() {
               </div>
               <div className="flex-1 grid grid-cols-2 overflow-hidden">
                 <div className="h-full overflow-y-auto bg-gray-100 p-6">
+                  {isGenerating && generationProgress && (
+                    <GenerationProgress progress={generationProgress} className="mb-4" />
+                  )}
                   <div className="resume-paper-shell bg-white shadow-lg mx-auto max-w-[816px]">
                     <iframe
                       srcDoc={activeMultiplePreview.html}
@@ -1702,6 +1869,7 @@ export default function Home() {
             isOpen={isSinglePreviewOpen}
             onClose={() => setIsSinglePreviewOpen(false)}
             generationStep={generationStep}
+            generationProgress={generationProgress}
             sidebar={
               <>
                 {unconfirmedPanel}

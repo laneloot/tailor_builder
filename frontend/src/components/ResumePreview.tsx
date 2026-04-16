@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import GenerationProgress, { type GenerationProgressState } from './GenerationProgress';
 
 interface ResumePreviewProps {
   html: string;
@@ -10,6 +11,7 @@ interface ResumePreviewProps {
   isTailored: boolean;
   isOpen: boolean;
   generationStep?: string;
+  generationProgress?: GenerationProgressState | null;
   sidebar?: ReactNode;
 }
 
@@ -21,6 +23,7 @@ export default function ResumePreview({
   isTailored,
   isOpen,
   generationStep,
+  generationProgress,
   sidebar,
 }: ResumePreviewProps) {
   if (!isOpen) return null;
@@ -83,6 +86,9 @@ export default function ResumePreview({
 
         <div className={sidebar ? 'flex-1 grid grid-cols-2 overflow-hidden' : 'flex-1 overflow-y-auto bg-gray-100 p-6'}>
           <div className={sidebar ? 'h-full overflow-y-auto bg-gray-100 p-6' : ''}>
+            {isGenerating && generationProgress && (
+              <GenerationProgress progress={generationProgress} className="mb-4" />
+            )}
             {html ? (
               <div className="resume-paper-shell bg-white shadow-lg mx-auto max-w-[816px]">
                 <iframe srcDoc={html} className="w-full h-[1056px] border-0" title="Resume Preview" />

@@ -41,7 +41,6 @@ export interface Profile {
     title: string;
     totalYearsExperience?: number;
     preferredTemplate?: string;
-    outputDirectory?: string;
     disabled?: boolean;
     contact: Contact;
     summary: string;
@@ -58,7 +57,6 @@ export interface CreateProfileDTO {
     title?: string;
     totalYearsExperience?: number;
     preferredTemplate?: string;
-    outputDirectory?: string;
     disabled?: boolean;
     contact?: Partial<Contact>;
     summary?: string;

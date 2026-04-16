@@ -58,7 +58,7 @@ function buildCoverLetterHTMLForDocx(content, profileName) {
   ${contentToHtmlParagraphs(content)}
   ${lineBreak}
   <p style="margin: 0 0 12pt 0;">Best regards,</p>
-  <p style="margin: 0; font-weight: bold; color: black; font-size: 12pt;">${esc(profileName.trim())}</p>
+  <p style="margin: 0; color: black; ">${esc(profileName.trim())}</p>
 </body>
 </html>`;
 }

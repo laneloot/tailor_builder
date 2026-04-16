@@ -4,9 +4,6 @@ import { Profile } from '../types/profile';
 import { renderOutputPathTemplate, resolveStoredFilePath, sanitizePathSegment } from '../config/storage';
 import { getOutputStorageSettings } from './aiModelConfig';
 
-const PROFILES_DIR = path.join(__dirname, '../../data/profiles');
-const MULTI_FOLDER_PREFIX = '@profile';
-
 function getCurrentDateFolder(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -29,7 +26,7 @@ export async function getGeneratedOutputPath(
   companyName: string,
   role: string
 ): Promise<GeneratedPathInfo> {
-  const { outputStorageMode, outputBaseDir, outputPathTemplate } = await getOutputStorageSettings();
+  const { outputBaseDir, outputPathTemplate } = await getOutputStorageSettings();
   const profileSlug = sanitizePathSegment(profile.name) || 'unknown';
   const companyFolderName = sanitizePathSegment(companyName || 'unknown') || 'unknown';
   const roleSlug = sanitizePathSegment(role || 'resume') || 'resume';
@@ -39,22 +36,12 @@ export async function getGeneratedOutputPath(
     companyName: companyName || 'unknown',
     jobTitle: role || 'resume',
   });
-  const baseDir = outputStorageMode === 'multi'
-    ? profile.outputDirectory?.trim()
-    : outputBaseDir;
-
-  if (!baseDir) {
-    throw new Error(
-      outputStorageMode === 'multi'
-        ? `Profile "${profile.name}" does not have an output directory configured.`
-        : 'Output base directory is not configured.'
-    );
+  if (!outputBaseDir) {
+    throw new Error('Output base directory is not configured.');
   }
 
-  const absoluteDir = path.join(baseDir, ...relativeBase.split('/'));
-  const storagePathBase = outputStorageMode === 'multi'
-    ? `${MULTI_FOLDER_PREFIX}/${profile.id}/${relativeBase}`
-    : relativeBase;
+  const absoluteDir = path.join(outputBaseDir, ...relativeBase.split('/'));
+  const storagePathBase = relativeBase;
 
   return { relativeBase, absoluteDir, storagePathBase, profileSlug, companyFolderName, roleSlug };
 }
@@ -65,29 +52,8 @@ export async function getGeneratedFilePath(relativePathValue: string): Promise<s
     return null;
   }
 
-  let resolved: string | null = null;
-
-  if (normalizedValue.startsWith(`${MULTI_FOLDER_PREFIX}/`)) {
-    const [, profileId, ...restSegments] = normalizedValue.split('/').filter(Boolean);
-    if (!profileId || restSegments.length === 0) {
-      return null;
-    }
-
-    try {
-      const profileContent = await fs.readFile(path.join(PROFILES_DIR, `${profileId}.json`), 'utf-8');
-      const profile = JSON.parse(profileContent) as Profile;
-      const profileBaseDir = profile.outputDirectory?.trim();
-      if (!profileBaseDir) {
-        return null;
-      }
-      resolved = resolveStoredFilePath(profileBaseDir, restSegments.join('/'));
-    } catch {
-      return null;
-    }
-  } else {
-    const { outputBaseDir } = await getOutputStorageSettings();
-    resolved = resolveStoredFilePath(outputBaseDir, normalizedValue);
-  }
+  const { outputBaseDir } = await getOutputStorageSettings();
+  const resolved = resolveStoredFilePath(outputBaseDir, normalizedValue);
 
   if (!resolved) {
     return null;
