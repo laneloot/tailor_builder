@@ -5,6 +5,7 @@ EXTRACTION RULES:
 - Do NOT paraphrase or normalize (keep "Node.js" not "NodeJS", "cross-functional" not "cross functional")
 - Every meaningful term must appear in exactly ONE category (no cross-category duplication)
 - For arrays, preserve first-seen order from the job description
+- Do not extract words such as place names, country names, or company names, especially any terms that are specific to this company.Never.
 
 Return a JSON object with EXACTLY these fields:
 

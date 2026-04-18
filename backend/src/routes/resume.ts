@@ -261,18 +261,24 @@ router.post('/generate-all', async (req: Request, res: Response) => {
       includeCoverLetterDocx,
     } = req.body;
 
+    // Load setting
     const settings = await getAIModelSettings();
     const appSettings = await getPublicAppSettings();
     const selectedModel = resolveAIProvider(model);
+
+
+    // Validate
     if (!isProviderEnabled(selectedModel, settings)) {
       res.status(400).json({ error: `Selected AI model '${selectedModel}' is disabled by admin` });
       return;
     }
+
     if (!companyName?.trim()) {
       res.status(400).json({ error: 'Company name is required' });
       return;
     }
 
+    // Load profiles
     const profiles = await loadAllProfiles(profileIds);
     if (profiles.length === 0) {
       res.status(400).json({ error: 'No matching profiles available. Add profiles in Admin or update group members.' });
@@ -282,10 +288,13 @@ router.post('/generate-all', async (req: Request, res: Response) => {
     await createDefaultTemplate();
 
     let analysis: import('../types/template').JobAnalysis | undefined;
+
     const trimmedJobDescription = jobDescription?.trim();
+
     if (trimmedJobDescription && trimmedJobDescription.length > 50) {
       analysis = jobAnalysis || await analyzeJobDescription(trimmedJobDescription, selectedModel);
     }
+
     const resolvedRole = resolveGenerationRole(role, analysis);
     if (appSettings.outputPathUsesJobTitle && !resolvedRole) {
       res.status(400).json({ error: 'Role is required' });

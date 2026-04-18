@@ -140,7 +140,7 @@ function extractSoftSkills(text) {
     });
 }
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.1';
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-5.4-nano';
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 const DEFAULT_PROVIDER = 'openai';
 exports.DEFAULT_PROVIDER = DEFAULT_PROVIDER;
