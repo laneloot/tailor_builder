@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --watch src --ignore-watch data --ignore-watch dist --ignore-watch generated --ignore-watch ../generated --ignore-watch .git src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "npm run build && node --test test/*.test.js"
   },
   "keywords": [],
   "author": "",

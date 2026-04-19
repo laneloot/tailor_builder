@@ -29,7 +29,10 @@ export class SkillDatabaseError extends Error {
   }
 }
 
-const SKILLS_DIR = path.join(__dirname, '../../data/skills');
+const DATA_DIR = process.env.TAILOR_DATA_DIR
+  ? path.resolve(process.env.TAILOR_DATA_DIR)
+  : path.join(__dirname, '../../data');
+const SKILLS_DIR = path.join(DATA_DIR, 'skills');
 const SKILLS_FILE = path.join(SKILLS_DIR, 'skills.json');
 
 function cleanSkill(value: unknown): string {

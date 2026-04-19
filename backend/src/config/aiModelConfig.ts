@@ -111,7 +111,10 @@ export type AppSettingsUpdate = Partial<PublicAppSettings> & {
   apiKeys?: Partial<Record<AIProvider, ApiKeyUpdate | string>>;
 };
 
-const CONFIG_DIR = path.join(__dirname, '../../data/config');
+const DATA_DIR = process.env.TAILOR_DATA_DIR
+  ? path.resolve(process.env.TAILOR_DATA_DIR)
+  : path.join(__dirname, '../../data');
+const CONFIG_DIR = path.join(DATA_DIR, 'config');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'ai-models.json');
 
 const DEFAULT_SETTINGS: AppSettings = {

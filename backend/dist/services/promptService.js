@@ -15,7 +15,10 @@ exports.validatePromptDraft = validatePromptDraft;
 exports.renderPrompt = renderPrompt;
 const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
-const PROMPTS_DIR = path_1.default.join(__dirname, '../../data/prompts');
+const DATA_DIR = process.env.TAILOR_DATA_DIR
+    ? path_1.default.resolve(process.env.TAILOR_DATA_DIR)
+    : path_1.default.join(__dirname, '../../data');
+const PROMPTS_DIR = path_1.default.join(DATA_DIR, 'prompts');
 const CUSTOM_PROMPT_PREFIX = 'custom-';
 const PROMPT_SUFFIX = '.json';
 const VARIABLE_PATTERN = /\[\[\s*([a-zA-Z0-9_.-]+)\s*\]\]/g;

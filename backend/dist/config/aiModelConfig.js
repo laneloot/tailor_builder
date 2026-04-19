@@ -17,7 +17,10 @@ const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
 const crypto_1 = require("crypto");
 const outputStorage_1 = require("../utils/outputStorage");
-const CONFIG_DIR = path_1.default.join(__dirname, '../../data/config');
+const DATA_DIR = process.env.TAILOR_DATA_DIR
+    ? path_1.default.resolve(process.env.TAILOR_DATA_DIR)
+    : path_1.default.join(__dirname, '../../data');
+const CONFIG_DIR = path_1.default.join(DATA_DIR, 'config');
 const CONFIG_FILE = path_1.default.join(CONFIG_DIR, 'ai-models.json');
 const DEFAULT_SETTINGS = {
     openaiEnabled: true,

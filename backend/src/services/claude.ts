@@ -8,6 +8,7 @@ import { getProviderApiKey } from '../config/aiModelConfig';
 import { readSkills } from '../database/skillsDatabase';
 import { moveCaseInsensitiveMatches, uniqueCaseInsensitive } from '../utils/array';
 import { extractJSON } from '../utils/json';
+import { removeDuplicateSubstrings } from './utils/resumeBuilder';
 
 // Ensure the repo .env file is loaded for this module even when it is imported
 // before index.ts finishes bootstrapping, and prefer .env over inherited shell vars.
@@ -28,30 +29,6 @@ export function refreshSkillCaches(): void {
   softSkills.length = 0;
   softSkills.push(...nextSoft);
 }
-
-// function splitSkillsByOriginal(
-//   hardSkills: string[],
-//   original: string[]
-// ): { matched: string[]; rest: string[] } {
-//   const originalLower = original.map((item) => item.toLowerCase());
-
-//   const matched: string[] = [];
-//   const rest: string[] = [];
-
-//   for (const skill of hardSkills) {
-//     const skillLower = skill.toLowerCase();
-
-//     const found = originalLower.some((orig) => orig.includes(skillLower));
-
-//     if (found) {
-//       matched.push(skill);
-//     } else {
-//       rest.push(skill);
-//     }
-//   }
-
-//   return { matched, rest };
-// }
 
 // Lazy initialization to ensure env vars are loaded first
 let openaiClient: OpenAI | null = null;
@@ -1162,6 +1139,7 @@ export async function tailorResume(
 
     finalResult.unconfirmedHardSkills = [...uniqueCaseInsensitive(finalResult.unconfirmedHardSkills)]
     finalResult.hardSkills = [...uniqueCaseInsensitive(finalResult.hardSkills)]
+    finalResult.hardSkills = removeDuplicateSubstrings([...finalResult.hardSkills])
 
     finalResult.unconfirmedSoftSkills = [...finalResult.softSkills]
     finalResult.softSkills = [...extractSoftSkills(jobDesc)]
@@ -1169,6 +1147,7 @@ export async function tailorResume(
 
     finalResult.unconfirmedSoftSkills = [...uniqueCaseInsensitive(finalResult.unconfirmedSoftSkills)]
     finalResult.softSkills = [...uniqueCaseInsensitive(finalResult.softSkills)]
+    finalResult.softSkills = removeDuplicateSubstrings([...finalResult.softSkills])
     
 
     return finalResult;

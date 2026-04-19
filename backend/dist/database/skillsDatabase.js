@@ -20,7 +20,10 @@ class SkillDatabaseError extends Error {
     }
 }
 exports.SkillDatabaseError = SkillDatabaseError;
-const SKILLS_DIR = path_1.default.join(__dirname, '../../data/skills');
+const DATA_DIR = process.env.TAILOR_DATA_DIR
+    ? path_1.default.resolve(process.env.TAILOR_DATA_DIR)
+    : path_1.default.join(__dirname, '../../data');
+const SKILLS_DIR = path_1.default.join(DATA_DIR, 'skills');
 const SKILLS_FILE = path_1.default.join(SKILLS_DIR, 'skills.json');
 function cleanSkill(value) {
     return typeof value === 'string' ? value.trim() : '';

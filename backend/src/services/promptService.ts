@@ -12,7 +12,10 @@ import {
   PromptVariableDefinition,
 } from '../types/prompt';
 
-const PROMPTS_DIR = path.join(__dirname, '../../data/prompts');
+const DATA_DIR = process.env.TAILOR_DATA_DIR
+  ? path.resolve(process.env.TAILOR_DATA_DIR)
+  : path.join(__dirname, '../../data');
+const PROMPTS_DIR = path.join(DATA_DIR, 'prompts');
 const CUSTOM_PROMPT_PREFIX = 'custom-';
 const PROMPT_SUFFIX = '.json';
 const VARIABLE_PATTERN = /\[\[\s*([a-zA-Z0-9_.-]+)\s*\]\]/g;
