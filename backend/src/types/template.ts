@@ -36,21 +36,52 @@ export interface CreateTemplateDTO {
 }
 
 export interface JobAnalysis {
-  requiredSkills: string[];
-  preferredSkills: string[];
-  keywords: string[];
-  experienceLevel: string;
-  keyResponsibilities: string[];
-  industryTerms: string[];
+  jobMeta: {
+    title: string;
+    seniority: string;
+    industry: string;
+    department: string;
+  };
+  skills: {
+    required: string[];
+    preferred: string[];
+    tools: string[];
+    technologies: string[];
+  };
+  responsibilities: string[];
+  domainKnowledge: string[];
   softSkills: string[];
-  weakSkills: string[];
-  techSkills: string[];
-  certifications: string[];
-  jobTitle: string;
-  companyInfo?: string;
+  keywords: {
+    actionVerbs: string[];
+    buzzwords: string[];
+    mustInclude: string[];
+  };
 }
 
 export type AIProvider = 'openai' | 'claude' | 'openrouter';
+
+export type RawNestedJobAnalysis = Partial<JobAnalysis> & {
+  jobMeta?: {
+    title?: unknown;
+    seniority?: unknown;
+    industry?: unknown;
+    department?: unknown;
+  };
+  skills?: {
+    required?: unknown;
+    preferred?: unknown;
+    tools?: unknown;
+    technologies?: unknown;
+  };
+  responsibilities?: unknown;
+  domainKnowledge?: unknown;
+  softSkills?: unknown;
+  keywords?: {
+    actionVerbs?: unknown,
+    buzzwords?: unknown,
+    mustInclude?: unknown
+  }
+};
 
 export interface TailoredContent {
   title: string;
@@ -58,8 +89,6 @@ export interface TailoredContent {
   experience: TailoredExperience[];
   skills: string[];
   hardSkills: string[];
-  techSkills: string[];
-  weakSkills: string[];
   softSkills: string[];
   unconfirmedSoftSkills: string[];
   unconfirmedHardSkills: string[];

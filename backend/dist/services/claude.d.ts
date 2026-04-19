@@ -1,7 +1,5 @@
 import { Profile } from '../types/profile';
-import { AIProvider, JobAnalysis, TailoredContent } from '../types/template';
-export declare function addTechSkill(skill: string): boolean;
-export declare function addSoftSkill(skill: string): boolean;
+import type { AIProvider, JobAnalysis, TailoredContent } from '../types/template';
 export declare function refreshSkillCaches(): void;
 declare const DEFAULT_PROVIDER: AIProvider;
 export declare function resolveAIProvider(model?: string): AIProvider;

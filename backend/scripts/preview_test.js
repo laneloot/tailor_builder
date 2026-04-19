@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 
-const pdfGen = require('../dist/services/pdfGenerator');
+const pdfGen = require('../dist/generators/pdfGenerator');
 
 async function run() {
   const profilesDir = path.join(__dirname, '../data/profiles');

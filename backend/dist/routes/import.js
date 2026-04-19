@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const googleSheets_1 = require("../services/googleSheets");
+const googleSheets_1 = require("../integrations/googleSheets");
 const router = (0, express_1.Router)();
 router.post('/', async (req, res) => {
     try {

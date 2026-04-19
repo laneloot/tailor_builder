@@ -1,4 +1,3 @@
-Active listening
 Clear verbal communication
 Clear written communication
 Concise communication
@@ -275,7 +274,7 @@ Independent learning
 Integrity
 Honesty
 Ethical judgment
-Confidentiality awareness
+Confidentiality
 Discretion
 Respect for privacy
 Fairness
@@ -1067,6 +1066,164 @@ Strong problem-solving skills
 Remote-first culture
 Strong analytical skills
 Mentorship
-
-Collaboration skills
 Motivation to grow
+Outreach
+Listening
+Customer Focus
+Client Relations
+Communication
+Written Communication
+Verbal Communication
+Active Listening
+Technical Writing
+Business Writing
+Copywriting
+Editing
+Proofreading
+Report Writing
+Documentation
+Mediation
+Assertiveness
+Empathy
+Emotional Intelligence
+Social Awareness
+Relationship Management
+Interpersonal Skills
+Networking
+Cross-functional Collaboration
+Remote Collaboration
+Team Building
+Training
+Knowledge Transfer
+Onboarding
+Leadership
+Team Leadership
+People Management
+Visionary Leadership
+Influence
+Decision Making
+Lateral Thinking
+Innovative Thinking
+Problem Solving
+Complex Problem Solving
+Root Cause Analysis
+Troubleshooting
+Quality Focus
+Thoroughness
+Diligence
+Work Ethic
+Proactiveness
+Drive
+Ambition
+Goal-oriented
+Results-driven
+Performance-focused
+Multitasking
+Scheduling
+Planning
+Organization
+Process Orientation
+Efficiency
+Productivity
+Focus
+Concentration
+Mindfulness
+Stress Management
+Flexibility
+Agility
+Change Management
+Comfort with Ambiguity
+Tolerance for Uncertainty
+Open-mindedness
+Intellectual Humility
+Feedback Reception
+Self-improvement
+Willingness to Learn
+Knowledge Retention
+Information Processing
+Research Skills
+Synthesis
+Data Interpretation
+Insight Generation
+Big Picture Thinking
+Detail Orientation
+Zoom In / Zoom Out
+Balancing
+Moral Reasoning
+Stakeholder Management
+Compassion
+Respect
+Inclusivity
+Cultural Awareness
+Global Mindset
+Diversity & Inclusion
+Equity Mindset
+Belonging
+Psychological Safety
+Conflict Management
+De-escalation
+Facilitation
+Workshop Facilitation
+Meeting Management
+Agenda Setting
+Moderation
+Empowerment
+Motivation
+Inspiration
+Recognition
+Performance Management
+Feedback Delivery
+Constructive Criticism
+Positive Reinforcement
+Goal Setting
+OKR Management
+KPI Tracking
+Metrics-driven Thinking
+Business Acumen
+Commercial Awareness
+Market Awareness
+Strategic Alignment
+Operational Thinking
+Process Improvement
+Lean Thinking
+Crisis Management
+Pressure Handling
+Composure
+Executive Presence
+Gravitas
+Confidence
+Self-regulation
+Impulse Control
+Patience under Pressure
+Creativity
+Innovation
+Brainstorming
+Ideation
+Prototyping Mindset
+Entrepreneurial Thinking
+Intrapreneurship
+Frugality
+Scrappiness
+Execution
+Tenacity
+Determination
+Commitment
+Passion
+Enthusiasm
+Energy
+Positivity
+Optimism
+Humor
+Approachability
+Warmth
+Charisma
+Rapport Building
+Community Building
+Volunteer Mindset
+Civic Engagement
+Social Responsibility
+Sustainability Mindset
+Ethical Leadership
+Values-driven
+Purpose-driven
+respectful

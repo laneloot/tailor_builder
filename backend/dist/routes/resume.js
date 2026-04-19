@@ -7,30 +7,15 @@ const express_1 = require("express");
 const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
 const claude_1 = require("../services/claude");
-const pdfGenerator_1 = require("../services/pdfGenerator");
-const docxGenerator_1 = require("../services/docxGenerator");
-const coverLetterGenerator_1 = require("../services/coverLetterGenerator");
-const generatedPath_1 = require("../services/generatedPath");
-const templateExtractor_1 = require("../services/templateExtractor");
-const aiModelConfig_1 = require("../services/aiModelConfig");
+const pdfGenerator_1 = require("../generators/pdfGenerator");
+const docxGenerator_1 = require("../generators/docxGenerator");
+const coverLetterGenerator_1 = require("../generators/coverLetterGenerator");
+const generatedPath_1 = require("../utils/generatedPath");
+const templateExtractor_1 = require("../extractors/templateExtractor");
+const aiModelConfig_1 = require("../config/aiModelConfig");
+const skills_1 = require("../controllers/skills");
 const router = (0, express_1.Router)();
 const PROFILES_DIR = path_1.default.join(__dirname, '../../data/profiles');
-const TECH_SKILLS_PATH = path_1.default.join(__dirname, '../../skill_data/tech_skills.txt');
-const SOFT_SKILLS_PATH = path_1.default.join(__dirname, '../../skill_data/soft_skills.txt');
-const getSkillsPath = (type) => (type === 'hard' ? TECH_SKILLS_PATH : SOFT_SKILLS_PATH);
-const readSkillsFile = async (type) => {
-    const filePath = getSkillsPath(type);
-    const content = await promises_1.default.readFile(filePath, 'utf-8').catch(() => '');
-    return content
-        .split(/\r?\n/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-};
-const writeSkillsFile = async (type, skills) => {
-    const filePath = getSkillsPath(type);
-    const payload = skills.length ? `${skills.join('\n')}\n` : '';
-    await promises_1.default.writeFile(filePath, payload, 'utf-8');
-};
 function shouldGenerateCoverLetterDocx(value) {
     return typeof value === 'boolean' ? value : true;
 }
@@ -38,7 +23,7 @@ function resolveGenerationRole(role, analysis) {
     if (typeof role === 'string' && role.trim()) {
         return role.trim();
     }
-    return analysis?.jobTitle?.trim() || '';
+    return analysis?.jobMeta?.title?.trim() || '';
 }
 // Get enabled AI models
 router.get('/models', async (req, res) => {
@@ -51,144 +36,15 @@ router.get('/models', async (req, res) => {
     }
 });
 // Confirm and persist a new skill
-router.post('/skills/confirm', async (req, res) => {
-    try {
-        const { type, skill } = req.body;
-        if (!type || !skill || !skill.trim()) {
-            res.status(400).json({ error: 'Skill type and value are required' });
-            return;
-        }
-        const cleaned = skill.trim();
-        const filePath = type === 'hard'
-            ? path_1.default.join(__dirname, '../../skill_data/tech_skills.txt')
-            : path_1.default.join(__dirname, '../../skill_data/soft_skills.txt');
-        const existing = (await promises_1.default.readFile(filePath, 'utf-8'))
-            .split(/\r?\n/)
-            .map((item) => item.trim())
-            .filter(Boolean);
-        const exists = existing.some((item) => item.toLowerCase() === cleaned.toLowerCase());
-        if (!exists) {
-            await promises_1.default.appendFile(filePath, `\n${cleaned}`);
-            if (type === 'hard') {
-                (0, claude_1.addTechSkill)(cleaned);
-                (0, pdfGenerator_1.refreshAllowedTechSkills)();
-            }
-            else {
-                (0, claude_1.addSoftSkill)(cleaned);
-            }
-        }
-        res.json({ added: !exists, skill: cleaned, type });
-    }
-    catch (error) {
-        console.error('Error confirming skill:', error);
-        res.status(500).json({ error: 'Failed to confirm skill' });
-    }
-});
+router.post('/skills/confirm', skills_1.confirmSkill);
 // List skills
-router.get('/skills', async (req, res) => {
-    try {
-        const type = req.query.type;
-        if (type !== 'hard' && type !== 'soft') {
-            res.status(400).json({ error: 'Skill type is required' });
-            return;
-        }
-        const skills = await readSkillsFile(type);
-        res.json({ skills });
-    }
-    catch (error) {
-        console.error('Error reading skills:', error);
-        res.status(500).json({ error: 'Failed to read skills' });
-    }
-});
+router.get('/skills', skills_1.listSkills);
 // Add skill
-router.post('/skills', async (req, res) => {
-    try {
-        const { type, skill } = req.body;
-        if (!type || !skill || !skill.trim()) {
-            res.status(400).json({ error: 'Skill type and value are required' });
-            return;
-        }
-        const cleaned = skill.trim();
-        const skills = await readSkillsFile(type);
-        const exists = skills.some((item) => item.toLowerCase() === cleaned.toLowerCase());
-        if (exists) {
-            res.json({ added: false, skill: cleaned, type });
-            return;
-        }
-        skills.push(cleaned);
-        await writeSkillsFile(type, skills);
-        (0, claude_1.refreshSkillCaches)();
-        if (type === 'hard') {
-            (0, pdfGenerator_1.refreshAllowedTechSkills)();
-        }
-        res.json({ added: true, skill: cleaned, type });
-    }
-    catch (error) {
-        console.error('Error adding skill:', error);
-        res.status(500).json({ error: 'Failed to add skill' });
-    }
-});
+router.post('/skills', skills_1.createSkill);
 // Update skill
-router.put('/skills', async (req, res) => {
-    try {
-        const { type, original, skill } = req.body;
-        if (!type || !original || !skill || !skill.trim()) {
-            res.status(400).json({ error: 'Skill type, original value, and new value are required' });
-            return;
-        }
-        const cleaned = skill.trim();
-        const originalKey = original.trim().toLowerCase();
-        const skills = await readSkillsFile(type);
-        const index = skills.findIndex((item) => item.toLowerCase() === originalKey);
-        if (index === -1) {
-            res.status(404).json({ error: 'Skill not found' });
-            return;
-        }
-        const duplicate = skills.some((item, idx) => idx !== index && item.toLowerCase() === cleaned.toLowerCase());
-        if (duplicate) {
-            res.status(409).json({ error: 'Skill already exists' });
-            return;
-        }
-        skills[index] = cleaned;
-        await writeSkillsFile(type, skills);
-        (0, claude_1.refreshSkillCaches)();
-        if (type === 'hard') {
-            (0, pdfGenerator_1.refreshAllowedTechSkills)();
-        }
-        res.json({ updated: true, skill: cleaned, type });
-    }
-    catch (error) {
-        console.error('Error updating skill:', error);
-        res.status(500).json({ error: 'Failed to update skill' });
-    }
-});
+router.put('/skills', skills_1.updateSkillHandler);
 // Delete skill
-router.delete('/skills', async (req, res) => {
-    try {
-        const { type, skill } = req.body;
-        if (!type || !skill || !skill.trim()) {
-            res.status(400).json({ error: 'Skill type and value are required' });
-            return;
-        }
-        const cleaned = skill.trim();
-        const skills = await readSkillsFile(type);
-        const next = skills.filter((item) => item.toLowerCase() !== cleaned.toLowerCase());
-        if (next.length === skills.length) {
-            res.status(404).json({ error: 'Skill not found' });
-            return;
-        }
-        await writeSkillsFile(type, next);
-        (0, claude_1.refreshSkillCaches)();
-        if (type === 'hard') {
-            (0, pdfGenerator_1.refreshAllowedTechSkills)();
-        }
-        res.json({ deleted: true, skill: cleaned, type });
-    }
-    catch (error) {
-        console.error('Error deleting skill:', error);
-        res.status(500).json({ error: 'Failed to delete skill' });
-    }
-});
+router.delete('/skills', skills_1.deleteSkillHandler);
 // Analyze job description
 router.post('/analyze', async (req, res) => {
     try {
@@ -241,9 +97,11 @@ async function loadAllProfiles(profileIds) {
 router.post('/generate-all', async (req, res) => {
     try {
         const { templateId, jobDescription, jobAnalysis, companyName, role, model, profileIds, format = 'both', includeCoverLetterDocx, } = req.body;
+        // Load setting
         const settings = await (0, aiModelConfig_1.getAIModelSettings)();
         const appSettings = await (0, aiModelConfig_1.getPublicAppSettings)();
         const selectedModel = (0, claude_1.resolveAIProvider)(model);
+        // Validate
         if (!(0, aiModelConfig_1.isProviderEnabled)(selectedModel, settings)) {
             res.status(400).json({ error: `Selected AI model '${selectedModel}' is disabled by admin` });
             return;
@@ -252,6 +110,7 @@ router.post('/generate-all', async (req, res) => {
             res.status(400).json({ error: 'Company name is required' });
             return;
         }
+        // Load profiles
         const profiles = await loadAllProfiles(profileIds);
         if (profiles.length === 0) {
             res.status(400).json({ error: 'No matching profiles available. Add profiles in Admin or update group members.' });

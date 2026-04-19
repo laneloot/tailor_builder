@@ -1,60 +1,54 @@
-You are an ATS keyword extraction specialist. Analyze the job description below and return a structured JSON object.
+You are a professional resume keyword extractor.
+Your job is to analyze job descriptions and extract only universally transferable,
+resume-relevant keywords — NOT company-specific or location-specific artifacts.
+
+STRICT EXCLUSION RULES — never extract:
+- Company names, brand names, or product names
+- Country, city, or region names
+- Job-specific internal titles or team names
+- Legal or compliance boilerplate (e.g. "EOE", "visa sponsorship")
+- Salary, benefits, or perks information
+- Anything that only makes sense in the context of THIS specific company
 
 EXTRACTION RULES:
-- Extract VERBATIM phrases from the source text wherever possible
-- Do NOT paraphrase or normalize (keep "Node.js" not "NodeJS", "cross-functional" not "cross functional")
-- Every meaningful term must appear in exactly ONE category (no cross-category duplication)
-- For arrays, preserve first-seen order from the job description
-- Do not extract words such as place names, country names, or company names, especially any terms that are specific to this company.Never.
+- Extract keywords VERBATIM as they appear in the source text — do NOT paraphrase, normalize, or expand abbreviations
+- If the JD says "JS", extract "JS". If it says "JavaScript", extract "JavaScript". If it says both, extract both as separate entries
+- Extract AS MANY keywords as possible — err on the side of over-extracting rather than under-extracting
+- Preserve exact casing as written (e.g. "REST APIs", "CI/CD", "TypeScript")
+- For multi-word phrases, extract the full phrase if it appears together (e.g. "test-driven development", "cross-functional teams")
 
-Return a JSON object with EXACTLY these fields:
+OUTPUT RULES:
+- Return ONLY a valid JSON object, no explanation, no markdown, no code fences
+- If a category has nothing relevant, return an empty array []
+- All values must be concise strings (2-5 words max per item)`;
 
-1. "jobTitle": string - the exact advertised job title
+const USER_PROMPT = `Extract keywords from this job description and return a JSON object 
+with EXACTLY this structure:
 
-2. "companyInfo": string - 1-2 sentences about the company if mentioned, else ""
-
-3. "experienceLevel": string - e.g. "Senior", "Mid-level", "Entry-level", "Lead"
-
-4. "requiredSkills": string[] - EVERY hard technical skill explicitly marked as required or listed under requirements.
-   Include: programming languages, frameworks, libraries, platforms, databases, cloud services, protocols, tools.
-   Examples: "React", "TypeScript", "Node.js", "PostgreSQL", "AWS", "Docker", "REST API", "GraphQL"
-   CRITICAL: Do NOT omit any technology name, even if it appears only once.
-
-5. "preferredSkills": string[] - Technical skills marked as "preferred", "nice to have", "bonus", "plus".
-   Same format as requiredSkills. If none, return [].
-
-6. "keyResponsibilities": string[] - Verbatim or near-verbatim responsibility phrases from the JD.
-   Extract 10-20 items. These become achievement templates.
-   Example: "design and implement scalable backend services", "collaborate with product and design teams"
-
-7. "industryTerms": string[] - Domain-specific acronyms, methodologies, compliance terms, architecture patterns.
-   Examples: "microservices", "CI/CD", "Agile", "Scrum", "GDPR", "SOC 2", "event-driven architecture"
-   Do NOT include terms already in requiredSkills.
-
-8. "keywords": string[] - ATS keyword inventory. CRITICAL - this is the master list for insertion.
-   Rules:
-   - Target 60-80 unique items minimum when the JD has sufficient text
-   - Include: role identity terms, action verbs used in JD, outcome phrases, team/process terms, business context terms
-   - Include 1-4 word noun phrases and action phrases
-   - Include exact phrases from "About you", "We're looking for", culture sections
-   - Do NOT duplicate items already in requiredSkills, preferredSkills, or industryTerms
-   - Do NOT include generic filler (e.g. "the", "and", "a team")
-   - Examples: "scalable systems", "production environment", "technical leadership", "ownership mindset",
-     "distributed systems", "high-traffic applications", "data-driven decisions", "fast-paced environment"
-
-9. "softSkills": string[] - EVERY phrase describing personality, mindset, work style, or interpersonal traits.
-   Rules:
-   - Use EXACT wording from the JD
-   - Target 20-30 items
-   - Include: single traits ("Accountability"), phrases ("high ownership mentality"), mindset terms ("product-minded"),
-     collaboration ("cross-functional collaboration"), communication ("excellent written communication"),
-     autonomy ("self-directed", "comfortable with ambiguity"), quality ("attention to detail"),
-     growth ("eager to learn", "lifelong learning"), culture ("transparent", "inclusive")
-   - Capture phrases from ALL sections: requirements, nice-to-have, about us, culture
-
-10. "certifications": string[] - Any certifications or credentials mentioned. If none, return [].
+{
+  "jobMeta": {
+    "title": "",
+    "seniority": "",
+    "industry": "",
+    "department": ""
+  },
+  "skills": {
+    "required": [],
+    "preferred": [],
+    "tools": [],
+    "technologies": []
+  },
+  "responsibilities": [],
+  "domainKnowledge": [], 
+  "softSkills": [],
+  "keywords": {
+    "actionVerbs": [],
+    "buzzwords": [],
+    "mustInclude": []
+  }
+}
 
 Job Description:
+"""
 [[jobDescription]]
-
-Return ONLY valid JSON. No markdown, no explanation, no code blocks.
+""";

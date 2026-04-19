@@ -12,8 +12,8 @@ import {
   updateManualTemplate,
   uploadJsonTemplate,
   type ManualTemplateConfig,
-} from '../services/templateExtractor';
-import { generateTemplatePreviewHTML } from '../services/pdfGenerator';
+} from '../extractors/templateExtractor';
+import { generateTemplatePreviewHTML } from '../generators/pdfGenerator';
 
 const router = Router();
 

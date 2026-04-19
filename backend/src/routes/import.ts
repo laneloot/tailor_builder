@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { fetchGoogleSheetsRange, GoogleSheetsRequestError } from '../services/googleSheets';
+import { fetchGoogleSheetsRange, GoogleSheetsRequestError } from '../integrations/googleSheets';
 
 const router = Router();
 

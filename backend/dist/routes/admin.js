@@ -2,9 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
-const aiModelConfig_1 = require("../services/aiModelConfig");
-const googleSheets_1 = require("../services/googleSheets");
-const nativeDirectoryPicker_1 = require("../services/nativeDirectoryPicker");
+const aiModelConfig_1 = require("../config/aiModelConfig");
+const googleSheets_1 = require("../integrations/googleSheets");
+const nativeDirectoryPicker_1 = require("../utils/nativeDirectoryPicker");
 const router = (0, express_1.Router)();
 // Login
 router.post('/login', (req, res) => {

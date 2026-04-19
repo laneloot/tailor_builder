@@ -584,16 +584,26 @@ export interface PromptPreviewResult {
 
 // Job Analysis types
 export interface JobAnalysis {
-  requiredSkills: string[];
-  preferredSkills: string[];
-  keywords: string[];
-  experienceLevel: string;
-  keyResponsibilities: string[];
-  industryTerms: string[];
+  jobMeta: {
+    title: string;
+    seniority: string;
+    industry: string;
+    department: string;
+  };
+  skills: {
+    required: string[];
+    preferred: string[];
+    tools: string[];
+    technologies: string[];
+  };
+  responsibilities: string[];
+  domainKnowledge: string[];
   softSkills: string[];
-  certifications: string[];
-  jobTitle: string;
-  companyInfo?: string;
+  keywords: {
+    actionVerbs: string[];
+    buzzwords: string[];
+    mustInclude: string[];
+  };
 }
 
 export interface TailoredExperience {

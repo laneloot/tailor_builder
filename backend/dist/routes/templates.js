@@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const multer_1 = __importDefault(require("multer"));
 const auth_1 = require("../middleware/auth");
-const templateExtractor_1 = require("../services/templateExtractor");
-const pdfGenerator_1 = require("../services/pdfGenerator");
+const templateExtractor_1 = require("../extractors/templateExtractor");
+const pdfGenerator_1 = require("../generators/pdfGenerator");
 const router = (0, express_1.Router)();
 // Configure multer for PDF uploads
 const uploadPdf = (0, multer_1.default)({

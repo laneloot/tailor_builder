@@ -1,38 +1,19 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
-import { analyzeJobDescription, tailorResume, generateCoverLetter, resolveAIProvider, addTechSkill, addSoftSkill, refreshSkillCaches } from '../services/claude';
-import { generateResumePDF, generatePreviewHTML, getGeneratedPDFPath, refreshAllowedTechSkills } from '../services/pdfGenerator';
-import { generateResumeDOCX } from '../services/docxGenerator';
-import { saveCoverLetter, saveCoverLetterDOCX } from '../services/coverLetterGenerator';
-import { getGeneratedOutputPath } from '../services/generatedPath';
-import { getTemplateById, createDefaultTemplate } from '../services/templateExtractor';
-import { getAIModelSettings, getDefaultEnabledProvider, getPublicAppSettings, isProviderEnabled } from '../services/aiModelConfig';
+import { analyzeJobDescription, tailorResume, generateCoverLetter, resolveAIProvider } from '../services/claude';
+import { generateResumePDF, generatePreviewHTML, getGeneratedPDFPath } from '../generators/pdfGenerator';
+import { generateResumeDOCX } from '../generators/docxGenerator';
+import { saveCoverLetter, saveCoverLetterDOCX } from '../generators/coverLetterGenerator';
+import { getGeneratedOutputPath } from '../utils/generatedPath';
+import { getTemplateById, createDefaultTemplate } from '../extractors/templateExtractor';
+import { getAIModelSettings, getDefaultEnabledProvider, getPublicAppSettings, isProviderEnabled } from '../config/aiModelConfig';
+import { confirmSkill, createSkill, deleteSkillHandler, listSkills, updateSkillHandler } from '../controllers/skills';
 import { Profile } from '../types/profile';
 import { AIProvider, GenerateResumeRequest, TailoredContent } from '../types/template';
 
 const router = Router();
 const PROFILES_DIR = path.join(__dirname, '../../data/profiles');
-
-const TECH_SKILLS_PATH = path.join(__dirname, '../../skill_data/tech_skills.txt');
-const SOFT_SKILLS_PATH = path.join(__dirname, '../../skill_data/soft_skills.txt');
-
-const getSkillsPath = (type: 'hard' | 'soft') => (type === 'hard' ? TECH_SKILLS_PATH : SOFT_SKILLS_PATH);
-
-const readSkillsFile = async (type: 'hard' | 'soft') => {
-  const filePath = getSkillsPath(type);
-  const content = await fs.readFile(filePath, 'utf-8').catch(() => '');
-  return content
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-};
-
-const writeSkillsFile = async (type: 'hard' | 'soft', skills: string[]) => {
-  const filePath = getSkillsPath(type);
-  const payload = skills.length ? `${skills.join('\n')}\n` : '';
-  await fs.writeFile(filePath, payload, 'utf-8');
-};
 
 function shouldGenerateCoverLetterDocx(value: unknown): boolean {
   return typeof value === 'boolean' ? value : true;
@@ -42,7 +23,7 @@ function resolveGenerationRole(role: unknown, analysis?: import('../types/templa
   if (typeof role === 'string' && role.trim()) {
     return role.trim();
   }
-  return analysis?.jobTitle?.trim() || '';
+  return analysis?.jobMeta?.title?.trim() || '';
 }
 
 // Get enabled AI models
@@ -56,147 +37,20 @@ router.get('/models', async (req: Request, res: Response) => {
 });
 
 // Confirm and persist a new skill
-router.post('/skills/confirm', async (req: Request, res: Response) => {
-  try {
-    const { type, skill } = req.body as { type?: 'hard' | 'soft'; skill?: string };
-    if (!type || !skill || !skill.trim()) {
-      res.status(400).json({ error: 'Skill type and value are required' });
-      return;
-    }
-
-    const cleaned = skill.trim();
-    const filePath = type === 'hard'
-      ? path.join(__dirname, '../../skill_data/tech_skills.txt')
-      : path.join(__dirname, '../../skill_data/soft_skills.txt');
-
-    const existing = (await fs.readFile(filePath, 'utf-8'))
-      .split(/\r?\n/)
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-    const exists = existing.some((item) => item.toLowerCase() === cleaned.toLowerCase());
-    if (!exists) {
-      await fs.appendFile(filePath, `\n${cleaned}`);
-      if (type === 'hard') {
-        addTechSkill(cleaned);
-        refreshAllowedTechSkills();
-      } else {
-        addSoftSkill(cleaned);
-      }
-    }
-
-    res.json({ added: !exists, skill: cleaned, type });
-  } catch (error) {
-    console.error('Error confirming skill:', error);
-    res.status(500).json({ error: 'Failed to confirm skill' });
-  }
-});
+router.post('/skills/confirm', confirmSkill);
 
 
 // List skills
-router.get('/skills', async (req: Request, res: Response) => {
-  try {
-    const type = req.query.type as 'hard' | 'soft' | undefined;
-    if (type !== 'hard' && type !== 'soft') {
-      res.status(400).json({ error: 'Skill type is required' });
-      return;
-    }
-    const skills = await readSkillsFile(type);
-    res.json({ skills });
-  } catch (error) {
-    console.error('Error reading skills:', error);
-    res.status(500).json({ error: 'Failed to read skills' });
-  }
-});
+router.get('/skills', listSkills);
 
 // Add skill
-router.post('/skills', async (req: Request, res: Response) => {
-  try {
-    const { type, skill } = req.body as { type?: 'hard' | 'soft'; skill?: string };
-    if (!type || !skill || !skill.trim()) {
-      res.status(400).json({ error: 'Skill type and value are required' });
-      return;
-    }
-    const cleaned = skill.trim();
-    const skills = await readSkillsFile(type);
-    const exists = skills.some((item) => item.toLowerCase() === cleaned.toLowerCase());
-    if (exists) {
-      res.json({ added: false, skill: cleaned, type });
-      return;
-    }
-    skills.push(cleaned);
-    await writeSkillsFile(type, skills);
-    refreshSkillCaches();
-    if (type === 'hard') {
-      refreshAllowedTechSkills();
-    }
-    res.json({ added: true, skill: cleaned, type });
-  } catch (error) {
-    console.error('Error adding skill:', error);
-    res.status(500).json({ error: 'Failed to add skill' });
-  }
-});
+router.post('/skills', createSkill);
 
 // Update skill
-router.put('/skills', async (req: Request, res: Response) => {
-  try {
-    const { type, original, skill } = req.body as { type?: 'hard' | 'soft'; original?: string; skill?: string };
-    if (!type || !original || !skill || !skill.trim()) {
-      res.status(400).json({ error: 'Skill type, original value, and new value are required' });
-      return;
-    }
-    const cleaned = skill.trim();
-    const originalKey = original.trim().toLowerCase();
-    const skills = await readSkillsFile(type);
-    const index = skills.findIndex((item) => item.toLowerCase() === originalKey);
-    if (index === -1) {
-      res.status(404).json({ error: 'Skill not found' });
-      return;
-    }
-    const duplicate = skills.some((item, idx) => idx !== index && item.toLowerCase() === cleaned.toLowerCase());
-    if (duplicate) {
-      res.status(409).json({ error: 'Skill already exists' });
-      return;
-    }
-    skills[index] = cleaned;
-    await writeSkillsFile(type, skills);
-    refreshSkillCaches();
-    if (type === 'hard') {
-      refreshAllowedTechSkills();
-    }
-    res.json({ updated: true, skill: cleaned, type });
-  } catch (error) {
-    console.error('Error updating skill:', error);
-    res.status(500).json({ error: 'Failed to update skill' });
-  }
-});
+router.put('/skills', updateSkillHandler);
 
 // Delete skill
-router.delete('/skills', async (req: Request, res: Response) => {
-  try {
-    const { type, skill } = req.body as { type?: 'hard' | 'soft'; skill?: string };
-    if (!type || !skill || !skill.trim()) {
-      res.status(400).json({ error: 'Skill type and value are required' });
-      return;
-    }
-    const cleaned = skill.trim();
-    const skills = await readSkillsFile(type);
-    const next = skills.filter((item) => item.toLowerCase() !== cleaned.toLowerCase());
-    if (next.length === skills.length) {
-      res.status(404).json({ error: 'Skill not found' });
-      return;
-    }
-    await writeSkillsFile(type, next);
-    refreshSkillCaches();
-    if (type === 'hard') {
-      refreshAllowedTechSkills();
-    }
-    res.json({ deleted: true, skill: cleaned, type });
-  } catch (error) {
-    console.error('Error deleting skill:', error);
-    res.status(500).json({ error: 'Failed to delete skill' });
-  }
-});
+router.delete('/skills', deleteSkillHandler);
 
 // Analyze job description
 router.post('/analyze', async (req: Request, res: Response) => {

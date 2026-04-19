@@ -1050,7 +1050,6 @@ Circuit Breaker Pattern
 Bulkhead Pattern
 RESTful API
 CI/CD
-CI/CD pipeline
 Figma
 API integration
 Cloud platforms
@@ -1129,3 +1128,5 @@ Boundary Testing
 Manual functional testing
 Jira
 API automation
+Aws Services
+UI/UX

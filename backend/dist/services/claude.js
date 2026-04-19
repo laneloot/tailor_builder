@@ -4,8 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_PROVIDER = void 0;
-exports.addTechSkill = addTechSkill;
-exports.addSoftSkill = addSoftSkill;
 exports.refreshSkillCaches = refreshSkillCaches;
 exports.resolveAIProvider = resolveAIProvider;
 exports.analyzeJobDescription = analyzeJobDescription;
@@ -15,109 +13,44 @@ exports.extractTemplateFromPDF = extractTemplateFromPDF;
 exports.extractProfileFromResume = extractProfileFromResume;
 const openai_1 = __importDefault(require("openai"));
 const dotenv_1 = __importDefault(require("dotenv"));
-const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const promptService_1 = require("./promptService");
-const aiModelConfig_1 = require("./aiModelConfig");
+const aiModelConfig_1 = require("../config/aiModelConfig");
+const skillsDatabase_1 = require("../database/skillsDatabase");
+const array_1 = require("../utils/array");
+const json_1 = require("../utils/json");
 // Ensure the repo .env file is loaded for this module even when it is imported
 // before index.ts finishes bootstrapping, and prefer .env over inherited shell vars.
 dotenv_1.default.config({ path: path_1.default.join(__dirname, '../../../.env'), override: true });
 let jobDesc = '';
-function moveMatches(array1, array2, array3) {
-    const lowerSet = new Set(array1.map(item => item.toLowerCase()));
-    for (let i = array2.length - 1; i >= 0; i--) {
-        if (lowerSet.has(array2[i].toLowerCase())) {
-            array3.push(array2[i]); // add to array3
-            array2.splice(i, 1); // remove from array2
-        }
-    }
-}
-function removeDuplicatesIgnoreCase(arr) {
-    const seen = new Set();
-    return arr.filter(item => {
-        const lower = item.toLowerCase();
-        if (seen.has(lower)) {
-            return false;
-        }
-        seen.add(lower);
-        return true;
-    });
-}
-const technicalSkills = fs_1.default
-    .readFileSync(path_1.default.resolve(__dirname, '../../skill_data/tech_skills.txt'), 'utf-8')
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-const softSkills = fs_1.default
-    .readFileSync(path_1.default.resolve(__dirname, '../../skill_data/soft_skills.txt'), 'utf-8')
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-function normalizeSkillKey(skill) {
-    return skill.trim().toLowerCase();
-}
-const TECH_SKILL_SET = new Set(technicalSkills.map(normalizeSkillKey));
-const SOFT_SKILL_SET = new Set(softSkills.map(normalizeSkillKey));
-function addTechSkill(skill) {
-    const cleaned = skill.trim();
-    if (!cleaned)
-        return false;
-    const key = normalizeSkillKey(cleaned);
-    if (TECH_SKILL_SET.has(key))
-        return false;
-    TECH_SKILL_SET.add(key);
-    technicalSkills.push(cleaned);
-    return true;
-}
-function addSoftSkill(skill) {
-    const cleaned = skill.trim();
-    if (!cleaned)
-        return false;
-    const key = normalizeSkillKey(cleaned);
-    if (SOFT_SKILL_SET.has(key))
-        return false;
-    SOFT_SKILL_SET.add(key);
-    softSkills.push(cleaned);
-    return true;
-}
+const technicalSkills = (0, skillsDatabase_1.readSkills)('hard');
+const softSkills = (0, skillsDatabase_1.readSkills)('soft');
 function refreshSkillCaches() {
-    const nextTech = fs_1.default
-        .readFileSync(path_1.default.resolve(__dirname, '../../skill_data/tech_skills.txt'), 'utf-8')
-        .split(/\r?\n/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-    const nextSoft = fs_1.default
-        .readFileSync(path_1.default.resolve(__dirname, '../../skill_data/soft_skills.txt'), 'utf-8')
-        .split(/\r?\n/)
-        .map((item) => item.trim())
-        .filter(Boolean);
+    const nextTech = (0, skillsDatabase_1.readSkills)('hard');
+    const nextSoft = (0, skillsDatabase_1.readSkills)('soft');
     technicalSkills.length = 0;
     technicalSkills.push(...nextTech);
-    TECH_SKILL_SET.clear();
-    for (const item of nextTech)
-        TECH_SKILL_SET.add(normalizeSkillKey(item));
     softSkills.length = 0;
     softSkills.push(...nextSoft);
-    SOFT_SKILL_SET.clear();
-    for (const item of nextSoft)
-        SOFT_SKILL_SET.add(normalizeSkillKey(item));
 }
-function splitSkillsByOriginal(hardSkills, original) {
-    const originalLower = original.map((item) => item.toLowerCase());
-    const matched = [];
-    const rest = [];
-    for (const skill of hardSkills) {
-        const skillLower = skill.toLowerCase();
-        const found = originalLower.some((orig) => orig.includes(skillLower));
-        if (found) {
-            matched.push(skill);
-        }
-        else {
-            rest.push(skill);
-        }
-    }
-    return { matched, rest };
-}
+// function splitSkillsByOriginal(
+//   hardSkills: string[],
+//   original: string[]
+// ): { matched: string[]; rest: string[] } {
+//   const originalLower = original.map((item) => item.toLowerCase());
+//   const matched: string[] = [];
+//   const rest: string[] = [];
+//   for (const skill of hardSkills) {
+//     const skillLower = skill.toLowerCase();
+//     const found = originalLower.some((orig) => orig.includes(skillLower));
+//     if (found) {
+//       matched.push(skill);
+//     } else {
+//       rest.push(skill);
+//     }
+//   }
+//   return { matched, rest };
+// }
 // Lazy initialization to ensure env vars are loaded first
 let openaiClient = null;
 let openRouterClient = null;
@@ -187,34 +120,34 @@ const ATS_SOFT_SKILL_RULES = [
     { canonical: 'Eager to learn', patterns: ['eager to learn', 'lifelong learning'] },
     { canonical: 'Accountability', patterns: ['accountability', 'accountable'] },
 ];
-const HARD_SKILL_PRIORITY_SIGNALS = [
-    'ai',
-    'ruby',
-    'sre',
-    'cloud infrastructure',
-    'cloud technologies',
-    'automation',
-    'aws',
-    'kubernetes',
-    'docker',
-    'linux',
-    'infrastructure as code',
-    'iac',
-    'devops',
-    'ci/cd',
-    'terraform',
-    'monitoring',
-    'observability',
-    'bash scripting',
-    'troubleshoot',
-    'log analysis',
-    'server-side',
-    'abstraction',
-    'debugging',
-    'aws cloud',
-    'tooling',
-    'version control',
-];
+// const HARD_SKILL_PRIORITY_SIGNALS = [
+//   'ai',
+//   'ruby',
+//   'sre',
+//   'cloud infrastructure',
+//   'cloud technologies',
+//   'automation',
+//   'aws',
+//   'kubernetes',
+//   'docker',
+//   'linux',
+//   'infrastructure as code',
+//   'iac',
+//   'devops',
+//   'ci/cd',
+//   'terraform',
+//   'monitoring',
+//   'observability',
+//   'bash scripting',
+//   'troubleshoot',
+//   'log analysis',
+//   'server-side',
+//   'abstraction',
+//   'debugging',
+//   'aws cloud',
+//   'tooling',
+//   'version control',
+// ];
 const HARD_SKILL_RULES = [
     { canonical: 'Bash scripting', patterns: ['bash scripting', 'bash'] },
     { canonical: 'Troubleshoot', patterns: ['troubleshoot', 'troubleshooting'] },
@@ -503,99 +436,6 @@ async function createTextCompletion(prompt, provider = DEFAULT_PROVIDER, maxToke
     }
     return createAnthropicMessage(prompt, maxTokens, temperature);
 }
-function tryParseJsonCandidate(text) {
-    const trimmed = text.trim();
-    if (!trimmed)
-        return null;
-    try {
-        JSON.parse(trimmed);
-        return trimmed;
-    }
-    catch {
-        return null;
-    }
-}
-function findFirstBalancedJson(text) {
-    const source = text.trim();
-    if (!source)
-        return null;
-    for (let start = 0; start < source.length; start += 1) {
-        const firstChar = source[start];
-        if (firstChar !== '{' && firstChar !== '[') {
-            continue;
-        }
-        const stack = [firstChar === '{' ? '}' : ']'];
-        let inString = false;
-        let escaping = false;
-        for (let index = start + 1; index < source.length; index += 1) {
-            const char = source[index];
-            if (inString) {
-                if (escaping) {
-                    escaping = false;
-                    continue;
-                }
-                if (char === '\\') {
-                    escaping = true;
-                    continue;
-                }
-                if (char === '"') {
-                    inString = false;
-                }
-                continue;
-            }
-            if (char === '"') {
-                inString = true;
-                continue;
-            }
-            if (char === '{') {
-                stack.push('}');
-                continue;
-            }
-            if (char === '[') {
-                stack.push(']');
-                continue;
-            }
-            if (char === '}' || char === ']') {
-                const expected = stack.pop();
-                if (expected !== char) {
-                    break;
-                }
-                if (stack.length === 0) {
-                    const candidate = source.slice(start, index + 1);
-                    if (tryParseJsonCandidate(candidate)) {
-                        return candidate;
-                    }
-                    break;
-                }
-            }
-        }
-    }
-    return null;
-}
-// Helper function to extract JSON from model response.
-// Models may wrap JSON in markdown or add extra prose around it.
-function extractJSON(text) {
-    const candidates = [];
-    const direct = text.trim();
-    if (direct) {
-        candidates.push(direct);
-    }
-    const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (jsonBlockMatch?.[1]?.trim()) {
-        candidates.unshift(jsonBlockMatch[1].trim());
-    }
-    for (const candidate of candidates) {
-        const exact = tryParseJsonCandidate(candidate);
-        if (exact) {
-            return exact;
-        }
-        const balanced = findFirstBalancedJson(candidate);
-        if (balanced) {
-            return balanced;
-        }
-    }
-    throw new Error('No valid JSON object found in model response');
-}
 function normalizeSkillsList(skills) {
     if (!Array.isArray(skills))
         return [];
@@ -614,6 +454,118 @@ function normalizeSkillsList(skills) {
         normalized.push(skill);
     }
     return normalized;
+}
+function asString(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+function toStringList(value) {
+    if (Array.isArray(value)) {
+        return value.filter((item) => typeof item === 'string').map((item) => item.trim()).filter(Boolean);
+    }
+    if (typeof value === 'string' && value.trim()) {
+        return [value.trim()];
+    }
+    return [];
+}
+function normalizeJobAnalysisResponse(parsed, jobDescription) {
+    // const inferredSoft = inferAtsSoftSkillsFromText(jobDescription);
+    // const inferredHard = inferHardSkillsFromText(jobDescription);
+    const required = normalizeSkillsList([
+        ...toStringList(parsed.skills?.required),
+        // ...inferredHard,
+    ]);
+    const preferred = normalizeSkillsList([
+        ...toStringList(parsed.skills?.preferred),
+    ]);
+    const tools = normalizeSkillsList(toStringList(parsed.skills?.tools));
+    const technologies = normalizeSkillsList(toStringList(parsed.skills?.technologies));
+    const responsibilities = normalizeSkillsList([
+        ...toStringList(parsed.responsibilities),
+    ]);
+    const domainKnowledge = normalizeSkillsList([
+        ...toStringList(parsed.domainKnowledge),
+    ]);
+    const softSkills = prioritizeSoftSkills(normalizeSkillsList([
+        ...toStringList(parsed.softSkills),
+    ]));
+    const keywordGroups = parsed.keywords && typeof parsed.keywords === 'object' && !Array.isArray(parsed.keywords)
+        ? parsed.keywords
+        : {};
+    return {
+        jobMeta: {
+            title: asString(parsed.jobMeta?.title) || asString(parsed.jobMeta?.title),
+            seniority: asString(parsed.jobMeta?.seniority),
+            industry: asString(parsed.jobMeta?.industry),
+            department: asString(parsed.jobMeta?.department),
+        },
+        skills: {
+            required,
+            preferred,
+            tools,
+            technologies,
+        },
+        responsibilities,
+        domainKnowledge,
+        softSkills,
+        keywords: {
+            actionVerbs: normalizeSkillsList(toStringList(keywordGroups.actionVerbs)),
+            buzzwords: normalizeSkillsList(toStringList(keywordGroups.buzzwords)),
+            mustInclude: normalizeSkillsList([
+                ...toStringList(keywordGroups.mustInclude),
+            ]),
+        },
+    };
+}
+function getJobAnalysisTitle(jobAnalysis) {
+    return jobAnalysis?.jobMeta?.title?.trim() ?? '';
+}
+function getRequiredSkills(jobAnalysis) {
+    return normalizeSkillsList(jobAnalysis?.skills?.required);
+}
+function getPreferredSkills(jobAnalysis) {
+    return normalizeSkillsList(jobAnalysis?.skills?.preferred);
+}
+function getSkillTools(jobAnalysis) {
+    return normalizeSkillsList(jobAnalysis?.skills?.tools);
+}
+function getSkillTechnologies(jobAnalysis) {
+    return normalizeSkillsList(jobAnalysis?.skills?.technologies);
+}
+function getResponsibilities(jobAnalysis) {
+    return normalizeSkillsList(jobAnalysis?.responsibilities);
+}
+function getDomainKnowledge(jobAnalysis) {
+    return normalizeSkillsList(jobAnalysis?.domainKnowledge);
+}
+function getSoftSkills(jobAnalysis) {
+    return normalizeSkillsList(jobAnalysis?.softSkills);
+}
+function getIndustryTerms(jobAnalysis) {
+    return normalizeSkillsList([
+        jobAnalysis?.jobMeta?.industry ?? '',
+        jobAnalysis?.jobMeta?.department ?? '',
+        ...getDomainKnowledge(jobAnalysis),
+    ]);
+}
+function getKeywordChecklist(jobAnalysis) {
+    return normalizeSkillsList([
+        ...(jobAnalysis?.keywords?.actionVerbs ?? []),
+        ...(jobAnalysis?.keywords?.buzzwords ?? []),
+        ...(jobAnalysis?.keywords?.mustInclude ?? []),
+        ...getSkillTools(jobAnalysis),
+        ...getSkillTechnologies(jobAnalysis),
+        ...getDomainKnowledge(jobAnalysis),
+    ]);
+}
+function getHardSkillChecklist(jobAnalysis) {
+    return normalizeSkillsList([
+        ...getRequiredSkills(jobAnalysis),
+        ...getPreferredSkills(jobAnalysis),
+        ...getSkillTools(jobAnalysis),
+        ...getSkillTechnologies(jobAnalysis),
+        ...getKeywordChecklist(jobAnalysis),
+        ...getIndustryTerms(jobAnalysis),
+    ]);
 }
 function normalizeHardSkillAlias(skill) {
     return skill.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -744,11 +696,10 @@ function inferAtsSoftSkillsFromAnalysis(jobAnalysis) {
     if (!jobAnalysis)
         return [];
     const text = [
-        ...(jobAnalysis.softSkills ?? []),
-        ...(jobAnalysis.keywords ?? []),
-        ...(jobAnalysis.keyResponsibilities ?? []),
-        ...(jobAnalysis.industryTerms ?? []),
-        jobAnalysis.companyInfo ?? '',
+        ...getSoftSkills(jobAnalysis),
+        ...getKeywordChecklist(jobAnalysis),
+        ...getResponsibilities(jobAnalysis),
+        ...getIndustryTerms(jobAnalysis),
     ].join(' | ');
     return inferAtsSoftSkillsFromText(text);
 }
@@ -764,15 +715,15 @@ function prioritizeHardSkills(skills, _jobAnalysis) {
 }
 function buildFallbackExperienceDescription(title, jobAnalysis) {
     const role = title.trim() || 'Engineer';
-    const responsibility = jobAnalysis?.keyResponsibilities?.find((item) => item.trim()) ||
+    const responsibility = getResponsibilities(jobAnalysis).find((item) => item.trim()) ||
         'delivering reliable solutions aligned with business goals';
-    const keywords = (jobAnalysis?.keywords ?? []).slice(0, 2).join(', ');
+    const keywords = getKeywordChecklist(jobAnalysis).slice(0, 2).join(', ');
     const suffix = keywords ? ` with focus on ${keywords}` : '';
     const text = `${role} focused on ${responsibility}${suffix}.`;
     return text.slice(0, MAX_ROLE_BRIEF_LENGTH).trim();
 }
 function buildFallbackAchievements(jobAnalysis) {
-    const base = (jobAnalysis?.keyResponsibilities ?? [])
+    const base = getResponsibilities(jobAnalysis)
         .filter((item) => item.trim())
         .slice(0, 3);
     if (base.length > 0) {
@@ -831,7 +782,7 @@ function toTitleCase(text) {
         .join(' ');
 }
 function buildSimpleSeniorEngineerTitle(contentTitle, jobAnalysis, profile) {
-    const source = (jobAnalysis?.jobTitle || contentTitle || profile?.title || '').trim();
+    const source = (getJobAnalysisTitle(jobAnalysis) || contentTitle || profile?.title || '').trim();
     const cleaned = source
         .replace(/[^a-zA-Z0-9\s/+.-]/g, ' ')
         .replace(/\s+/g, ' ')
@@ -879,12 +830,7 @@ function buildSimpleSeniorEngineerTitle(contentTitle, jobAnalysis, profile) {
 function normalizeTailoredContent(content, jobAnalysis, profile) {
     const MAX_SOFT_SKILLS = 10;
     // Job analysis skills FIRST (required, preferred, keywords) - must appear in hard skills
-    const jobHardRaw = [
-        ...(jobAnalysis?.requiredSkills ?? []),
-        ...(jobAnalysis?.preferredSkills ?? []),
-        ...(jobAnalysis?.keywords ?? []),
-        ...(jobAnalysis?.industryTerms ?? []),
-    ];
+    const jobHardRaw = getHardSkillChecklist(jobAnalysis);
     const combinedHardRaw = [
         ...jobHardRaw,
         ...(content.requiredSkills ?? []),
@@ -895,7 +841,7 @@ function normalizeTailoredContent(content, jobAnalysis, profile) {
     const atsSoftPriority = inferAtsSoftSkillsFromAnalysis(jobAnalysis);
     const hardSkills = prioritizeHardSkills(normalizeAllowedHardSkills(combinedHardRaw), jobAnalysis);
     const softFromModel = normalizeSkillsList(content.softSkills);
-    const softFromAnalysis = normalizeSkillsList(jobAnalysis?.softSkills);
+    const softFromAnalysis = getSoftSkills(jobAnalysis);
     const softMerged = normalizeSkillsList([...atsSoftPriority, ...softFromModel, ...softFromAnalysis]);
     const softSkills = prioritizeSoftSkills(softMerged);
     const hardLimited = hardSkills; // No limit on hard skills
@@ -914,8 +860,8 @@ function normalizeTailoredContent(content, jobAnalysis, profile) {
     const clampRoleBrief = (description) => {
         const cleanBase = stripBoldTags(description).trim().replace(/\s+/g, ' ');
         const clean = ensureMinLength(cleanBase, MIN_ROLE_BRIEF_LENGTH, [
-            ...(jobAnalysis?.keyResponsibilities ?? []).slice(0, 3),
-            ...(jobAnalysis?.keywords ?? []).slice(0, 2).map((k) => `Focus on ${k}.`),
+            ...getResponsibilities(jobAnalysis).slice(0, 3),
+            ...getKeywordChecklist(jobAnalysis).slice(0, 2).map((k) => `Focus on ${k}.`),
         ]);
         if (clean.length <= MAX_ROLE_BRIEF_LENGTH)
             return trimIncompleteEnd(clean);
@@ -947,7 +893,7 @@ function normalizeTailoredContent(content, jobAnalysis, profile) {
             ? normalizeSkillsList(item.achievements).map(stripBoldTags)
             : buildFallbackAchievements(jobAnalysis),
     }));
-    const extractedJobTitle = (jobAnalysis?.jobTitle ?? '').trim();
+    const extractedJobTitle = getJobAnalysisTitle(jobAnalysis);
     if (normalizedExperience.length > 0 && extractedJobTitle) {
         const latestExperience = normalizedExperience[0];
         const baseDescription = (latestExperience.description ?? '').trim();
@@ -966,12 +912,12 @@ function normalizeTailoredContent(content, jobAnalysis, profile) {
         }
     }
     const strengthKeywordPool = normalizeSkillsList([
-        ...(jobAnalysis?.requiredSkills ?? []),
-        ...(jobAnalysis?.preferredSkills ?? []),
-        ...(jobAnalysis?.keywords ?? []),
-        ...(jobAnalysis?.industryTerms ?? []),
+        ...getRequiredSkills(jobAnalysis),
+        ...getPreferredSkills(jobAnalysis),
+        ...getKeywordChecklist(jobAnalysis),
+        ...getIndustryTerms(jobAnalysis),
     ]).filter((keyword) => keyword.length >= 3);
-    const fallbackStrengths = (jobAnalysis?.keyResponsibilities ?? [])
+    const fallbackStrengths = getResponsibilities(jobAnalysis)
         .filter((item) => item.trim())
         .slice(0, 4)
         .map((item, index) => ({
@@ -1012,58 +958,51 @@ function normalizeTailoredContent(content, jobAnalysis, profile) {
     };
 }
 async function analyzeJobDescription(jobDescription, provider = DEFAULT_PROVIDER) {
-    const keywordTarget = jobDescription.trim().length > 3000 ? 2000 : 1500;
     jobDesc = jobDescription;
     const prompt = await (0, promptService_1.renderPrompt)('analyze-job-description', {
         jobDescription,
     });
     const content = await createTextCompletion(prompt, provider, 7000, 0, 'json');
     try {
-        const jsonText = extractJSON(content);
+        const jsonText = (0, json_1.extractJSON)(content);
         const parsed = JSON.parse(jsonText);
-        const inferredSoft = inferAtsSoftSkillsFromText(jobDescription);
-        const inferredHard = inferHardSkillsFromText(jobDescription);
-        return {
-            ...parsed,
-            requiredSkills: normalizeSkillsList([...(parsed.requiredSkills ?? []), ...inferredHard]),
-            keywords: normalizeSkillsList([...(parsed.keywords ?? []), ...inferredHard]),
-            softSkills: prioritizeSoftSkills(normalizeSkillsList([...(parsed.softSkills ?? []), ...inferredSoft])),
-        };
+        return normalizeJobAnalysisResponse(parsed, jobDescription);
     }
-    catch {
-        console.error('Failed to parse model response:', content);
+    catch (error) {
+        console.error('Failed to parse model response:', error, content);
         throw new Error('Failed to parse job analysis response');
     }
 }
 async function tailorResume(profile, jobAnalysis, provider = DEFAULT_PROVIDER) {
-    const keywordCount = jobAnalysis.keywords?.length ?? 0;
+    const keywords = getKeywordChecklist(jobAnalysis);
+    const responsibilities = getResponsibilities(jobAnalysis);
+    const keywordCount = keywords.length;
     const insertionTarget = keywordCount >= 2000 ? 2000 : keywordCount >= 1500 ? 1500 : keywordCount;
     const prompt = await (0, promptService_1.renderPrompt)('tailor-resume', {
         profileJson: JSON.stringify(profile, null, 2),
         jobAnalysisJson: JSON.stringify(jobAnalysis, null, 2),
-        jobTitle: jobAnalysis.jobTitle ?? '',
-        requiredSkillsJson: JSON.stringify(jobAnalysis.requiredSkills ?? []),
-        preferredSkillsJson: JSON.stringify(jobAnalysis.preferredSkills ?? []),
-        industryTermsJson: JSON.stringify(jobAnalysis.industryTerms ?? []),
-        keywordsJson: JSON.stringify(jobAnalysis.keywords ?? []),
-        keyResponsibilitiesJson: JSON.stringify(jobAnalysis.keyResponsibilities ?? []),
-        softSkillsJson: JSON.stringify(jobAnalysis.softSkills ?? []),
+        jobTitle: getJobAnalysisTitle(jobAnalysis),
+        hardSkillsJSON: JSON.stringify([...jobAnalysis.skills.preferred, ...jobAnalysis.skills.required, ...jobAnalysis.skills.technologies, ...jobAnalysis.skills.tools]),
+        softSkillsJSON: JSON.stringify([...jobAnalysis.softSkills]),
+        keywordsJson: JSON.stringify([...jobAnalysis.keywords.actionVerbs, ...jobAnalysis.keywords.buzzwords, ...jobAnalysis.keywords.mustInclude]),
+        keyResponsibilitiesJson: JSON.stringify([...jobAnalysis.responsibilities]),
+        domainKnowledge: JSON.stringify([...jobAnalysis.domainKnowledge, jobAnalysis.jobMeta.industry])
     });
     const content = await createTextCompletion(prompt, provider, 11000, 0.2, 'json');
     try {
-        const jsonText = extractJSON(content);
+        const jsonText = (0, json_1.extractJSON)(content);
         const parsed = JSON.parse(jsonText);
         const finalResult = normalizeTailoredContent(parsed, jobAnalysis, profile);
         finalResult.unconfirmedHardSkills = [...finalResult.hardSkills];
         finalResult.hardSkills = [...extractTechSkills(jobDesc)];
-        moveMatches(technicalSkills, finalResult.unconfirmedHardSkills, finalResult.hardSkills);
-        finalResult.unconfirmedHardSkills = [...removeDuplicatesIgnoreCase(finalResult.unconfirmedHardSkills)];
-        finalResult.hardSkills = [...removeDuplicatesIgnoreCase(finalResult.hardSkills)];
+        (0, array_1.moveCaseInsensitiveMatches)(technicalSkills, finalResult.unconfirmedHardSkills, finalResult.hardSkills);
+        finalResult.unconfirmedHardSkills = [...(0, array_1.uniqueCaseInsensitive)(finalResult.unconfirmedHardSkills)];
+        finalResult.hardSkills = [...(0, array_1.uniqueCaseInsensitive)(finalResult.hardSkills)];
         finalResult.unconfirmedSoftSkills = [...finalResult.softSkills];
         finalResult.softSkills = [...extractSoftSkills(jobDesc)];
-        moveMatches(softSkills, finalResult.unconfirmedSoftSkills, finalResult.softSkills);
-        finalResult.unconfirmedSoftSkills = [...removeDuplicatesIgnoreCase(finalResult.unconfirmedSoftSkills)];
-        finalResult.softSkills = [...removeDuplicatesIgnoreCase(finalResult.softSkills)];
+        (0, array_1.moveCaseInsensitiveMatches)(softSkills, finalResult.unconfirmedSoftSkills, finalResult.softSkills);
+        finalResult.unconfirmedSoftSkills = [...(0, array_1.uniqueCaseInsensitive)(finalResult.unconfirmedSoftSkills)];
+        finalResult.softSkills = [...(0, array_1.uniqueCaseInsensitive)(finalResult.softSkills)];
         return finalResult;
     }
     catch {
@@ -1090,7 +1029,7 @@ async function extractTemplateFromPDF(pdfText, templateName, provider = DEFAULT_
         templateName,
     }), provider, 8000, 0, 'json');
     try {
-        const jsonText = extractJSON(content);
+        const jsonText = (0, json_1.extractJSON)(content);
         return JSON.parse(jsonText);
     }
     catch {
@@ -1103,7 +1042,7 @@ async function extractProfileFromResume(resumeText, provider = DEFAULT_PROVIDER)
         resumeText,
     }), provider, 4000, 0, 'json');
     try {
-        const jsonText = extractJSON(content);
+        const jsonText = (0, json_1.extractJSON)(content);
         return JSON.parse(jsonText);
     }
     catch {

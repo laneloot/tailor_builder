@@ -9,6 +9,7 @@ type Props = {
 
 const NAV_ITEMS = [
   { href: '/', label: 'Builder' },
+  { href: '/test', label: 'Test' },
   { href: '/admin/profiles', label: 'Profiles' },
   { href: '/admin/templates', label: 'Templates' },
   { href: '/admin/prompts', label: 'Prompts' },

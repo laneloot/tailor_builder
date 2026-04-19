@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
-import { getGeneratedFilePath } from './services/generatedPath';
+import { getGeneratedFilePath } from './utils/generatedPath';
 
 import profileRoutes from './routes/profiles';
 import templateRoutes from './routes/templates';

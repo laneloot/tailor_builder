@@ -77,16 +77,29 @@ Preferred: GraphQL, Kubernetes, Terraform, CI/CD, and experience in fast-paced s
                 name: 'jobAnalysisJson',
                 description: 'Serialized job analysis JSON produced from the target job description.',
                 sampleValue: `{
-  "jobTitle": "Senior Backend Engineer",
-  "requiredSkills": ["Node.js", "TypeScript", "PostgreSQL", "AWS"],
-  "preferredSkills": ["GraphQL", "Docker"],
-  "industryTerms": ["microservices", "CI/CD"],
-  "keywords": ["scalable systems", "cross-functional collaboration", "ownership mindset"],
-  "keyResponsibilities": [
+  "jobMeta": {
+    "title": "Senior Backend Engineer",
+    "seniority": "Senior",
+    "industry": "Software",
+    "department": "Engineering"
+  },
+  "skills": {
+    "required": ["Node.js", "TypeScript", "PostgreSQL", "AWS"],
+    "preferred": ["GraphQL", "Docker"],
+    "tools": ["Docker"],
+    "technologies": ["microservices", "CI/CD"]
+  },
+  "responsibilities": [
     "design and implement scalable backend services",
     "collaborate with product and design teams"
   ],
-  "softSkills": ["high ownership mentality", "excellent written communication"]
+  "domainKnowledge": ["backend platforms", "distributed systems"],
+  "softSkills": ["high ownership mentality", "excellent written communication"],
+  "keywords": {
+    "actionVerbs": ["design", "collaborate"],
+    "buzzwords": ["scalable systems", "ownership mindset"],
+    "mustInclude": ["Node.js", "TypeScript"]
+  }
 }`,
             },
             {
@@ -95,19 +108,14 @@ Preferred: GraphQL, Kubernetes, Terraform, CI/CD, and experience in fast-paced s
                 sampleValue: 'Senior Backend Engineer',
             },
             {
-                name: 'requiredSkillsJson',
-                description: 'Serialized required skills array.',
-                sampleValue: `["Node.js", "TypeScript", "PostgreSQL", "AWS"]`,
+                name: 'hardSkillsJSON',
+                description: 'Serialized combined hard skills array from required, preferred, technologies, and tools.',
+                sampleValue: `["Node.js", "TypeScript", "PostgreSQL", "AWS", "GraphQL", "Docker"]`,
             },
             {
-                name: 'preferredSkillsJson',
-                description: 'Serialized preferred skills array.',
-                sampleValue: `["GraphQL", "Docker"]`,
-            },
-            {
-                name: 'industryTermsJson',
-                description: 'Serialized industry terms array.',
-                sampleValue: `["microservices", "CI/CD"]`,
+                name: 'domainKnowledge',
+                description: 'Serialized domain knowledge and industry terms array.',
+                sampleValue: `["backend platforms", "distributed systems", "Software"]`,
             },
             {
                 name: 'keywordsJson',
@@ -123,7 +131,7 @@ Preferred: GraphQL, Kubernetes, Terraform, CI/CD, and experience in fast-paced s
 ]`,
             },
             {
-                name: 'softSkillsJson',
+                name: 'softSkillsJSON',
                 description: 'Serialized soft skills array.',
                 sampleValue: `["high ownership mentality", "excellent written communication"]`,
             },
@@ -294,10 +302,26 @@ Looking for a backend-leaning engineer with Node.js, TypeScript, PostgreSQL, Doc
 }`;
         case 'jobAnalysisJson':
             return `{
-  "jobTitle": "Senior Backend Engineer",
-  "requiredSkills": ["Node.js", "TypeScript", "PostgreSQL", "AWS"],
-  "preferredSkills": ["GraphQL", "Docker"],
-  "keywords": ["scalable systems", "ownership mindset"]
+  "jobMeta": {
+    "title": "Senior Backend Engineer",
+    "seniority": "Senior",
+    "industry": "Software",
+    "department": "Engineering"
+  },
+  "skills": {
+    "required": ["Node.js", "TypeScript", "PostgreSQL", "AWS"],
+    "preferred": ["GraphQL", "Docker"],
+    "tools": ["Docker"],
+    "technologies": ["microservices", "CI/CD"]
+  },
+  "responsibilities": ["design scalable backend services"],
+  "domainKnowledge": ["backend platforms", "distributed systems"],
+  "softSkills": ["ownership mindset"],
+  "keywords": {
+    "actionVerbs": ["design"],
+    "buzzwords": ["scalable systems"],
+    "mustInclude": ["Node.js", "TypeScript"]
+  }
 }`;
         case 'companyName':
             return 'Acme';

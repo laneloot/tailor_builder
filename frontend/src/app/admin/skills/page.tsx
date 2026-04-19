@@ -20,8 +20,7 @@ export default function SkillsPage() {
   const [softSkills, setSoftSkills] = useState<string[]>([]);
   const [newTech, setNewTech] = useState('');
   const [newSoft, setNewSoft] = useState('');
-  const [techQuery, setTechQuery] = useState('');
-  const [softQuery, setSoftQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [techSort, setTechSort] = useState<SortOption>('az');
   const [softSort, setSoftSort] = useState<SortOption>('az');
   const [techPage, setTechPage] = useState(1);
@@ -155,8 +154,8 @@ export default function SkillsPage() {
     return filtered;
   };
 
-  const techVisibleSkills = buildVisibleSkills(techSkills, techQuery, techSort);
-  const softVisibleSkills = buildVisibleSkills(softSkills, softQuery, softSort);
+  const techVisibleSkills = buildVisibleSkills(techSkills, searchQuery, techSort);
+  const softVisibleSkills = buildVisibleSkills(softSkills, searchQuery, softSort);
   const techTotalPages = Math.max(1, Math.ceil(techVisibleSkills.length / techPageSize));
   const softTotalPages = Math.max(1, Math.ceil(softVisibleSkills.length / softPageSize));
   const safeTechPage = Math.min(techPage, techTotalPages);
@@ -169,29 +168,13 @@ export default function SkillsPage() {
     allSkills: string[],
     visibleSkills: string[],
     pageItems: string[],
-    query: string,
     sort: SortOption,
     page: number,
     totalPages: number,
     pageSize: number
   ) => (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px_120px]">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => {
-            if (type === 'hard') {
-              setTechQuery(e.target.value);
-              setTechPage(1);
-            } else {
-              setSoftQuery(e.target.value);
-              setSoftPage(1);
-            }
-          }}
-          placeholder="Filter skills"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-        />
+      <div className="grid gap-3 sm:grid-cols-[160px_120px]">
         <select
           value={sort}
           onChange={(e) => {
@@ -232,12 +215,16 @@ export default function SkillsPage() {
       </div>
 
       <div className="flex items-center justify-between text-xs text-gray-500">
-        <span>{visibleSkills.length} matching skills</span>
+        <span>
+          {visibleSkills.length} {searchQuery.trim() ? 'matching' : 'visible'} skills
+        </span>
         <span>{allSkills.length} total</span>
       </div>
 
       {visibleSkills.length === 0 && (
-        <div className="text-sm text-gray-500">No skills yet.</div>
+        <div className="text-sm text-gray-500">
+          {searchQuery.trim() ? 'No skills match your search.' : 'No skills yet.'}
+        </div>
       )}
 
       {pageItems.map((skill) => {
@@ -344,6 +331,42 @@ export default function SkillsPage() {
         </button>
       </div>
 
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
+        <label htmlFor="skill-library-search" className="mb-2 block text-sm font-medium text-gray-700">
+          Search skills
+        </label>
+        <div className="flex gap-2">
+          <input
+            id="skill-library-search"
+            type="search"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setTechPage(1);
+              setSoftPage(1);
+            }}
+            placeholder="Search tech and soft skills"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setTechPage(1);
+                setSoftPage(1);
+              }}
+              className="shrink-0 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <p className="mt-2 text-xs text-gray-500">
+          Showing {techVisibleSkills.length + softVisibleSkills.length} of {techSkills.length + softSkills.length} skills.
+        </p>
+      </div>
+
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           {error}
@@ -380,7 +403,7 @@ export default function SkillsPage() {
                 Add
               </button>
             </div>
-            {renderList('hard', techSkills, techVisibleSkills, techPageItems, techQuery, techSort, safeTechPage, techTotalPages, techPageSize)}
+            {renderList('hard', techSkills, techVisibleSkills, techPageItems, techSort, safeTechPage, techTotalPages, techPageSize)}
           </section>
 
           <section className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
@@ -404,7 +427,7 @@ export default function SkillsPage() {
                 Add
               </button>
             </div>
-            {renderList('soft', softSkills, softVisibleSkills, softPageItems, softQuery, softSort, safeSoftPage, softTotalPages, softPageSize)}
+            {renderList('soft', softSkills, softVisibleSkills, softPageItems, softSort, safeSoftPage, softTotalPages, softPageSize)}
           </section>
         </div>
       )}

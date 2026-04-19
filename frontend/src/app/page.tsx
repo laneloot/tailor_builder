@@ -48,6 +48,10 @@ function formatCompanySummary(companyNames: string[]): string {
   return `${uniqueCompanies.slice(0, 3).join(', ')}, ...`;
 }
 
+function getAnalysisJobTitle(analysis?: JobAnalysis): string {
+  return analysis?.jobMeta?.title?.trim() ?? '';
+}
+
 export default function Home() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -467,7 +471,7 @@ export default function Home() {
               jobDescription: trimmedJobDescription,
               jobAnalysis: analysis,
               companyName: job.companyName.trim(),
-              role: shouldShowRoleInput ? job.jobTitle.trim() : (job.jobTitle.trim() || analysis?.jobTitle?.trim() || ''),
+              role: shouldShowRoleInput ? job.jobTitle.trim() : (job.jobTitle.trim() || getAnalysisJobTitle(analysis) || ''),
               model: selectedModel,
               ...getDefaultGenerationOptions(),
             });
@@ -626,7 +630,7 @@ export default function Home() {
           jobDescription,
           jobAnalysis: analysis,
           companyName: companyName.trim(),
-          role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
+          role: shouldShowRoleInput ? role.trim() : (getAnalysisJobTitle(analysis) || ''),
           model: selectedModel,
           ...getDefaultGenerationOptions(),
         });
@@ -641,7 +645,7 @@ export default function Home() {
           targetProfiles,
           analysis,
           targetCompanyName: companyName.trim(),
-          resolvedRole: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
+          resolvedRole: shouldShowRoleInput ? role.trim() : (getAnalysisJobTitle(analysis) || ''),
         });
         if (multipleTarget === 'group') {
           const selectedGroup = groups.find((group) => group.id === selectedGroupId)!;
@@ -1027,7 +1031,7 @@ export default function Home() {
         jobAnalysis: analysis,
         tailoredContent: tailoredContent || undefined,
         companyName: companyName.trim(),
-        role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
+        role: shouldShowRoleInput ? role.trim() : (getAnalysisJobTitle(analysis) || ''),
         model: selectedModel,
         ...getDefaultGenerationOptions(),
       });
@@ -1178,7 +1182,7 @@ export default function Home() {
             jobAnalysis: analysis,
             tailoredContent: preview.tailoredContent,
             companyName: companyName.trim(),
-            role: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
+            role: shouldShowRoleInput ? role.trim() : (getAnalysisJobTitle(analysis) || ''),
             model: selectedModel,
             ...getDefaultGenerationOptions(),
           });
@@ -1200,7 +1204,7 @@ export default function Home() {
         targetProfiles,
         analysis,
         targetCompanyName: companyName.trim(),
-        resolvedRole: shouldShowRoleInput ? role.trim() : (analysis.jobTitle?.trim() || ''),
+        resolvedRole: shouldShowRoleInput ? role.trim() : (getAnalysisJobTitle(analysis) || ''),
       });
       if (multipleTarget === 'group') {
         const selectedGroup = groups.find((group) => group.id === selectedGroupId)!;

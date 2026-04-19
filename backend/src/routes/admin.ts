@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { generateToken, validatePassword, invalidateToken, authMiddleware } from '../middleware/auth';
-import { getAdminAppSettings, updateAppSettings } from '../services/aiModelConfig';
-import { fetchGoogleSheetsRange, GoogleSheetsRequestError, updateGoogleSheetsRange } from '../services/googleSheets';
-import { openNativeDirectoryPicker } from '../services/nativeDirectoryPicker';
+import { getAdminAppSettings, updateAppSettings } from '../config/aiModelConfig';
+import { fetchGoogleSheetsRange, GoogleSheetsRequestError, updateGoogleSheetsRange } from '../integrations/googleSheets';
+import { openNativeDirectoryPicker } from '../utils/nativeDirectoryPicker';
 
 const router = Router();
 
