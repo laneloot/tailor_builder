@@ -14,8 +14,7 @@ import {
 
 const PROMPTS_DIR = path.join(__dirname, '../../data/prompts');
 const CUSTOM_PROMPT_PREFIX = 'custom-';
-const META_SUFFIX = '.meta.json';
-const TEXT_SUFFIX = '.txt';
+const PROMPT_SUFFIX = '.json';
 const VARIABLE_PATTERN = /\[\[\s*([a-zA-Z0-9_.-]+)\s*\]\]/g;
 
 type BuiltInPromptDefinition = {
@@ -35,6 +34,10 @@ type StoredCustomPromptMeta = {
   allowedVariables: PromptVariableDefinition[];
   createdAt: string;
   updatedAt: string;
+};
+
+type StoredPromptJson = Partial<StoredCustomPromptMeta> & {
+  content?: unknown;
 };
 
 const BUILT_IN_PROMPTS: BuiltInPromptDefinition[] = [
@@ -241,12 +244,8 @@ function getBuiltInPrompt(id: string): BuiltInPromptDefinition | undefined {
   return BUILT_IN_PROMPTS.find((prompt) => prompt.id === id);
 }
 
-function getPromptTextPath(id: string): string {
-  return path.join(PROMPTS_DIR, `${id}${TEXT_SUFFIX}`);
-}
-
-function getPromptMetaPath(id: string): string {
-  return path.join(PROMPTS_DIR, `${id}${META_SUFFIX}`);
+function getPromptPath(id: string): string {
+  return path.join(PROMPTS_DIR, `${id}${PROMPT_SUFFIX}`);
 }
 
 async function ensurePromptDirectory(): Promise<void> {
@@ -433,18 +432,10 @@ async function generateCustomPromptId(name: string): Promise<string> {
 
   while (true) {
     try {
-      await fs.access(getPromptMetaPath(candidate));
+      await fs.access(getPromptPath(candidate));
       candidate = `${base}-${counter}`;
       counter += 1;
       continue;
-    } catch {
-      // Keep checking the paired text file before accepting the candidate.
-    }
-
-    try {
-      await fs.access(getPromptTextPath(candidate));
-      candidate = `${base}-${counter}`;
-      counter += 1;
     } catch {
       return candidate;
     }
@@ -463,80 +454,103 @@ async function safeStat(filePath: string): Promise<{ createdAt: string; updatedA
   }
 }
 
-async function readBuiltInPromptRecord(definition: BuiltInPromptDefinition): Promise<PromptRecord | null> {
+async function readPromptJson(id: string): Promise<{
+  parsed: StoredPromptJson;
+  content: string;
+  timestamps: { createdAt: string; updatedAt: string } | null;
+} | null> {
   try {
-    const content = await fs.readFile(getPromptTextPath(definition.id), 'utf-8');
-    const normalizedContent = normalizePromptContent(content);
-    const validation = validatePromptContent(normalizedContent, definition.allowedVariables);
-    const timestamps = await safeStat(getPromptTextPath(definition.id));
+    const filePath = getPromptPath(id);
+    const raw = await fs.readFile(filePath, 'utf-8');
+    const parsed = JSON.parse(raw) as StoredPromptJson;
+    const content = normalizePromptContent(typeof parsed.content === 'string' ? parsed.content : '');
+    if (!content) return null;
+
     return {
-      id: definition.id,
-      name: definition.name,
-      description: definition.description,
-      responseFormat: definition.responseFormat,
-      allowedVariables: definition.allowedVariables,
-      validation,
-      isBuiltIn: true,
-      usage: definition.usage,
-      createdAt: timestamps?.createdAt ?? new Date().toISOString(),
-      updatedAt: timestamps?.updatedAt ?? new Date().toISOString(),
-      content: normalizedContent,
+      parsed,
+      content,
+      timestamps: await safeStat(filePath),
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.warn(`Built-in prompt file missing: ${definition.id}`);
       return null;
     }
     throw error;
   }
 }
 
-async function readCustomPromptMeta(id: string): Promise<StoredCustomPromptMeta | null> {
-  try {
-    const raw = await fs.readFile(getPromptMetaPath(id), 'utf-8');
-    const parsed = JSON.parse(raw) as StoredCustomPromptMeta;
-    return {
-      id: parsed.id,
-      name: normalizePromptName(parsed.name),
-      description: normalizePromptDescription(parsed.description),
-      responseFormat: normalizeResponseFormat(parsed.responseFormat),
-      allowedVariables: normalizeAllowedVariables(parsed.allowedVariables),
-      createdAt: parsed.createdAt,
-      updatedAt: parsed.updatedAt,
-    };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null;
-    }
-    throw error;
+async function readBuiltInPromptRecord(definition: BuiltInPromptDefinition): Promise<PromptRecord | null> {
+  const stored = await readPromptJson(definition.id);
+  if (!stored) {
+    console.warn(`Built-in prompt file missing: ${definition.id}`);
+    return null;
   }
+
+  const validation = validatePromptContent(stored.content, definition.allowedVariables);
+
+  return {
+    id: definition.id,
+    name: definition.name,
+    description: definition.description,
+    responseFormat: definition.responseFormat,
+    allowedVariables: definition.allowedVariables,
+    validation,
+    isBuiltIn: true,
+    usage: definition.usage,
+    createdAt: typeof stored.parsed.createdAt === 'string'
+      ? stored.parsed.createdAt
+      : stored.timestamps?.createdAt ?? new Date().toISOString(),
+    updatedAt: typeof stored.parsed.updatedAt === 'string'
+      ? stored.parsed.updatedAt
+      : stored.timestamps?.updatedAt ?? new Date().toISOString(),
+    content: stored.content,
+  };
+}
+
+async function readCustomPromptFile(id: string): Promise<(StoredCustomPromptMeta & { content: string }) | null> {
+  const stored = await readPromptJson(id);
+  if (!stored) return null;
+
+  const parsed = stored.parsed;
+
+  return {
+    id: typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id.trim() : id,
+    name: normalizePromptName(typeof parsed.name === 'string' ? parsed.name : id),
+    description: normalizePromptDescription(typeof parsed.description === 'string' ? parsed.description : ''),
+    responseFormat: normalizeResponseFormat(parsed.responseFormat),
+    allowedVariables: normalizeAllowedVariables(
+      Array.isArray(parsed.allowedVariables) ? parsed.allowedVariables : []
+    ),
+    createdAt: typeof parsed.createdAt === 'string' && parsed.createdAt.trim()
+      ? parsed.createdAt.trim()
+      : stored.timestamps?.createdAt ?? new Date().toISOString(),
+    updatedAt: typeof parsed.updatedAt === 'string' && parsed.updatedAt.trim()
+      ? parsed.updatedAt.trim()
+      : stored.timestamps?.updatedAt ?? new Date().toISOString(),
+    content: stored.content,
+  };
+}
+
+async function writePromptJson(id: string, prompt: StoredPromptJson & { content: string }): Promise<void> {
+  await fs.writeFile(getPromptPath(id), `${JSON.stringify(prompt, null, 2)}\n`, 'utf-8');
 }
 
 async function readCustomPromptRecord(id: string): Promise<PromptRecord | null> {
-  const meta = await readCustomPromptMeta(id);
-  if (!meta) return null;
+  const prompt = await readCustomPromptFile(id);
+  if (!prompt) return null;
 
-  try {
-    const content = await fs.readFile(getPromptTextPath(id), 'utf-8');
-    const normalizedContent = normalizePromptContent(content);
-    return {
-      id: meta.id,
-      name: meta.name,
-      description: meta.description,
-      responseFormat: meta.responseFormat,
-      allowedVariables: meta.allowedVariables,
-      validation: validatePromptContent(normalizedContent, meta.allowedVariables),
-      isBuiltIn: false,
-      createdAt: meta.createdAt,
-      updatedAt: meta.updatedAt,
-      content: normalizedContent,
-    };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null;
-    }
-    throw error;
-  }
+  return {
+    id: prompt.id,
+    name: prompt.name,
+    description: prompt.description,
+    responseFormat: prompt.responseFormat,
+    allowedVariables: prompt.allowedVariables,
+    validation: validatePromptContent(prompt.content, prompt.allowedVariables),
+    isBuiltIn: false,
+    createdAt: prompt.createdAt,
+    updatedAt: prompt.updatedAt,
+    content: prompt.content,
+  };
 }
 
 function toPromptSummary(record: PromptRecord): PromptSummary {
@@ -562,8 +576,8 @@ export async function listPrompts(): Promise<PromptSummary[]> {
 
   const entries = await fs.readdir(PROMPTS_DIR);
   const customIds = entries
-    .filter((entry) => entry.endsWith(META_SUFFIX))
-    .map((entry) => entry.slice(0, -META_SUFFIX.length))
+    .filter((entry) => entry.endsWith(PROMPT_SUFFIX))
+    .map((entry) => entry.slice(0, -PROMPT_SUFFIX.length))
     .filter((id) => !isBuiltInPrompt(id));
 
   const customRecords = (await Promise.all(customIds.map(readCustomPromptRecord)))
@@ -605,7 +619,7 @@ export async function createPrompt(input: PromptCreateInput): Promise<PromptReco
 
   const id = await generateCustomPromptId(name);
   const now = new Date().toISOString();
-  const meta: StoredCustomPromptMeta = {
+  const prompt: StoredCustomPromptMeta & { content: string } = {
     id,
     name,
     description,
@@ -613,10 +627,10 @@ export async function createPrompt(input: PromptCreateInput): Promise<PromptReco
     allowedVariables,
     createdAt: now,
     updatedAt: now,
+    content,
   };
 
-  await fs.writeFile(getPromptTextPath(id), `${content}\n`, 'utf-8');
-  await fs.writeFile(getPromptMetaPath(id), JSON.stringify(meta, null, 2), 'utf-8');
+  await writePromptJson(id, prompt);
 
   const saved = await getPromptById(id);
   if (!saved) {
@@ -638,11 +652,19 @@ export async function updatePrompt(id: string, input: PromptUpdateInput): Promis
     if (!definition) return null;
 
     assertValidPromptDraft(content, definition.allowedVariables);
-    await fs.writeFile(getPromptTextPath(id), `${content}\n`, 'utf-8');
+    const existing = await readPromptJson(id);
+    await writePromptJson(id, {
+      id,
+      content,
+      createdAt: typeof existing?.parsed.createdAt === 'string'
+        ? existing.parsed.createdAt
+        : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     return getPromptById(id);
   }
 
-  const current = await readCustomPromptMeta(id);
+  const current = await readCustomPromptFile(id);
   if (!current) return null;
 
   const name = normalizePromptName(input.name ?? current.name);
@@ -656,17 +678,17 @@ export async function updatePrompt(id: string, input: PromptUpdateInput): Promis
 
   assertValidPromptDraft(content, allowedVariables);
 
-  const nextMeta: StoredCustomPromptMeta = {
+  const nextPrompt: StoredCustomPromptMeta & { content: string } = {
     ...current,
     name,
     description,
     responseFormat,
     allowedVariables,
     updatedAt: new Date().toISOString(),
+    content,
   };
 
-  await fs.writeFile(getPromptTextPath(id), `${content}\n`, 'utf-8');
-  await fs.writeFile(getPromptMetaPath(id), JSON.stringify(nextMeta, null, 2), 'utf-8');
+  await writePromptJson(id, nextPrompt);
 
   return getPromptById(id);
 }
@@ -681,10 +703,7 @@ export async function deletePrompt(id: string): Promise<boolean> {
   const prompt = await getPromptById(id);
   if (!prompt) return false;
 
-  await Promise.all([
-    fs.unlink(getPromptTextPath(id)).catch(() => undefined),
-    fs.unlink(getPromptMetaPath(id)).catch(() => undefined),
-  ]);
+  await fs.unlink(getPromptPath(id)).catch(() => undefined);
 
   return true;
 }

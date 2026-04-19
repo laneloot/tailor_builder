@@ -12,18 +12,6 @@ import {
   outputPathTemplateUsesJobTitle,
   validateOutputPathTemplate,
 } from '../utils/outputStorage';
-import {
-  countStoredApiKeys,
-  countStoredGoogleSheetRows,
-  ensureSettingsDatabase,
-  readStoredApiKeys,
-  readStoredGoogleSheetRows,
-  replaceStoredApiKeys,
-  replaceStoredGoogleSheetRows,
-  StoredApiKeyRow,
-  StoredGoogleSheetRow,
-} from '../database/settingsDatabase';
-
 export type DefaultMode = 'preview' | 'generate';
 export type ThemeMode = 'light' | 'dark';
 export type DefaultResumeSelection = 'single' | 'all' | 'group';
@@ -125,7 +113,6 @@ export type AppSettingsUpdate = Partial<PublicAppSettings> & {
 
 const CONFIG_DIR = path.join(__dirname, '../../data/config');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'ai-models.json');
-const PROVIDERS: AIProvider[] = ['openai', 'claude', 'openrouter'];
 
 const DEFAULT_SETTINGS: AppSettings = {
   openaiEnabled: true,
@@ -147,21 +134,6 @@ const DEFAULT_SETTINGS: AppSettings = {
     openrouter: { activeKeyId: '', entries: [] },
   },
 };
-
-function createEmptyProviderKeyStores(): ProviderKeyStores {
-  return {
-    openai: { activeKeyId: '', entries: [] },
-    claude: { activeKeyId: '', entries: [] },
-    openrouter: { activeKeyId: '', entries: [] },
-  };
-}
-
-function createDbBackedDefaults(): Pick<AppSettings, 'googleSheetsSources' | 'apiKeys'> {
-  return {
-    googleSheetsSources: [],
-    apiKeys: createEmptyProviderKeyStores(),
-  };
-}
 
 function normalizeThemeMode(value: unknown, fallback: ThemeMode): ThemeMode {
   return value === 'light' || value === 'dark' ? value : fallback;
@@ -346,74 +318,6 @@ function normalizeSettings(input: unknown, fallback: AppSettings = DEFAULT_SETTI
   };
 }
 
-function toStoredApiKeyRows(stores: ProviderKeyStores): StoredApiKeyRow[] {
-  const rows: StoredApiKeyRow[] = [];
-
-  for (const provider of PROVIDERS) {
-    const store = stores[provider];
-    const activeKeyId = store.activeKeyId.trim();
-
-    for (const entry of store.entries) {
-      rows.push({
-        id: entry.id,
-        provider,
-        name: entry.name,
-        keyValue: entry.value,
-        isActive: activeKeyId.length > 0 && entry.id === activeKeyId,
-        createdAt: entry.createdAt,
-      });
-    }
-  }
-
-  return rows;
-}
-
-function fromStoredApiKeyRows(rows: StoredApiKeyRow[]): ProviderKeyStores {
-  const stores = createEmptyProviderKeyStores();
-
-  for (const provider of PROVIDERS) {
-    const providerRows = rows.filter((row) => row.provider === provider);
-    stores[provider] = {
-      activeKeyId: providerRows.find((row) => row.isActive)?.id ?? providerRows[0]?.id ?? '',
-      entries: providerRows.map((row) => ({
-        id: row.id,
-        name: row.name,
-        value: row.keyValue,
-        createdAt: row.createdAt,
-      })),
-    };
-  }
-
-  return stores;
-}
-
-function toStoredGoogleSheetRows(sources: GoogleSheetSource[]): StoredGoogleSheetRow[] {
-  return sources.map((source) => ({
-    id: source.id,
-    name: source.name,
-    sheetId: source.sheetId,
-    createdAt: source.createdAt,
-    updatedAt: source.updatedAt,
-  }));
-}
-
-function fromStoredGoogleSheetRows(rows: StoredGoogleSheetRow[]): GoogleSheetSource[] {
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    sheetId: row.sheetId,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  }));
-}
-
-function toFileBackedSettings(settings: AppSettings): AppSettings {
-  return {
-    ...settings,
-    ...createDbBackedDefaults(),
-  };
-}
-
 function ensureAtLeastOneProviderEnabled(settings: AppSettings): AppSettings {
   if (settings.openaiEnabled || settings.claudeEnabled || settings.openrouterEnabled) {
     return settings;
@@ -533,59 +437,22 @@ async function readSettingsFile(): Promise<AppSettings> {
     const raw = await fs.readFile(CONFIG_FILE, 'utf-8');
     const parsed = JSON.parse(raw) as unknown;
     const settings = ensureAtLeastOneProviderEnabled(normalizeSettings(parsed));
-    await fs.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(settings), null, 2));
+    await fs.writeFile(CONFIG_FILE, JSON.stringify(settings, null, 2));
     return settings;
   } catch {
-    await fs.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(DEFAULT_SETTINGS), null, 2));
+    await fs.writeFile(CONFIG_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2));
     return DEFAULT_SETTINGS;
   }
 }
 
-async function ensureSettingsStorageReady(): Promise<void> {
-  await ensureConfigDir();
-  ensureSettingsDatabase();
-
-  const fileSettings = await readSettingsFile();
-  const hasStoredApiKeys = countStoredApiKeys() > 0;
-  const hasStoredGoogleSheetRows = countStoredGoogleSheetRows() > 0;
-
-  let migrated = false;
-
-  if (!hasStoredApiKeys && fileSettings.apiKeys && toStoredApiKeyRows(fileSettings.apiKeys).length > 0) {
-    replaceStoredApiKeys(toStoredApiKeyRows(fileSettings.apiKeys));
-    migrated = true;
-  }
-
-  if (!hasStoredGoogleSheetRows && fileSettings.googleSheetsSources.length > 0) {
-    replaceStoredGoogleSheetRows(toStoredGoogleSheetRows(fileSettings.googleSheetsSources));
-    migrated = true;
-  }
-
-  if (migrated) {
-    await fs.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(fileSettings), null, 2));
-  }
-}
-
 async function readSettings(): Promise<AppSettings> {
-  await ensureSettingsStorageReady();
-  const fileSettings = await readSettingsFile();
-  const apiKeys = fromStoredApiKeyRows(readStoredApiKeys());
-  const googleSheetsSources = fromStoredGoogleSheetRows(readStoredGoogleSheetRows());
-
-  return {
-    ...fileSettings,
-    apiKeys,
-    googleSheetsSources,
-  };
+  return readSettingsFile();
 }
 
 async function writeSettings(settings: AppSettings): Promise<AppSettings> {
   const normalized = ensureAtLeastOneProviderEnabled(normalizeSettings(settings));
-  ensureSettingsDatabase();
-  replaceStoredApiKeys(toStoredApiKeyRows(normalized.apiKeys));
-  replaceStoredGoogleSheetRows(toStoredGoogleSheetRows(normalized.googleSheetsSources));
   await ensureConfigDir();
-  await fs.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(normalized), null, 2));
+  await fs.writeFile(CONFIG_FILE, JSON.stringify(normalized, null, 2));
   return normalized;
 }
 

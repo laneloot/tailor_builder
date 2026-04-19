@@ -12,8 +12,6 @@ exports.updateSkill = updateSkill;
 exports.deleteSkill = deleteSkill;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
-const crypto_1 = require("crypto");
-const node_sqlite_1 = require("node:sqlite");
 class SkillDatabaseError extends Error {
     constructor(message, statusCode) {
         super(message);
@@ -22,41 +20,20 @@ class SkillDatabaseError extends Error {
     }
 }
 exports.SkillDatabaseError = SkillDatabaseError;
-const DB_DIR = path_1.default.join(__dirname, '../../db');
-const DATABASE_FILE = path_1.default.join(DB_DIR, 'skills.sqlite');
-const SCHEMA_FILE = path_1.default.join(DB_DIR, '002_skills_schema.sql');
-const SEED_FILES = {
-    hard: path_1.default.join(__dirname, '../../skill_data/tech_skills.txt'),
-    soft: path_1.default.join(__dirname, '../../skill_data/soft_skills.txt'),
-};
-let database = null;
-let schemaInitialized = false;
-let seedInitialized = false;
+const SKILLS_DIR = path_1.default.join(__dirname, '../../data/skills');
+const SKILLS_FILE = path_1.default.join(SKILLS_DIR, 'skills.json');
 function cleanSkill(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 function normalizeSkillValue(value) {
     return value.trim().toLowerCase();
 }
-function mapSkillRow(row) {
-    return {
-        id: row.id,
-        type: row.type,
-        value: row.value,
-        normalizedValue: row.normalizedValue,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-    };
-}
-function readSeedSkills(type) {
-    if (!fs_1.default.existsSync(SEED_FILES[type])) {
-        return [];
-    }
+function normalizeSkillList(input) {
+    const source = Array.isArray(input) ? input : [];
     const seen = new Set();
     const skills = [];
-    const content = fs_1.default.readFileSync(SEED_FILES[type], 'utf8');
-    for (const rawSkill of content.split(/\r?\n/)) {
-        const skill = cleanSkill(rawSkill);
+    for (const item of source) {
+        const skill = cleanSkill(item);
         if (!skill)
             continue;
         const key = normalizeSkillValue(skill);
@@ -65,112 +42,62 @@ function readSeedSkills(type) {
         seen.add(key);
         skills.push(skill);
     }
-    return skills;
+    return skills.sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }));
 }
-function seedSkillsIfEmpty(db) {
-    if (seedInitialized) {
-        return;
+function normalizeStore(input) {
+    const source = typeof input === 'object' && input !== null
+        ? input
+        : {};
+    return {
+        hard: normalizeSkillList(source.hard),
+        soft: normalizeSkillList(source.soft),
+    };
+}
+function ensureSkillsFile() {
+    fs_1.default.mkdirSync(SKILLS_DIR, { recursive: true });
+    if (!fs_1.default.existsSync(SKILLS_FILE)) {
+        writeStore({ hard: [], soft: [] });
     }
-    const row = db.prepare('SELECT COUNT(*) AS count FROM skills').get();
-    if (row.count > 0) {
-        seedInitialized = true;
-        return;
-    }
-    const now = new Date().toISOString();
-    const insert = db.prepare(`
-    INSERT OR IGNORE INTO skills (id, type, value, normalized_value, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-    db.exec('BEGIN IMMEDIATE');
+}
+function readStore() {
+    ensureSkillsFile();
     try {
-        for (const type of ['hard', 'soft']) {
-            for (const skill of readSeedSkills(type)) {
-                insert.run((0, crypto_1.randomUUID)(), type, skill, normalizeSkillValue(skill), now, now);
-            }
-        }
-        db.exec('COMMIT');
+        const parsed = JSON.parse(fs_1.default.readFileSync(SKILLS_FILE, 'utf8'));
+        return normalizeStore(parsed);
     }
-    catch (error) {
-        db.exec('ROLLBACK');
-        throw error;
-    }
-    seedInitialized = true;
-}
-function getDatabase() {
-    if (!database) {
-        fs_1.default.mkdirSync(DB_DIR, { recursive: true });
-        database = new node_sqlite_1.DatabaseSync(DATABASE_FILE);
-        database.exec('PRAGMA foreign_keys = ON;');
-    }
-    if (!schemaInitialized) {
-        const schemaSql = fs_1.default.readFileSync(SCHEMA_FILE, 'utf8');
-        database.exec(schemaSql);
-        schemaInitialized = true;
-    }
-    seedSkillsIfEmpty(database);
-    return database;
-}
-function withTransaction(work) {
-    const db = getDatabase();
-    db.exec('BEGIN IMMEDIATE');
-    try {
-        const result = work(db);
-        db.exec('COMMIT');
-        return result;
-    }
-    catch (error) {
-        db.exec('ROLLBACK');
-        throw error;
+    catch {
+        return { hard: [], soft: [] };
     }
 }
-function getSkillByNormalizedValue(db, type, normalizedValue) {
-    const row = db.prepare(`
-    SELECT
-      id,
-      type,
-      value,
-      normalized_value AS normalizedValue,
-      created_at AS createdAt,
-      updated_at AS updatedAt
-    FROM skills
-    WHERE type = ? AND normalized_value = ?
-  `).get(type, normalizedValue);
-    return row ? mapSkillRow(row) : null;
+function writeStore(store) {
+    fs_1.default.mkdirSync(SKILLS_DIR, { recursive: true });
+    fs_1.default.writeFileSync(SKILLS_FILE, `${JSON.stringify(normalizeStore(store), null, 2)}\n`, 'utf8');
+}
+function findSkillIndex(skills, skill) {
+    const normalized = normalizeSkillValue(skill);
+    return skills.findIndex((item) => normalizeSkillValue(item) === normalized);
 }
 function ensureSkillsDatabase() {
-    getDatabase();
+    ensureSkillsFile();
 }
 function isSkillType(value) {
     return value === 'hard' || value === 'soft';
 }
 function readSkills(type) {
-    const db = getDatabase();
-    const rows = db.prepare(`
-    SELECT value
-    FROM skills
-    WHERE type = ?
-    ORDER BY value COLLATE NOCASE ASC
-  `).all(type);
-    return rows.map((row) => row.value);
+    return readStore()[type];
 }
 function addSkill(type, skill) {
     const cleaned = cleanSkill(skill);
     if (!cleaned) {
         throw new SkillDatabaseError('Skill type and value are required', 400);
     }
-    return withTransaction((db) => {
-        const normalizedValue = normalizeSkillValue(cleaned);
-        const existing = getSkillByNormalizedValue(db, type, normalizedValue);
-        if (existing) {
-            return { added: false, skill: cleaned, type };
-        }
-        const now = new Date().toISOString();
-        db.prepare(`
-      INSERT INTO skills (id, type, value, normalized_value, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run((0, crypto_1.randomUUID)(), type, cleaned, normalizedValue, now, now);
-        return { added: true, skill: cleaned, type };
-    });
+    const store = readStore();
+    if (findSkillIndex(store[type], cleaned) !== -1) {
+        return { added: false, skill: cleaned, type };
+    }
+    store[type].push(cleaned);
+    writeStore(store);
+    return { added: true, skill: cleaned, type };
 }
 function updateSkill(type, original, skill) {
     const cleanedOriginal = cleanSkill(original);
@@ -178,37 +105,31 @@ function updateSkill(type, original, skill) {
     if (!cleanedOriginal || !cleaned) {
         throw new SkillDatabaseError('Skill type, original value, and new value are required', 400);
     }
-    return withTransaction((db) => {
-        const originalNormalizedValue = normalizeSkillValue(cleanedOriginal);
-        const existing = getSkillByNormalizedValue(db, type, originalNormalizedValue);
-        if (!existing) {
-            throw new SkillDatabaseError('Skill not found', 404);
-        }
-        const nextNormalizedValue = normalizeSkillValue(cleaned);
-        const duplicate = getSkillByNormalizedValue(db, type, nextNormalizedValue);
-        if (duplicate && duplicate.id !== existing.id) {
-            throw new SkillDatabaseError('Skill already exists', 409);
-        }
-        db.prepare(`
-      UPDATE skills
-      SET value = ?, normalized_value = ?, updated_at = ?
-      WHERE id = ?
-    `).run(cleaned, nextNormalizedValue, new Date().toISOString(), existing.id);
-        return { updated: true, skill: cleaned, type };
-    });
+    const store = readStore();
+    const originalIndex = findSkillIndex(store[type], cleanedOriginal);
+    if (originalIndex === -1) {
+        throw new SkillDatabaseError('Skill not found', 404);
+    }
+    const duplicateIndex = findSkillIndex(store[type], cleaned);
+    if (duplicateIndex !== -1 && duplicateIndex !== originalIndex) {
+        throw new SkillDatabaseError('Skill already exists', 409);
+    }
+    store[type][originalIndex] = cleaned;
+    writeStore(store);
+    return { updated: true, skill: cleaned, type };
 }
 function deleteSkill(type, skill) {
     const cleaned = cleanSkill(skill);
     if (!cleaned) {
         throw new SkillDatabaseError('Skill type and value are required', 400);
     }
-    return withTransaction((db) => {
-        const existing = getSkillByNormalizedValue(db, type, normalizeSkillValue(cleaned));
-        if (!existing) {
-            throw new SkillDatabaseError('Skill not found', 404);
-        }
-        db.prepare('DELETE FROM skills WHERE id = ?').run(existing.id);
-        return { deleted: true, skill: cleaned, type };
-    });
+    const store = readStore();
+    const index = findSkillIndex(store[type], cleaned);
+    if (index === -1) {
+        throw new SkillDatabaseError('Skill not found', 404);
+    }
+    store[type].splice(index, 1);
+    writeStore(store);
+    return { deleted: true, skill: cleaned, type };
 }
 //# sourceMappingURL=skillsDatabase.js.map

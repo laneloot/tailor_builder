@@ -17,10 +17,8 @@ const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
 const crypto_1 = require("crypto");
 const outputStorage_1 = require("../utils/outputStorage");
-const settingsDatabase_1 = require("../database/settingsDatabase");
 const CONFIG_DIR = path_1.default.join(__dirname, '../../data/config');
 const CONFIG_FILE = path_1.default.join(CONFIG_DIR, 'ai-models.json');
-const PROVIDERS = ['openai', 'claude', 'openrouter'];
 const DEFAULT_SETTINGS = {
     openaiEnabled: true,
     claudeEnabled: true,
@@ -41,19 +39,6 @@ const DEFAULT_SETTINGS = {
         openrouter: { activeKeyId: '', entries: [] },
     },
 };
-function createEmptyProviderKeyStores() {
-    return {
-        openai: { activeKeyId: '', entries: [] },
-        claude: { activeKeyId: '', entries: [] },
-        openrouter: { activeKeyId: '', entries: [] },
-    };
-}
-function createDbBackedDefaults() {
-    return {
-        googleSheetsSources: [],
-        apiKeys: createEmptyProviderKeyStores(),
-    };
-}
 function normalizeThemeMode(value, fallback) {
     return value === 'light' || value === 'dark' ? value : fallback;
 }
@@ -203,64 +188,6 @@ function normalizeSettings(input, fallback = DEFAULT_SETTINGS) {
         apiKeys: normalizeProviderKeyStores(source.apiKeys, fallback.apiKeys),
     };
 }
-function toStoredApiKeyRows(stores) {
-    const rows = [];
-    for (const provider of PROVIDERS) {
-        const store = stores[provider];
-        const activeKeyId = store.activeKeyId.trim();
-        for (const entry of store.entries) {
-            rows.push({
-                id: entry.id,
-                provider,
-                name: entry.name,
-                keyValue: entry.value,
-                isActive: activeKeyId.length > 0 && entry.id === activeKeyId,
-                createdAt: entry.createdAt,
-            });
-        }
-    }
-    return rows;
-}
-function fromStoredApiKeyRows(rows) {
-    const stores = createEmptyProviderKeyStores();
-    for (const provider of PROVIDERS) {
-        const providerRows = rows.filter((row) => row.provider === provider);
-        stores[provider] = {
-            activeKeyId: providerRows.find((row) => row.isActive)?.id ?? providerRows[0]?.id ?? '',
-            entries: providerRows.map((row) => ({
-                id: row.id,
-                name: row.name,
-                value: row.keyValue,
-                createdAt: row.createdAt,
-            })),
-        };
-    }
-    return stores;
-}
-function toStoredGoogleSheetRows(sources) {
-    return sources.map((source) => ({
-        id: source.id,
-        name: source.name,
-        sheetId: source.sheetId,
-        createdAt: source.createdAt,
-        updatedAt: source.updatedAt,
-    }));
-}
-function fromStoredGoogleSheetRows(rows) {
-    return rows.map((row) => ({
-        id: row.id,
-        name: row.name,
-        sheetId: row.sheetId,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-    }));
-}
-function toFileBackedSettings(settings) {
-    return {
-        ...settings,
-        ...createDbBackedDefaults(),
-    };
-}
 function ensureAtLeastOneProviderEnabled(settings) {
     if (settings.openaiEnabled || settings.claudeEnabled || settings.openrouterEnabled) {
         return settings;
@@ -371,51 +298,21 @@ async function readSettingsFile() {
         const raw = await promises_1.default.readFile(CONFIG_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         const settings = ensureAtLeastOneProviderEnabled(normalizeSettings(parsed));
-        await promises_1.default.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(settings), null, 2));
+        await promises_1.default.writeFile(CONFIG_FILE, JSON.stringify(settings, null, 2));
         return settings;
     }
     catch {
-        await promises_1.default.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(DEFAULT_SETTINGS), null, 2));
+        await promises_1.default.writeFile(CONFIG_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2));
         return DEFAULT_SETTINGS;
     }
 }
-async function ensureSettingsStorageReady() {
-    await ensureConfigDir();
-    (0, settingsDatabase_1.ensureSettingsDatabase)();
-    const fileSettings = await readSettingsFile();
-    const hasStoredApiKeys = (0, settingsDatabase_1.countStoredApiKeys)() > 0;
-    const hasStoredGoogleSheetRows = (0, settingsDatabase_1.countStoredGoogleSheetRows)() > 0;
-    let migrated = false;
-    if (!hasStoredApiKeys && fileSettings.apiKeys && toStoredApiKeyRows(fileSettings.apiKeys).length > 0) {
-        (0, settingsDatabase_1.replaceStoredApiKeys)(toStoredApiKeyRows(fileSettings.apiKeys));
-        migrated = true;
-    }
-    if (!hasStoredGoogleSheetRows && fileSettings.googleSheetsSources.length > 0) {
-        (0, settingsDatabase_1.replaceStoredGoogleSheetRows)(toStoredGoogleSheetRows(fileSettings.googleSheetsSources));
-        migrated = true;
-    }
-    if (migrated) {
-        await promises_1.default.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(fileSettings), null, 2));
-    }
-}
 async function readSettings() {
-    await ensureSettingsStorageReady();
-    const fileSettings = await readSettingsFile();
-    const apiKeys = fromStoredApiKeyRows((0, settingsDatabase_1.readStoredApiKeys)());
-    const googleSheetsSources = fromStoredGoogleSheetRows((0, settingsDatabase_1.readStoredGoogleSheetRows)());
-    return {
-        ...fileSettings,
-        apiKeys,
-        googleSheetsSources,
-    };
+    return readSettingsFile();
 }
 async function writeSettings(settings) {
     const normalized = ensureAtLeastOneProviderEnabled(normalizeSettings(settings));
-    (0, settingsDatabase_1.ensureSettingsDatabase)();
-    (0, settingsDatabase_1.replaceStoredApiKeys)(toStoredApiKeyRows(normalized.apiKeys));
-    (0, settingsDatabase_1.replaceStoredGoogleSheetRows)(toStoredGoogleSheetRows(normalized.googleSheetsSources));
     await ensureConfigDir();
-    await promises_1.default.writeFile(CONFIG_FILE, JSON.stringify(toFileBackedSettings(normalized), null, 2));
+    await promises_1.default.writeFile(CONFIG_FILE, JSON.stringify(normalized, null, 2));
     return normalized;
 }
 function applyApiKeyUpdate(current, update) {

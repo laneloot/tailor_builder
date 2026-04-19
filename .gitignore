@@ -2,4 +2,4 @@
 generated/
 service-account-key.json
 backend/service-account-key.json
-backend/data/profiles
+backend/data
