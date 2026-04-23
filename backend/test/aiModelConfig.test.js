@@ -17,7 +17,7 @@ test('app settings persist entirely in JSON', async () => {
   const defaults = await config.getAdminAppSettings();
   assert.equal(defaults.openaiEnabled, true);
   assert.equal(defaults.defaultMode, 'preview');
-  assert.equal(fs.existsSync(path.join(dataDir, 'config', 'ai-models.json')), true);
+  assert.equal(fs.existsSync(path.join(dataDir, 'config', 'ai-models.json')), false);
 
   const updated = await config.updateAppSettings({
     openaiEnabled: false,
@@ -62,6 +62,68 @@ test('app settings persist entirely in JSON', async () => {
   assert.equal(stored.apiKeys.claude.entries[0].value, 'claude-secret');
   assert.equal(stored.googleSheetsSources[0].sheetId, 'abc123');
   assert.equal(fs.existsSync(path.join(dataDir, 'config', 'settings.sqlite')), false);
+});
+
+test('reading settings does not rewrite an existing settings file', async () => {
+  const dataDir = makeTempDataDir('settings-readonly');
+  const configDir = path.join(dataDir, 'config');
+  const configFile = path.join(configDir, 'ai-models.json');
+  const originalJson = `{
+  "openaiEnabled": true,
+  "claudeEnabled": true,
+  "openrouterEnabled": true,
+  "defaultMode": "preview",
+  "defaultTheme": "light",
+  "defaultResumeSelection": "single",
+  "defaultGroupId": "",
+  "defaultProfileId": "",
+  "defaultResumeDocxEnabled": true,
+  "defaultCoverLetterDocxEnabled": true,
+  "outputBaseDir": "${path.join(dataDir, 'generated-output').replace(/\\/g, '\\\\')}",
+  "outputPathTemplate": "/{{date}}/{{profile name}}/{{company name}}",
+  "googleSheetsSources": [],
+  "apiKeys": {
+    "openai": { "activeKeyId": "", "entries": [] },
+    "claude": { "activeKeyId": "", "entries": [] },
+    "openrouter": { "activeKeyId": "", "entries": [] }
+  }
+}`;
+
+  fs.mkdirSync(configDir, { recursive: true });
+  fs.writeFileSync(configFile, originalJson);
+
+  process.env.TAILOR_DATA_DIR = dataDir;
+  process.env.OPENAI_API_KEY = '';
+  process.env.ANTHROPIC_API_KEY = '';
+  process.env.OPENROUTER_API_KEY = '';
+  const config = loadFresh('../dist/config/aiModelConfig');
+
+  const loaded = await config.getAdminAppSettings();
+  assert.equal(loaded.outputPathTemplate, '/{{date}}/{{profile name}}/{{company name}}');
+  assert.equal(fs.readFileSync(configFile, 'utf8'), originalJson);
+});
+
+test('invalid settings JSON is reported and never overwritten with defaults', async () => {
+  const dataDir = makeTempDataDir('settings-invalid');
+  const configDir = path.join(dataDir, 'config');
+  const configFile = path.join(configDir, 'ai-models.json');
+  const invalidJson = '{ invalid json';
+
+  fs.mkdirSync(configDir, { recursive: true });
+  fs.writeFileSync(configFile, invalidJson);
+
+  process.env.TAILOR_DATA_DIR = dataDir;
+  process.env.OPENAI_API_KEY = '';
+  process.env.ANTHROPIC_API_KEY = '';
+  process.env.OPENROUTER_API_KEY = '';
+  const config = loadFresh('../dist/config/aiModelConfig');
+
+  await assert.rejects(
+    () => config.getAdminAppSettings(),
+    /contains invalid JSON/
+  );
+
+  assert.equal(fs.readFileSync(configFile, 'utf8'), invalidJson);
 });
 
 test('app settings preserve at least one enabled provider and can fall back to environment keys', async () => {

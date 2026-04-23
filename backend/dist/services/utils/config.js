@@ -1,0 +1,47 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.supplimentSoftSkills = exports.supplimentTechSkills = void 0;
+exports.supplimentTechSkills = [
+    'Agile Development',
+    'Apache Kafka',
+    'API Development',
+    'AWS Lambda',
+    'AWS S3',
+    'Azure Kubernetes Service',
+    'CI/CD',
+    'Docker',
+    'Elasticsearch',
+    'Git',
+    'Kubernetes',
+    'Node.js',
+    'Python',
+    'React',
+    'Redis',
+    'SQL',
+    'Terraform',
+    'WebSocket Protocol',
+    'AWS DynamoDB',
+];
+exports.supplimentSoftSkills = [
+    'Accountability',
+    'Adaptability',
+    'Analytical Thinking',
+    'Assertiveness',
+    'Communication',
+    'Conflict Management',
+    'Collaboration',
+    'Critical Thinking',
+    'Decision Making',
+    'Empathy',
+    'Feedback Reception',
+    'Flexibility',
+    'Goal Setting',
+    'Innovation',
+    'Leadership',
+    'Negotiation',
+    'Problem Solving',
+    'Teamwork',
+    'Time Management',
+    'Written Communication',
+];
+//# sourceMappingURL=config.js.map

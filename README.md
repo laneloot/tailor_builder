@@ -103,11 +103,23 @@ NEXT_PUBLIC_API_URL=http://localhost:9001/api
 ### 3. Run
 
 ```bash
+# Stable multi-tab mode
+npm run dev
+```
+
+This starts:
+
+- backend in watch mode
+- frontend with `next build && next start` to avoid Next.js dev websocket reloads across tabs
+
+If you want live frontend hot reload while developing UI code, use:
+
+```bash
 # Terminal 1: Start backend
 cd backend && npm run dev
 
-# Terminal 2: Start frontend
-cd frontend && npm run dev
+# Terminal 2: Start frontend with live reload
+cd frontend && npm run dev:live
 ```
 
 - **Frontend:** http://localhost:3000  

@@ -19,6 +19,8 @@ const aiModelConfig_1 = require("../config/aiModelConfig");
 const skillsDatabase_1 = require("../database/skillsDatabase");
 const array_1 = require("../utils/array");
 const json_1 = require("../utils/json");
+const resumeBuilder_1 = require("./utils/resumeBuilder");
+const config_1 = require("./utils/config");
 // Ensure the repo .env file is loaded for this module even when it is imported
 // before index.ts finishes bootstrapping, and prefer .env over inherited shell vars.
 dotenv_1.default.config({ path: path_1.default.join(__dirname, '../../../.env'), override: true });
@@ -33,24 +35,6 @@ function refreshSkillCaches() {
     softSkills.length = 0;
     softSkills.push(...nextSoft);
 }
-// function splitSkillsByOriginal(
-//   hardSkills: string[],
-//   original: string[]
-// ): { matched: string[]; rest: string[] } {
-//   const originalLower = original.map((item) => item.toLowerCase());
-//   const matched: string[] = [];
-//   const rest: string[] = [];
-//   for (const skill of hardSkills) {
-//     const skillLower = skill.toLowerCase();
-//     const found = originalLower.some((orig) => orig.includes(skillLower));
-//     if (found) {
-//       matched.push(skill);
-//     } else {
-//       rest.push(skill);
-//     }
-//   }
-//   return { matched, rest };
-// }
 // Lazy initialization to ensure env vars are loaded first
 let openaiClient = null;
 let openRouterClient = null;
@@ -988,6 +972,7 @@ async function tailorResume(profile, jobAnalysis, provider = DEFAULT_PROVIDER) {
         keyResponsibilitiesJson: JSON.stringify([...jobAnalysis.responsibilities]),
         domainKnowledge: JSON.stringify([...jobAnalysis.domainKnowledge, jobAnalysis.jobMeta.industry])
     });
+    console.log(prompt);
     const content = await createTextCompletion(prompt, provider, 11000, 0.2, 'json');
     try {
         const jsonText = (0, json_1.extractJSON)(content);
@@ -998,11 +983,15 @@ async function tailorResume(profile, jobAnalysis, provider = DEFAULT_PROVIDER) {
         (0, array_1.moveCaseInsensitiveMatches)(technicalSkills, finalResult.unconfirmedHardSkills, finalResult.hardSkills);
         finalResult.unconfirmedHardSkills = [...(0, array_1.uniqueCaseInsensitive)(finalResult.unconfirmedHardSkills)];
         finalResult.hardSkills = [...(0, array_1.uniqueCaseInsensitive)(finalResult.hardSkills)];
+        finalResult.hardSkills = (0, resumeBuilder_1.removeDuplicateSubstrings)([...finalResult.hardSkills]);
+        finalResult.hardSkills = (0, resumeBuilder_1.ensureMinTechSkills)([...finalResult.hardSkills], config_1.supplimentTechSkills, 20);
         finalResult.unconfirmedSoftSkills = [...finalResult.softSkills];
         finalResult.softSkills = [...extractSoftSkills(jobDesc)];
         (0, array_1.moveCaseInsensitiveMatches)(softSkills, finalResult.unconfirmedSoftSkills, finalResult.softSkills);
         finalResult.unconfirmedSoftSkills = [...(0, array_1.uniqueCaseInsensitive)(finalResult.unconfirmedSoftSkills)];
         finalResult.softSkills = [...(0, array_1.uniqueCaseInsensitive)(finalResult.softSkills)];
+        finalResult.softSkills = (0, resumeBuilder_1.removeDuplicateSubstrings)([...finalResult.softSkills]);
+        finalResult.softSkills = (0, resumeBuilder_1.ensureMinTechSkills)([...finalResult.softSkills], config_1.supplimentSoftSkills, 5);
         return finalResult;
     }
     catch {

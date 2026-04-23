@@ -8,7 +8,8 @@ import { getProviderApiKey } from '../config/aiModelConfig';
 import { readSkills } from '../database/skillsDatabase';
 import { moveCaseInsensitiveMatches, uniqueCaseInsensitive } from '../utils/array';
 import { extractJSON } from '../utils/json';
-import { removeDuplicateSubstrings } from './utils/resumeBuilder';
+import { removeDuplicateSubstrings, ensureMinTechSkills } from './utils/resumeBuilder';
+import { supplimentSoftSkills, supplimentTechSkills } from './utils/config';
 
 // Ensure the repo .env file is loaded for this module even when it is imported
 // before index.ts finishes bootstrapping, and prefer .env over inherited shell vars.
@@ -1126,6 +1127,7 @@ export async function tailorResume(
     keyResponsibilitiesJson: JSON.stringify([...jobAnalysis.responsibilities]),
     domainKnowledge: JSON.stringify([...jobAnalysis.domainKnowledge, jobAnalysis.jobMeta.industry])
   });
+  console.log(prompt)
   const content = await createTextCompletion(prompt, provider, 11000, 0.2, 'json');
 
   try {
@@ -1140,6 +1142,7 @@ export async function tailorResume(
     finalResult.unconfirmedHardSkills = [...uniqueCaseInsensitive(finalResult.unconfirmedHardSkills)]
     finalResult.hardSkills = [...uniqueCaseInsensitive(finalResult.hardSkills)]
     finalResult.hardSkills = removeDuplicateSubstrings([...finalResult.hardSkills])
+    finalResult.hardSkills = ensureMinTechSkills([...finalResult.hardSkills], supplimentTechSkills, 20);
 
     finalResult.unconfirmedSoftSkills = [...finalResult.softSkills]
     finalResult.softSkills = [...extractSoftSkills(jobDesc)]
@@ -1148,6 +1151,9 @@ export async function tailorResume(
     finalResult.unconfirmedSoftSkills = [...uniqueCaseInsensitive(finalResult.unconfirmedSoftSkills)]
     finalResult.softSkills = [...uniqueCaseInsensitive(finalResult.softSkills)]
     finalResult.softSkills = removeDuplicateSubstrings([...finalResult.softSkills])
+    finalResult.softSkills = ensureMinTechSkills([...finalResult.softSkills], supplimentSoftSkills, 5);
+
+
     
 
     return finalResult;
