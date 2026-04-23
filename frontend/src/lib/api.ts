@@ -604,6 +604,7 @@ export interface JobAnalysis {
     buzzwords: string[];
     mustInclude: string[];
   };
+  sourceJobDescription?: string;
 }
 
 export interface TailoredExperience {

@@ -15,8 +15,6 @@ import { supplimentSoftSkills, supplimentTechSkills } from './utils/config';
 // before index.ts finishes bootstrapping, and prefer .env over inherited shell vars.
 dotenv.config({ path: path.join(__dirname, '../../../.env'), override: true });
 
-let jobDesc = '';
-
 const technicalSkills = readSkills('hard');
 const softSkills = readSkills('soft');
 
@@ -56,6 +54,70 @@ function extractSoftSkills(text: string): string[] {
     const regex = new RegExp(`(?<![\\w-])${escaped}(?![\\w-])`, "i");
     return regex.test(text);
   });
+}
+
+type SkillReconciliationOptions = {
+  extractedSkills: string[];
+  modelSkills: string[];
+  referenceSkills: string[];
+  supplementSkills: string[];
+  minimumCount: number;
+};
+
+type SkillReconciliationResult = {
+  confirmedSkills: string[];
+  unconfirmedSkills: string[];
+};
+
+function getTailoringSourceText(jobAnalysis?: JobAnalysis): string {
+  const directSource = jobAnalysis?.sourceJobDescription?.trim();
+  if (directSource) {
+    return directSource;
+  }
+
+  return [
+    getJobAnalysisTitle(jobAnalysis),
+    ...getRequiredSkills(jobAnalysis),
+    ...getPreferredSkills(jobAnalysis),
+    ...getSkillTools(jobAnalysis),
+    ...getSkillTechnologies(jobAnalysis),
+    ...getKeywordChecklist(jobAnalysis),
+    ...getResponsibilities(jobAnalysis),
+    ...getDomainKnowledge(jobAnalysis),
+    ...getSoftSkills(jobAnalysis),
+  ]
+    .filter((value) => value.trim().length > 0)
+    .join('\n');
+}
+
+function reconcileSkillBuckets({
+  extractedSkills,
+  modelSkills,
+  referenceSkills,
+  supplementSkills,
+  minimumCount,
+}: SkillReconciliationOptions): SkillReconciliationResult {
+  const confirmedSkills = [...extractedSkills];
+  const unconfirmedSkills = [...modelSkills];
+
+  moveCaseInsensitiveMatches(referenceSkills, unconfirmedSkills, confirmedSkills);
+
+  const uniqueConfirmedSkills = uniqueCaseInsensitive(ensureMinTechSkills(
+    removeDuplicateSubstrings(uniqueCaseInsensitive(confirmedSkills)),
+    supplementSkills,
+    minimumCount
+  ));
+
+  return {
+    confirmedSkills: uniqueConfirmedSkills,
+    unconfirmedSkills: uniqueCaseInsensitive(unconfirmedSkills),
+  };
+}
+
+function capitalizeFirstCharacter(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.1';
@@ -561,6 +623,7 @@ function normalizeJobAnalysisResponse(
         ...toStringList(keywordGroups.mustInclude),
       ]),
     },
+    sourceJobDescription: jobDescription.trim(),
   };
 }
 
@@ -1048,7 +1111,9 @@ function normalizeTailoredContent(content: TailoredContent, jobAnalysis?: JobAna
 
   const baseStrengths = (content.strengths ?? []).length > 0 ? (content.strengths ?? []) : fallbackStrengths;
   const normalizedStrengths = baseStrengths.map((strength, index) => {
-    const title = (strength?.title ?? `Core Strength ${index + 1}`).trim() || `Core Strength ${index + 1}`;
+    const title = capitalizeFirstCharacter(
+      (strength?.title ?? `Core Strength ${index + 1}`).trim() || `Core Strength ${index + 1}`
+    );
     const rawDescription = (strength?.description ?? '').trim();
     const keywordA = strengthKeywordPool[index % Math.max(strengthKeywordPool.length, 1)] ?? '';
     const keywordB = strengthKeywordPool[(index + 7) % Math.max(strengthKeywordPool.length, 1)] ?? '';
@@ -1092,7 +1157,6 @@ function normalizeTailoredContent(content: TailoredContent, jobAnalysis?: JobAna
 }
 
 export async function analyzeJobDescription(jobDescription: string, provider: AIProvider = DEFAULT_PROVIDER): Promise<JobAnalysis> {
-  jobDesc = jobDescription;
   const prompt = await renderPrompt('analyze-job-description', {
     jobDescription,
   });
@@ -1113,13 +1177,10 @@ export async function tailorResume(
   jobAnalysis: JobAnalysis,
   provider: AIProvider = DEFAULT_PROVIDER
 ): Promise<TailoredContent> {
-  const keywords = getKeywordChecklist(jobAnalysis);
-  const responsibilities = getResponsibilities(jobAnalysis);
-  const keywordCount = keywords.length;
-  const insertionTarget = keywordCount >= 2000 ? 2000 : keywordCount >= 1500 ? 1500 : keywordCount;
+  const { sourceJobDescription: _sourceJobDescription, ...jobAnalysisForPrompt } = jobAnalysis;
   const prompt = await renderPrompt('tailor-resume', {
     profileJson: JSON.stringify(profile, null, 2),
-    jobAnalysisJson: JSON.stringify(jobAnalysis, null, 2),
+    jobAnalysisJson: JSON.stringify(jobAnalysisForPrompt, null, 2),
     jobTitle: getJobAnalysisTitle(jobAnalysis),
     hardSkillsJSON: JSON.stringify([...jobAnalysis.skills.preferred, ...jobAnalysis.skills.required, ...jobAnalysis.skills.technologies, ...jobAnalysis.skills.tools]),
     softSkillsJSON: JSON.stringify([...jobAnalysis.softSkills]),
@@ -1127,36 +1188,45 @@ export async function tailorResume(
     keyResponsibilitiesJson: JSON.stringify([...jobAnalysis.responsibilities]),
     domainKnowledge: JSON.stringify([...jobAnalysis.domainKnowledge, jobAnalysis.jobMeta.industry])
   });
-  console.log(prompt)
   const content = await createTextCompletion(prompt, provider, 11000, 0.2, 'json');
 
   try {
     const jsonText = extractJSON(content);
     const parsed = JSON.parse(jsonText) as TailoredContent;
     const finalResult = normalizeTailoredContent(parsed, jobAnalysis, profile);
+    const tailoringSourceText = getTailoringSourceText(jobAnalysis);
 
-    finalResult.unconfirmedHardSkills = [...finalResult.hardSkills]
-    finalResult.hardSkills = [...extractTechSkills(jobDesc)]
-    moveCaseInsensitiveMatches(technicalSkills, finalResult.unconfirmedHardSkills, finalResult.hardSkills);
+    const {
+      confirmedSkills: confirmedHardSkills,
+      unconfirmedSkills: unconfirmedHardSkills,
+    } = reconcileSkillBuckets({
+      extractedSkills: extractTechSkills(tailoringSourceText),
+      modelSkills: finalResult.hardSkills,
+      referenceSkills: technicalSkills,
+      supplementSkills: supplimentTechSkills,
+      minimumCount: 20,
+    });
 
-    finalResult.unconfirmedHardSkills = [...uniqueCaseInsensitive(finalResult.unconfirmedHardSkills)]
-    finalResult.hardSkills = [...uniqueCaseInsensitive(finalResult.hardSkills)]
-    finalResult.hardSkills = removeDuplicateSubstrings([...finalResult.hardSkills])
-    finalResult.hardSkills = ensureMinTechSkills([...finalResult.hardSkills], supplimentTechSkills, 20);
+    const {
+      confirmedSkills: confirmedSoftSkills,
+      unconfirmedSkills: unconfirmedSoftSkills,
+    } = reconcileSkillBuckets({
+      extractedSkills: extractSoftSkills(tailoringSourceText),
+      modelSkills: finalResult.softSkills,
+      referenceSkills: softSkills,
+      supplementSkills: supplimentSoftSkills,
+      minimumCount: 5,
+    });
 
-    finalResult.unconfirmedSoftSkills = [...finalResult.softSkills]
-    finalResult.softSkills = [...extractSoftSkills(jobDesc)]
-    moveCaseInsensitiveMatches(softSkills, finalResult.unconfirmedSoftSkills, finalResult.softSkills);
-
-    finalResult.unconfirmedSoftSkills = [...uniqueCaseInsensitive(finalResult.unconfirmedSoftSkills)]
-    finalResult.softSkills = [...uniqueCaseInsensitive(finalResult.softSkills)]
-    finalResult.softSkills = removeDuplicateSubstrings([...finalResult.softSkills])
-    finalResult.softSkills = ensureMinTechSkills([...finalResult.softSkills], supplimentSoftSkills, 5);
-
-
-    
-
-    return finalResult;
+    return {
+      ...finalResult,
+      hardSkills: confirmedHardSkills,
+      softSkills: confirmedSoftSkills,
+      unconfirmedHardSkills,
+      unconfirmedSoftSkills,
+      // Keep legacy field aligned with the post-processed hard skills.
+      skills: confirmedHardSkills,
+    };
   } catch {
     console.error('Failed to parse model response:', content);
     throw new Error('Failed to parse tailored resume response');

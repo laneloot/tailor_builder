@@ -53,6 +53,7 @@ export interface JobAnalysis {
         buzzwords: string[];
         mustInclude: string[];
     };
+    sourceJobDescription?: string;
 }
 export type AIProvider = 'openai' | 'claude' | 'openrouter';
 export type RawNestedJobAnalysis = Partial<JobAnalysis> & {
