@@ -5,7 +5,7 @@ const test = require('node:test');
 
 const { loadFresh, makeTempDataDir, readJson } = require('./helpers');
 
-function writePrompt(dataDir, id, content) {
+function writePrompt(dataDir, id, content, extra = {}) {
   const promptsDir = path.join(dataDir, 'prompts');
   fs.mkdirSync(promptsDir, { recursive: true });
   fs.writeFileSync(
@@ -13,6 +13,7 @@ function writePrompt(dataDir, id, content) {
     `${JSON.stringify({
       id,
       content,
+      ...extra,
       createdAt: '2026-04-18T00:00:00.000Z',
       updatedAt: '2026-04-18T00:00:00.000Z',
     }, null, 2)}\n`
@@ -51,16 +52,22 @@ test('prompt service creates, previews, updates, and deletes custom JSON prompts
     description: 'Simple greeting',
     content: 'Hello [[name]]',
     responseFormat: 'text',
+    modelProvider: 'openrouter',
+    modelName: 'google/gemini-2.5-flash',
     allowedVariables: [{ name: 'name', description: 'Recipient name', sampleValue: 'Jane' }],
   });
 
   assert.equal(created.id, 'custom-greeting-prompt');
   assert.equal(created.isBuiltIn, false);
   assert.equal(created.content, 'Hello [[name]]');
+  assert.equal(created.modelProvider, 'openrouter');
+  assert.equal(created.modelName, 'google/gemini-2.5-flash');
   assert.deepEqual(created.validation, { usedVariables: ['name'], unknownVariables: [] });
 
   const promptPath = path.join(dataDir, 'prompts', `${created.id}.json`);
   assert.equal(readJson(promptPath).content, 'Hello [[name]]');
+  assert.equal(readJson(promptPath).modelProvider, 'openrouter');
+  assert.equal(readJson(promptPath).modelName, 'google/gemini-2.5-flash');
 
   const preview = await promptService.previewPrompt({
     id: created.id,
@@ -74,11 +81,15 @@ test('prompt service creates, previews, updates, and deletes custom JSON prompts
     name: 'Greeting Prompt Updated',
     content: 'Hi [[name]]',
     responseFormat: 'text',
+    modelProvider: 'openai',
+    modelName: 'gpt-5-mini',
     allowedVariables: [{ name: 'name' }],
   });
 
   assert.equal(updated.name, 'Greeting Prompt Updated');
   assert.equal(updated.content, 'Hi [[name]]');
+  assert.equal(updated.modelProvider, 'openai');
+  assert.equal(updated.modelName, 'gpt-5-mini');
 
   assert.equal(await promptService.deletePrompt(created.id), true);
   assert.equal(await promptService.getPromptById(created.id), null);
@@ -105,4 +116,42 @@ test('prompt validation rejects unknown variables', async () => {
     }),
     /Unknown prompt variables/
   );
+});
+
+test('built-in prompts persist optional model overrides alongside content', async () => {
+  const dataDir = makeTempDataDir('prompts-built-in-model');
+  process.env.TAILOR_DATA_DIR = dataDir;
+  writePrompt(dataDir, 'analyze-job-description', 'Analyze [[jobDescription]]');
+
+  const promptService = loadFresh('../dist/services/promptService');
+  const updated = await promptService.updatePrompt('analyze-job-description', {
+    content: 'Analyze deeply [[jobDescription]]',
+    modelProvider: 'openrouter',
+    modelName: 'deepseek/deepseek-chat',
+  });
+
+  assert.equal(updated.content, 'Analyze deeply [[jobDescription]]');
+  assert.equal(updated.modelProvider, 'openrouter');
+  assert.equal(updated.modelName, 'deepseek/deepseek-chat');
+
+  const stored = readJson(path.join(dataDir, 'prompts', 'analyze-job-description.json'));
+  assert.equal(stored.modelProvider, 'openrouter');
+  assert.equal(stored.modelName, 'deepseek/deepseek-chat');
+});
+
+test('prompt service renders prompt segments in template order', async () => {
+  const dataDir = makeTempDataDir('prompts-segments');
+  process.env.TAILOR_DATA_DIR = dataDir;
+  writePrompt(dataDir, 'analyze-job-description', 'Intro [[jobDescription]] outro');
+
+  const promptService = loadFresh('../dist/services/promptService');
+  const segments = await promptService.renderPromptSegments('analyze-job-description', {
+    jobDescription: 'Backend role',
+  });
+
+  assert.deepEqual(segments, [
+    { text: 'Intro ' },
+    { text: 'Backend role', variableName: 'jobDescription' },
+    { text: ' outro' },
+  ]);
 });

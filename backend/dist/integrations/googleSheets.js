@@ -6,6 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GoogleSheetsRequestError = void 0;
 exports.fetchGoogleSheetsRange = fetchGoogleSheetsRange;
 exports.updateGoogleSheetsRange = updateGoogleSheetsRange;
+exports.batchUpdateGoogleSheetsColumns = batchUpdateGoogleSheetsColumns;
+exports.fetchGoogleSheetsColumnValues = fetchGoogleSheetsColumnValues;
+exports.updateGoogleSheetsRow = updateGoogleSheetsRow;
 const crypto_1 = __importDefault(require("crypto"));
 const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
@@ -325,6 +328,29 @@ function normalizeUpdateValues(values, rowCount, columnCount) {
         });
     });
 }
+function normalizeColumnUpdateValues(values) {
+    if (!Array.isArray(values)) {
+        throw new GoogleSheetsRequestError(400, 'Column update values must be an array.');
+    }
+    return values.map((value) => {
+        if (value === null || value === undefined)
+            return '';
+        if (typeof value === 'string')
+            return value;
+        if (typeof value === 'number' || typeof value === 'boolean')
+            return String(value);
+        throw new GoogleSheetsRequestError(400, 'Column update values must contain only strings, numbers, booleans, or empty cells.');
+    });
+}
+function normalizeSingleCellValue(fieldName, value) {
+    if (value === null || value === undefined)
+        return '';
+    if (typeof value === 'string')
+        return value;
+    if (typeof value === 'number' || typeof value === 'boolean')
+        return String(value);
+    throw new GoogleSheetsRequestError(400, `${fieldName} must be a string, number, boolean, or empty value.`);
+}
 async function getSpreadsheetMetadata(sheetId) {
     const metadata = await googleSheetsFetch(`/spreadsheets/${encodeURIComponent(sheetId)}?fields=spreadsheetId,properties(title),sheets(properties(title,sheetId,index))`);
     return {
@@ -434,6 +460,137 @@ async function updateGoogleSheetsRange(input) {
         updatedRows: updateResponse.updatedRows ?? requestedRowCount,
         updatedColumns: updateResponse.updatedColumns ?? requestedColumnCount,
         updatedCells: updateResponse.updatedCells ?? requestedRowCount * requestedColumnCount,
+    };
+}
+async function batchUpdateGoogleSheetsColumns(input) {
+    const sheetId = requireNonEmptyString('sheetId', input.sheetId);
+    const metadata = await getSpreadsheetMetadata(sheetId);
+    const tabName = requireNonEmptyString('tabName', input.tabName);
+    const startRow = toPositiveInteger('startRow', input.startRow);
+    const matchingTab = metadata.tabs.find((tab) => tab.title === tabName);
+    if (!matchingTab) {
+        throw new GoogleSheetsRequestError(400, `Tab "${tabName}" was not found in the spreadsheet.`);
+    }
+    if (!Array.isArray(input.updates) || input.updates.length === 0) {
+        throw new GoogleSheetsRequestError(400, 'updates must contain at least one column update.');
+    }
+    const normalizedUpdates = input.updates.map((entry, index) => {
+        if (!entry || typeof entry !== 'object') {
+            throw new GoogleSheetsRequestError(400, `updates[${index + 1}] must be an object.`);
+        }
+        const typedEntry = entry;
+        const col = toPositiveInteger(`updates[${index + 1}].col`, typedEntry.col);
+        const values = normalizeColumnUpdateValues(typedEntry.values);
+        return { col, values };
+    });
+    const rowCount = Math.max(...normalizedUpdates.map((entry) => entry.values.length), 0);
+    if (rowCount === 0) {
+        return {
+            spreadsheetId: metadata.spreadsheetId,
+            spreadsheetTitle: metadata.spreadsheetTitle,
+            selectedTab: matchingTab.title,
+            updatedRanges: [],
+            updatedRows: 0,
+            updatedColumns: normalizedUpdates.length,
+            updatedCells: 0,
+        };
+    }
+    const data = normalizedUpdates.map((entry) => {
+        const toRow = startRow + rowCount - 1;
+        const range = buildA1Notation(tabName, startRow, toRow, entry.col, entry.col);
+        const values = Array.from({ length: rowCount }, (_, rowIndex) => [entry.values[rowIndex] ?? '']);
+        return {
+            range,
+            majorDimension: 'ROWS',
+            values,
+        };
+    });
+    const updateResponse = await googleSheetsFetch(`/spreadsheets/${encodeURIComponent(sheetId)}/values:batchUpdate`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            valueInputOption: 'USER_ENTERED',
+            data,
+        }),
+    });
+    return {
+        spreadsheetId: metadata.spreadsheetId,
+        spreadsheetTitle: metadata.spreadsheetTitle,
+        selectedTab: matchingTab.title,
+        updatedRanges: updateResponse.responses?.map((entry) => entry.updatedRange ?? '').filter(Boolean) ?? data.map((entry) => entry.range),
+        updatedRows: updateResponse.totalUpdatedRows ?? rowCount,
+        updatedColumns: updateResponse.totalUpdatedColumns ?? normalizedUpdates.length,
+        updatedCells: updateResponse.totalUpdatedCells ?? rowCount * normalizedUpdates.length,
+    };
+}
+async function fetchGoogleSheetsColumnValues(input) {
+    const sheetId = requireNonEmptyString('sheetId', input.sheetId);
+    const metadata = await getSpreadsheetMetadata(sheetId);
+    const tabName = requireNonEmptyString('tabName', input.tabName);
+    const col = toPositiveInteger('col', input.col);
+    const matchingTab = metadata.tabs.find((tab) => tab.title === tabName);
+    if (!matchingTab) {
+        throw new GoogleSheetsRequestError(400, `Tab "${tabName}" was not found in the spreadsheet.`);
+    }
+    const range = `${quoteSheetTitle(tabName)}!${toColumnLetters(col)}:${toColumnLetters(col)}`;
+    const response = await googleSheetsFetch(`/spreadsheets/${encodeURIComponent(sheetId)}/values/${encodeURIComponent(range)}`);
+    return {
+        spreadsheetId: metadata.spreadsheetId,
+        spreadsheetTitle: metadata.spreadsheetTitle,
+        selectedTab: matchingTab.title,
+        column: col,
+        values: (response.values ?? []).map((row) => normalizeSingleCellValue('value', row?.[0] ?? '')),
+    };
+}
+async function updateGoogleSheetsRow(input) {
+    const sheetId = requireNonEmptyString('sheetId', input.sheetId);
+    const metadata = await getSpreadsheetMetadata(sheetId);
+    const tabName = requireNonEmptyString('tabName', input.tabName);
+    const row = toPositiveInteger('row', input.row);
+    const matchingTab = metadata.tabs.find((tab) => tab.title === tabName);
+    if (!matchingTab) {
+        throw new GoogleSheetsRequestError(400, `Tab "${tabName}" was not found in the spreadsheet.`);
+    }
+    if (!Array.isArray(input.updates) || input.updates.length === 0) {
+        throw new GoogleSheetsRequestError(400, 'updates must contain at least one cell update.');
+    }
+    const normalizedUpdates = input.updates.map((entry, index) => {
+        if (!entry || typeof entry !== 'object') {
+            throw new GoogleSheetsRequestError(400, `updates[${index + 1}] must be an object.`);
+        }
+        const typedEntry = entry;
+        const col = toPositiveInteger(`updates[${index + 1}].col`, typedEntry.col);
+        const value = normalizeSingleCellValue(`updates[${index + 1}].value`, typedEntry.value);
+        return { col, value };
+    });
+    const data = normalizedUpdates.map((entry) => {
+        const range = buildA1Notation(tabName, row, row, entry.col, entry.col);
+        return {
+            range,
+            majorDimension: 'ROWS',
+            values: [[entry.value]],
+        };
+    });
+    const updateResponse = await googleSheetsFetch(`/spreadsheets/${encodeURIComponent(sheetId)}/values:batchUpdate`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            valueInputOption: 'USER_ENTERED',
+            data,
+        }),
+    });
+    return {
+        spreadsheetId: metadata.spreadsheetId,
+        spreadsheetTitle: metadata.spreadsheetTitle,
+        selectedTab: matchingTab.title,
+        row,
+        updatedRanges: updateResponse.responses?.map((entry) => entry.updatedRange ?? '').filter(Boolean) ?? data.map((entry) => entry.range),
+        updatedColumns: updateResponse.totalUpdatedColumns ?? normalizedUpdates.length,
+        updatedCells: updateResponse.totalUpdatedCells ?? normalizedUpdates.length,
     };
 }
 //# sourceMappingURL=googleSheets.js.map

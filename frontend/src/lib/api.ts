@@ -133,6 +133,158 @@ export interface GoogleSheetSource {
   updatedAt: string;
 }
 
+export type LinkedInPostedSince = 'past-24-hours' | 'past-week' | 'past-month';
+export type ScraperSource = 'linkedin' | 'indeed' | 'jobboard' | 'wellfound' | 'lever' | 'hiringcafe';
+export type ScraperTimePosted = '24h' | '3d' | '7d' | '30d';
+export type ScraperJobType = 'full-time' | 'part-time' | 'contract' | 'internship' | 'temporary';
+
+export interface ScraperProviderSummary {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface ScraperSourceProviderCatalog {
+  source: ScraperSource;
+  defaultProviderId: string;
+  providers: ScraperProviderSummary[];
+}
+
+export interface LinkedInJobCriteria {
+  label: string;
+  value: string;
+}
+
+export interface LinkedInJob {
+  id: string;
+  title: string;
+  company: string;
+  jobId: string | null;
+  jobTitle: string | null;
+  companyName: string | null;
+  companyLogo: string | null;
+  companyWebsite: string | null;
+  location: string | null;
+  postedAtText: string;
+  postedAtIso: string | null;
+  link: string | null;
+  jobUrl: string;
+  applyUrl: string | null;
+  easyApply: boolean | null;
+  descriptionText: string | null;
+  postedAt: string | null;
+  externalApplyUrl: string | null;
+  applyText: string;
+  workplaceType: string;
+  employmentType: string | null;
+  experienceLevel: string | null;
+  seniorityLevel: string;
+  workplaceTypes: string[] | null;
+  jobFunction: string;
+  industries: string;
+  sector: string | null;
+  description: string;
+  insights: string[];
+  criteria: LinkedInJobCriteria[];
+}
+
+export interface LinkedInJobSearchResponse {
+  fetchedAt: string;
+  filters: {
+    keywords: string;
+    postedSince: LinkedInPostedSince;
+    location: string;
+    workplaceType: 'remote';
+    excludeEasyApply: true;
+    limit: number;
+  };
+  results: LinkedInJob[];
+}
+
+export interface LinkedInJobSheetExportSummary {
+  spreadsheetId: string;
+  spreadsheetTitle: string;
+  selectedTab: string;
+  updatedRanges: string[];
+  rowsWritten: number;
+  startRow: number;
+  endRow: number;
+  unresolvedJobLinks: number;
+  skippedCompanyDuplicates: number;
+  beforeExportResultCount?: number;
+}
+
+export interface LinkedInJobSearchAndExportResponse extends LinkedInJobSearchResponse {
+  export: LinkedInJobSheetExportSummary;
+}
+
+export interface ScraperJob {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  job_type: string;
+  salary_min: number | null;
+  salary_max: number | null;
+  equity: string | null;
+  posted_at: string | null;
+  description: string;
+  apply_url: string;
+  source: ScraperSource;
+  raw: Record<string, unknown>;
+}
+
+export interface ScraperRunFilters {
+  title?: string;
+  rows?: number;
+  keywords?: string;
+  startUrl?: string;
+  location?: string;
+  timePosted?: ScraperTimePosted;
+  jobType?: ScraperJobType;
+  remoteOnly?: boolean;
+  maxResults?: number;
+  rawResultCount?: number;
+  resultsWithinPostedWindowCount?: number;
+  remoteFilteredCount?: number;
+}
+
+export interface ScraperRunResponse {
+  fetchedAt: string;
+  source: ScraperSource;
+  providerId: string;
+  providerLabel: string;
+  filters: ScraperRunFilters;
+  results: ScraperJob[];
+}
+
+export interface ScraperExportResponse extends ScraperRunResponse {
+  export: LinkedInJobSheetExportSummary;
+}
+
+export interface GoogleSheetJobFilterResponse {
+  spreadsheetId: string;
+  spreadsheetTitle: string;
+  selectedTab: string;
+  provider: AIProvider;
+  modelName: string;
+  startRow: number;
+  endRow: number;
+  jobLinkCol: number;
+  resultCol: number;
+  reasonCol: number;
+  scannedRows: number;
+  processedRows: number;
+  skippedRows: number;
+  scrapedRows: number;
+  errorRows: number;
+  updatedRanges: string[];
+  rowErrors: Array<{
+    row: number;
+    message: string;
+  }>;
+}
+
 // Admin API
 export interface PublicAppSettings {
   openaiEnabled: boolean;
@@ -434,6 +586,76 @@ export const importApi = {
     }),
 };
 
+export const jobsApi = {
+  getScraperProviders: () => apiFetch<ScraperSourceProviderCatalog[]>('/jobs/scrapers/providers'),
+
+  searchLinkedIn: (data: { keywords: string; postedSince: LinkedInPostedSince; limit?: number }) => {
+    const params = new URLSearchParams({
+      keywords: data.keywords,
+      postedSince: data.postedSince,
+    });
+
+    if (typeof data.limit === 'number') {
+      params.set('limit', String(data.limit));
+    }
+
+    return apiFetch<LinkedInJobSearchResponse>(`/jobs/linkedin?${params.toString()}`);
+  },
+
+  searchLinkedInAndExport: (data: {
+    keywords: string;
+    postedSince: LinkedInPostedSince;
+    limit?: number;
+    sheetId: string;
+    tabName: string;
+    startRow: number;
+    companyNameCol: number;
+    jobTitleCol: number;
+    jobLinkCol: number;
+    jobDescriptionCol: number;
+  }) =>
+    apiFetch<LinkedInJobSearchAndExportResponse>('/jobs/linkedin/search-and-export', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  runScraper: (data: ScraperRunFilters & { source: ScraperSource; provider?: string }) =>
+    apiFetch<ScraperRunResponse>('/jobs/scrapers/run', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  exportScraperToGoogleSheet: (data: ScraperRunFilters & {
+    source: ScraperSource;
+    provider?: string;
+    sheetId: string;
+    tabName: string;
+    startRow: number;
+    companyNameCol: number;
+    jobTitleCol: number;
+    jobLinkCol: number;
+    jobDescriptionCol: number;
+  }) =>
+    apiFetch<ScraperExportResponse>('/jobs/scrapers/export', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  filterGoogleSheetJobs: (data: {
+    sheetId: string;
+    tabName: string;
+    startRow: number;
+    endRow: number;
+    jobLinkCol: number;
+    resultCol: number;
+    reasonCol: number;
+  }) =>
+    apiFetch<GoogleSheetJobFilterResponse>('/jobs/filter-google-sheet', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
 // Profile types
 export interface Contact {
   phone: string;
@@ -548,6 +770,14 @@ export interface Template {
 
 export type PromptResponseFormat = 'json' | 'text';
 
+export interface AIModelOption {
+  id: string;
+  label: string;
+  provider: AIProvider;
+  modelName: string;
+  description: string;
+}
+
 export interface PromptVariableDefinition {
   name: string;
   description?: string;
@@ -564,6 +794,8 @@ export interface PromptSummary {
   name: string;
   description: string;
   responseFormat: PromptResponseFormat;
+  modelProvider?: AIProvider;
+  modelName?: string;
   allowedVariables: PromptVariableDefinition[];
   validation: PromptValidation;
   isBuiltIn: boolean;
@@ -795,6 +1027,8 @@ export const promptsApi = {
     description?: string;
     content: string;
     responseFormat?: PromptResponseFormat;
+    modelProvider?: AIProvider;
+    modelName?: string;
     allowedVariables?: PromptVariableDefinition[];
   }) =>
     apiFetch<PromptRecord>('/prompts', {
@@ -809,6 +1043,8 @@ export const promptsApi = {
       description?: string;
       content: string;
       responseFormat?: PromptResponseFormat;
+      modelProvider?: AIProvider;
+      modelName?: string;
       allowedVariables?: PromptVariableDefinition[];
     }
   ) =>
@@ -821,6 +1057,8 @@ export const promptsApi = {
     apiFetch<{ message: string }>(`/prompts/${id}`, {
       method: 'DELETE',
     }),
+
+  getModelOptions: () => apiFetch<AIModelOption[]>('/prompts/models'),
 
   validateDraft: (data: {
     id?: string;
@@ -853,6 +1091,34 @@ export const resumeApi = {
     apiFetch<JobAnalysis>('/resume/analyze', {
       method: 'POST',
       body: JSON.stringify({ jobDescription, model }),
+    }),
+
+  analyzeMultiJob: (data: {
+    jobs: Array<{
+      companyName: string;
+      jobDescription: string;
+      sourceRowNumber?: number;
+    }>;
+    model: AIProvider;
+  }) =>
+    apiFetch<{
+      provider: AIProvider;
+      analyzed: number;
+      analyses: Array<{
+        companyName: string;
+        sourceRowNumber?: number;
+        jobDescription: string;
+        analysis: JobAnalysis;
+      }>;
+      failed: number;
+      failures: Array<{
+        companyName: string;
+        sourceRowNumber?: number;
+        error: string;
+      }>;
+    }>('/resume/analyze-multi-job', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 
   generate: (data: {
@@ -928,6 +1194,48 @@ export const resumeApi = {
       unconfirmedHardSkills?: string[];
       unconfirmedSoftSkills?: string[];
     }>('/resume/generate-all', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  generateMultiJob: (data: {
+    templateId?: string;
+    jobs: Array<{
+      companyName: string;
+      role: string;
+      jobDescription?: string;
+      jobAnalysis?: JobAnalysis;
+      sourceRowNumber?: number;
+    }>;
+    model: AIProvider;
+    profileIds?: string[];
+    format?: 'pdf' | 'docx' | 'both';
+    includeCoverLetterDocx?: boolean;
+  }) =>
+    apiFetch<{
+      generated: number;
+      failed: number;
+      results: Array<{
+        profileId: string;
+        profileName: string;
+        companyName: string;
+        role: string;
+        pdf?: string;
+        docx?: string;
+        coverLetterPdf?: string;
+        coverLetterDocx?: string;
+      }>;
+      failures: Array<{
+        profileId: string;
+        profileName: string;
+        companyName: string;
+        error: string;
+      }>;
+      failedCompanies: string[];
+      tailored: boolean;
+      unconfirmedHardSkills?: string[];
+      unconfirmedSoftSkills?: string[];
+    }>('/resume/generate-multi-job', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

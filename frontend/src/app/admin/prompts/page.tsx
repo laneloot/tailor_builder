@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
+  adminApi,
+  AIModelOption,
+  AIProvider,
   promptsApi,
   PromptPreviewResult,
   PromptRecord,
@@ -17,6 +20,8 @@ type PromptDraft = {
   description: string;
   content: string;
   responseFormat: PromptResponseFormat;
+  modelProvider?: AIProvider;
+  modelName?: string;
   allowedVariables: PromptVariableDefinition[];
   isBuiltIn: boolean;
   usage?: string;
@@ -38,6 +43,8 @@ function makeDraft(record: PromptRecord): PromptDraft {
     description: record.description,
     content: record.content,
     responseFormat: record.responseFormat,
+    modelProvider: record.modelProvider,
+    modelName: record.modelName,
     allowedVariables: record.allowedVariables.map((variable) => ({ ...variable })),
     isBuiltIn: record.isBuiltIn,
     usage: record.usage,
@@ -52,6 +59,8 @@ function makeBlankDraft(): PromptDraft {
     description: '',
     content: '',
     responseFormat: 'json',
+    modelProvider: undefined,
+    modelName: undefined,
     allowedVariables: [],
     isBuiltIn: false,
   };
@@ -75,6 +84,12 @@ function formatDate(value?: string): string {
 
 export default function PromptsPage() {
   const [prompts, setPrompts] = useState<PromptSummary[]>([]);
+  const [modelOptions, setModelOptions] = useState<AIModelOption[]>([]);
+  const [enabledProviders, setEnabledProviders] = useState<Record<AIProvider, boolean>>({
+    openai: true,
+    claude: true,
+    openrouter: true,
+  });
   const [draft, setDraft] = useState<PromptDraft | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [validation, setValidation] = useState<PromptValidation>(emptyValidation());
@@ -137,6 +152,42 @@ export default function PromptsPage() {
   useEffect(() => {
     void refreshPrompts();
   }, [refreshPrompts]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadRuntimeConfig = async () => {
+      try {
+        const [options, settings] = await Promise.all([
+          promptsApi.getModelOptions(),
+          adminApi.getAIModels(),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setModelOptions(options);
+        setEnabledProviders({
+          openai: settings.openaiEnabled,
+          claude: settings.claudeEnabled,
+          openrouter: settings.openrouterEnabled,
+        });
+      } catch (err) {
+        if (!isMounted) {
+          return;
+        }
+
+        setError(err instanceof Error ? err.message : 'Failed to load prompt model options');
+      }
+    };
+
+    void loadRuntimeConfig();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const confirmDiscard = (): boolean => {
     if (!isDirty) return true;
@@ -233,6 +284,8 @@ export default function PromptsPage() {
         description: draft.description,
         content: draft.content,
         responseFormat: draft.responseFormat,
+        modelProvider: draft.modelProvider,
+        modelName: draft.modelName,
         allowedVariables: draft.allowedVariables,
       };
 
@@ -296,6 +349,11 @@ export default function PromptsPage() {
       allowedVariables: current.allowedVariables.filter((_, variableIndex) => variableIndex !== index),
     }));
   };
+
+  const selectedModelOptionId =
+    draft?.modelProvider && draft.modelName
+      ? `${draft.modelProvider}:${draft.modelName}`
+      : '';
 
   if (isLoadingList && !draft) {
     return (
@@ -487,6 +545,42 @@ export default function PromptsPage() {
                     <option value="text">Text</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Runtime Model</label>
+                <select
+                  value={selectedModelOptionId}
+                  onChange={(event) => {
+                    const nextId = event.target.value;
+                    const nextOption = modelOptions.find((option) => option.id === nextId) ?? null;
+                    updateDraft((current) => ({
+                      ...current,
+                      modelProvider: nextOption?.provider,
+                      modelName: nextOption?.modelName,
+                    }));
+                  }}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                >
+                  <option value="">Use runtime default</option>
+                  {modelOptions.map((option) => (
+                    <option
+                      key={option.id}
+                      value={option.id}
+                      disabled={!enabledProviders[option.provider]}
+                    >
+                      {option.label}{!enabledProviders[option.provider] ? ' (provider disabled)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-sm text-gray-600">
+                  Choose a specific model for this prompt, or leave it on the runtime default to keep current route behavior.
+                </p>
+                {draft.modelProvider && draft.modelName && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Saved override: {draft.modelProvider} / {draft.modelName}
+                  </p>
+                )}
               </div>
 
               <div>

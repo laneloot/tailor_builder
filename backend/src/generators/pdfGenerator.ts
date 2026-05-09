@@ -7,7 +7,7 @@ import { Profile } from '../types/profile';
 import { TailoredContent, Template } from '../types/template';
 import type { GeneratedPathInfo } from '../utils/generatedPath';
 import { getGeneratedFilePath } from '../utils/generatedPath';
-import { readSkills } from '../database/skillsDatabase';
+import { readHardSkillPriorityMap, readSkills } from '../database/skillsDatabase';
 const MAX_ROLE_BRIEF_LENGTH = 1200;
 const A4_PRINTABLE_WIDTH_PX = 698; // A4 width (8.27in) minus 0.5in margins on both sides at 96 DPI
 const A4_PRINTABLE_HEIGHT_PX = 1026; // A4 height (11.69in) minus 0.5in margins top/bottom at 96 DPI
@@ -347,12 +347,14 @@ function normalizeHardSkillAlias(skill: string): string {
 }
 
 const ALLOWED_TECH_SKILLS = new Set<string>();
+let hardSkillPriorityMap = readHardSkillPriorityMap();
 
 function loadAllowedTechSkills() {
   ALLOWED_TECH_SKILLS.clear();
   for (const skill of readSkills('hard')) {
     ALLOWED_TECH_SKILLS.add(normalizeHardSkillAlias(skill));
   }
+  hardSkillPriorityMap = readHardSkillPriorityMap();
 }
 
 loadAllowedTechSkills();
@@ -423,6 +425,19 @@ function prioritizeSoftSkills(skills: string[]): string[] {
   return [...prioritized, ...remainder];
 }
 
+function sortHardSkillsByPriority(skills: string[]): string[] {
+  return [...normalizeSkills(skills)].sort((a, b) => {
+    const aPriority = hardSkillPriorityMap.get(normalizeHardSkillAlias(a)) ?? Number.MAX_SAFE_INTEGER;
+    const bPriority = hardSkillPriorityMap.get(normalizeHardSkillAlias(b)) ?? Number.MAX_SAFE_INTEGER;
+
+    if (aPriority !== bPriority) {
+      return aPriority - bPriority;
+    }
+
+    return a.localeCompare(b, undefined, { sensitivity: 'base' });
+  });
+}
+
 type SkillsData = {
   hardSkills?: string[];
   softSkills?: string[];
@@ -433,9 +448,7 @@ function applySkillsLimit<T extends SkillsData>(data: T): T {
   const MAX_SOFT_SKILLS = 10;
 
   const combinedHardRaw = data.hardSkills ?? data.skills ?? [];
-  // const hardFiltered = normalizeSkills(combinedHardRaw as unknown[]).filter(isTechnicalSkill);
-  // const hardLimited = hardFiltered.map(capitalizeHardSkill);
-  const hardLimited = combinedHardRaw;
+  const hardLimited = sortHardSkillsByPriority(combinedHardRaw);
 
   const softRaw = prioritizeSoftSkills(normalizeSkills(data.softSkills));
   const softCondensed = softRaw.slice(0, MAX_SOFT_SKILLS).map(condenseSoftSkill);

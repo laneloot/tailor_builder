@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const promptService_1 = require("../services/promptService");
+const aiModelCatalog_1 = require("../services/aiModelCatalog");
 const router = (0, express_1.Router)();
 router.use(auth_1.authMiddleware);
 router.get('/', async (_req, res) => {
@@ -38,6 +39,9 @@ router.post('/preview', async (req, res) => {
             error: error instanceof Error ? error.message : 'Failed to generate prompt preview',
         });
     }
+});
+router.get('/models', (_req, res) => {
+    res.json((0, aiModelCatalog_1.listAIModelOptions)());
 });
 router.get('/:id', async (req, res) => {
     try {

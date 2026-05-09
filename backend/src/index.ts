@@ -11,6 +11,7 @@ import adminRoutes from './routes/admin';
 import groupRoutes from './routes/groups';
 import importRoutes from './routes/import';
 import promptRoutes from './routes/prompts';
+import jobRoutes from './routes/jobs';
 
 dotenv.config({ path: path.join(__dirname, '../../.env'), override: true });
 
@@ -66,6 +67,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/prompts', promptRoutes);
+app.use('/api/jobs', jobRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

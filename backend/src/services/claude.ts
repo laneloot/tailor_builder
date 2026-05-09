@@ -3,13 +3,14 @@ import dotenv from 'dotenv';
 import { Profile } from '../types/profile';
 import type { AIProvider, JobAnalysis, RawNestedJobAnalysis, TailoredContent } from '../types/template';
 import path from "path";
-import { renderPrompt } from './promptService';
-import { getProviderApiKey } from '../config/aiModelConfig';
-import { readSkills } from '../database/skillsDatabase';
+import { getPromptById, renderPrompt, renderPromptSegments } from './promptService';
+import { getAIModelSettings, getProviderApiKey, isProviderEnabled } from '../config/aiModelConfig';
+import { readHardSkillPriorityMap, readSkills } from '../database/skillsDatabase';
 import { moveCaseInsensitiveMatches, uniqueCaseInsensitive } from '../utils/array';
 import { extractJSON } from '../utils/json';
 import { removeDuplicateSubstrings, ensureMinTechSkills } from './utils/resumeBuilder';
 import { supplimentSoftSkills, supplimentTechSkills } from './utils/config';
+import { DEFAULT_CLAUDE_MODEL, DEFAULT_OPENAI_MODEL, DEFAULT_OPENROUTER_MODEL } from './aiModelCatalog';
 
 // Ensure the repo .env file is loaded for this module even when it is imported
 // before index.ts finishes bootstrapping, and prefer .env over inherited shell vars.
@@ -17,23 +18,26 @@ dotenv.config({ path: path.join(__dirname, '../../../.env'), override: true });
 
 const technicalSkills = readSkills('hard');
 const softSkills = readSkills('soft');
+let hardSkillPriorityMap = readHardSkillPriorityMap();
 
 export function refreshSkillCaches(): void {
   const nextTech = readSkills('hard');
   const nextSoft = readSkills('soft');
+  const nextHardSkillPriorityMap = readHardSkillPriorityMap();
 
   technicalSkills.length = 0;
   technicalSkills.push(...nextTech);
 
   softSkills.length = 0;
   softSkills.push(...nextSoft);
+
+  hardSkillPriorityMap = nextHardSkillPriorityMap;
 }
 
 // Lazy initialization to ensure env vars are loaded first
 let openaiClient: OpenAI | null = null;
-let openRouterClient: OpenAI | null = null;
 let openaiClientKey = '';
-let openRouterClientKey = '';
+let anthropicCacheUsageWarningShown = false;
 
 function extractTechSkills(text: string): string[] {
   return technicalSkills.filter((item: string) => {
@@ -62,6 +66,7 @@ type SkillReconciliationOptions = {
   referenceSkills: string[];
   supplementSkills: string[];
   minimumCount: number;
+  finalizeSkills?: (skills: string[]) => string[];
 };
 
 type SkillReconciliationResult = {
@@ -96,6 +101,7 @@ function reconcileSkillBuckets({
   referenceSkills,
   supplementSkills,
   minimumCount,
+  finalizeSkills,
 }: SkillReconciliationOptions): SkillReconciliationResult {
   const confirmedSkills = [...extractedSkills];
   const unconfirmedSkills = [...modelSkills];
@@ -109,7 +115,7 @@ function reconcileSkillBuckets({
   ));
 
   return {
-    confirmedSkills: uniqueConfirmedSkills,
+    confirmedSkills: finalizeSkills ? finalizeSkills(uniqueConfirmedSkills) : uniqueConfirmedSkills,
     unconfirmedSkills: uniqueCaseInsensitive(unconfirmedSkills),
   };
 }
@@ -120,14 +126,14 @@ function capitalizeFirstCharacter(value: string): string {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.1';
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-5.4-nano';
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 const DEFAULT_PROVIDER: AIProvider = 'openai';
 const ANTHROPIC_MAX_RETRIES = 4;
 const ANTHROPIC_BASE_RETRY_DELAY_MS = 600;
 const MIN_ROLE_BRIEF_LENGTH = 320;
 const MAX_ROLE_BRIEF_LENGTH = 900;
+const MAX_HARD_SKILLS = 25;
+const MAX_HARD_SKILLS_PER_CATEGORY = 5;
+const MAX_SOFT_SKILLS = 10;
 const SOFT_SKILL_SIGNALS = [
   'accountability',
   'communication',
@@ -206,122 +212,436 @@ const HARD_SKILL_RULES: Array<{ canonical: string; patterns: string[] }> = [
   { canonical: 'Tooling', patterns: ['tooling', 'tools'] },
   { canonical: 'Version control', patterns: ['version control', 'git'] },
 ];
-type HardSkillCategory = 'language' | 'framework' | 'other';
+type HardSkillCategory =
+  | 'backend'
+  | 'frontend'
+  | 'databases'
+  | 'cloud-devops'
+  | 'testing-automation'
+  | 'ai-ml'
+  | 'tools-methodologies'
+  | 'other';
 type CompletionResponseFormat = 'json' | 'text';
+type AnthropicCacheTtl = '5m' | '1h';
+
+type AnthropicCacheControl = {
+  type: 'ephemeral';
+  ttl?: '1h';
+};
+
+type AnthropicTextBlock = {
+  type: 'text';
+  text: string;
+  cache_control?: AnthropicCacheControl;
+};
+
+type AnthropicMessageParam = {
+  role: 'user' | 'assistant';
+  content: string | AnthropicTextBlock[];
+};
+
+type AnthropicMessageRequestParams = {
+  model: string;
+  max_tokens: number;
+  temperature?: number;
+  system?: AnthropicTextBlock[];
+  messages: AnthropicMessageParam[];
+};
+
+type AnthropicMessageResponse = {
+  content?: Array<{ type: string; text?: string }>;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
+};
+
+type AnthropicMessageBatchResponse = {
+  id: string;
+  processing_status: 'in_progress' | 'canceling' | 'ended';
+  request_counts?: {
+    processing?: number;
+    succeeded?: number;
+    errored?: number;
+    canceled?: number;
+    expired?: number;
+  };
+  results_url?: string | null;
+};
+
+type AnthropicBatchResultLine = {
+  custom_id: string;
+  result: {
+    type: 'succeeded' | 'errored' | 'canceled' | 'expired';
+    message?: AnthropicMessageResponse;
+    error?: {
+      type?: string;
+      message?: string;
+    };
+  };
+};
+
+type ProviderChatMessage = {
+  role: 'system' | 'user';
+  content: string;
+};
 
 type HardSkillDefinition = {
   display: string;
   category: HardSkillCategory;
   aliases: string[];
+  priority: number;
 };
 
-const HARD_SKILL_DEFINITIONS: HardSkillDefinition[] = [
-  { display: 'Python', category: 'language', aliases: ['python'] },
-  { display: 'JavaScript', category: 'language', aliases: ['javascript', 'js'] },
-  { display: 'TypeScript', category: 'language', aliases: ['typescript', 'ts'] },
-  { display: 'Java', category: 'language', aliases: ['java'] },
-  { display: 'Go', category: 'language', aliases: ['go', 'golang'] },
-  { display: 'Rust', category: 'language', aliases: ['rust'] },
-  { display: 'Ruby', category: 'language', aliases: ['ruby'] },
-  { display: 'PHP', category: 'language', aliases: ['php'] },
-  { display: 'C++', category: 'language', aliases: ['c++'] },
-  { display: 'C#', category: 'language', aliases: ['c#'] },
-  { display: 'Kotlin', category: 'language', aliases: ['kotlin'] },
-  { display: 'Swift', category: 'language', aliases: ['swift'] },
-  { display: 'Scala', category: 'language', aliases: ['scala'] },
-  { display: 'SQL', category: 'language', aliases: ['sql'] },
-  { display: 'HTML', category: 'language', aliases: ['html'] },
-  { display: 'CSS', category: 'language', aliases: ['css'] },
-  { display: 'Elixir', category: 'language', aliases: ['elixir'] },
-  { display: 'Bash', category: 'language', aliases: ['bash', 'bash scripting'] },
-  { display: 'React', category: 'framework', aliases: ['react', 'react.js', 'reactjs'] },
-  { display: 'Next.js', category: 'framework', aliases: ['next', 'next.js', 'nextjs'] },
-  { display: 'Node.js', category: 'framework', aliases: ['node', 'node.js', 'nodejs'] },
-  { display: 'Vue', category: 'framework', aliases: ['vue', 'vue.js', 'vuejs'] },
-  { display: 'Express', category: 'framework', aliases: ['express', 'express.js', 'expressjs'] },
-  { display: 'Angular', category: 'framework', aliases: ['angular', 'angular.js', 'angularjs'] },
-  { display: 'NestJS', category: 'framework', aliases: ['nest', 'nestjs', 'nest.js'] },
-  { display: 'Nuxt', category: 'framework', aliases: ['nuxt', 'nuxt.js', 'nuxtjs'] },
-  { display: 'Django', category: 'framework', aliases: ['django'] },
-  { display: 'Flask', category: 'framework', aliases: ['flask'] },
-  { display: 'FastAPI', category: 'framework', aliases: ['fastapi', 'fast api'] },
-  { display: 'Fastify', category: 'framework', aliases: ['fastify'] },
-  { display: 'Laravel', category: 'framework', aliases: ['laravel'] },
-  { display: 'Ruby on Rails', category: 'framework', aliases: ['rails', 'ruby on rails'] },
-  { display: 'Spring', category: 'framework', aliases: ['spring', 'spring boot', 'springboot'] },
-  { display: 'TensorFlow', category: 'framework', aliases: ['tensorflow', 'tensor flow'] },
-  { display: 'PyTorch', category: 'framework', aliases: ['pytorch', 'py torch', 'torch'] },
-  { display: 'Keras', category: 'framework', aliases: ['keras'] },
-  { display: 'Scikit-learn', category: 'framework', aliases: ['scikit-learn', 'sklearn'] },
-  { display: 'Pandas', category: 'framework', aliases: ['pandas'] },
-  { display: 'NumPy', category: 'framework', aliases: ['numpy', 'num py'] },
-  { display: 'Redux', category: 'framework', aliases: ['redux'] },
-  { display: 'React Router', category: 'framework', aliases: ['react router'] },
-  { display: 'TailwindCSS', category: 'framework', aliases: ['tailwind', 'tailwindcss', 'tailwind css'] },
-  { display: 'MUI', category: 'framework', aliases: ['mui', 'material ui', 'material-ui'] },
-  { display: 'Sass', category: 'framework', aliases: ['sass'] },
-  { display: 'SCSS', category: 'framework', aliases: ['scss'] },
-  { display: 'Svelte', category: 'framework', aliases: ['svelte', 'svelte.js', 'sveltejs'] },
-  { display: 'Ember', category: 'framework', aliases: ['ember', 'ember.js', 'emberjs'] },
-  { display: 'jQuery', category: 'framework', aliases: ['jquery', 'jquery.js', 'jqueryjs'] },
-  { display: 'Bootstrap', category: 'framework', aliases: ['bootstrap'] },
-  { display: 'GraphQL', category: 'framework', aliases: ['graphql'] },
-  { display: 'SWR', category: 'framework', aliases: ['swr'] },
-  { display: 'Flutter', category: 'framework', aliases: ['flutter'] },
-  { display: 'React Native', category: 'framework', aliases: ['react native', 'reactnative'] },
-  { display: '.NET', category: 'framework', aliases: ['.net', 'dotnet', 'asp.net', 'aspnet'] },
-  { display: 'Docker', category: 'other', aliases: ['docker'] },
-  { display: 'Kubernetes', category: 'other', aliases: ['kubernetes', 'k8s', 'kube'] },
-  { display: 'AWS', category: 'other', aliases: ['aws', 'aws cloud'] },
-  { display: 'GCP', category: 'other', aliases: ['gcp', 'google cloud'] },
-  { display: 'Azure', category: 'other', aliases: ['azure'] },
-  { display: 'Git', category: 'other', aliases: ['git', 'version control'] },
-  { display: 'Nginx', category: 'other', aliases: ['nginx'] },
-  { display: 'Redis', category: 'other', aliases: ['redis'] },
-  { display: 'Celery', category: 'other', aliases: ['celery'] },
-  { display: 'PostgreSQL', category: 'other', aliases: ['postgres', 'postgresql', 'psql'] },
-  { display: 'MongoDB', category: 'other', aliases: ['mongodb', 'mongo'] },
-  { display: 'MySQL', category: 'other', aliases: ['mysql'] },
-  { display: 'NoSQL', category: 'other', aliases: ['nosql'] },
-  { display: 'OpenAPI', category: 'other', aliases: ['openapi'] },
-  { display: 'RESTful API', category: 'other', aliases: ['restful api', 'rest api', 'rest'] },
-  { display: 'JWT', category: 'other', aliases: ['jwt'] },
-  { display: 'OAuth', category: 'other', aliases: ['oauth'] },
-  { display: 'Jest', category: 'other', aliases: ['jest'] },
-  { display: 'Mocha', category: 'other', aliases: ['mocha'] },
-  { display: 'Chai', category: 'other', aliases: ['chai'] },
-  { display: 'CI/CD', category: 'other', aliases: ['ci/cd', 'github actions', 'gitlab ci'] },
-  { display: 'Vercel', category: 'other', aliases: ['vercel'] },
-  { display: 'Netlify', category: 'other', aliases: ['netlify'] },
-  { display: 'Figma', category: 'other', aliases: ['figma'] },
-  { display: 'Sketch', category: 'other', aliases: ['sketch'] },
-  { display: 'Unix/Linux', category: 'other', aliases: ['unix/linux', 'linux'] },
-  { display: 'RDBMS', category: 'other', aliases: ['rdbms/sql', 'rdbms'] },
-  { display: 'Webpack', category: 'other', aliases: ['webpack'] },
-  { display: 'Vite', category: 'other', aliases: ['vite'] },
-  { display: 'Gatsby', category: 'other', aliases: ['gatsby'] },
-  { display: 'ESLint', category: 'other', aliases: ['eslint', 'es lint'] },
-  { display: 'OpenAI API', category: 'other', aliases: ['openai api'] },
-  { display: 'LLM', category: 'other', aliases: ['llm', 'llms'] },
-  { display: 'Terraform', category: 'other', aliases: ['terraform'] },
-  { display: 'Ansible', category: 'other', aliases: ['ansible'] },
-  { display: 'Jenkins', category: 'other', aliases: ['jenkins'] },
-  { display: 'Kafka', category: 'other', aliases: ['kafka'] },
-  { display: 'RabbitMQ', category: 'other', aliases: ['rabbitmq'] },
-  { display: 'Airflow', category: 'other', aliases: ['airflow'] },
-  { display: 'dbt', category: 'other', aliases: ['dbt'] },
-  { display: 'Snowflake', category: 'other', aliases: ['snowflake'] },
-  { display: 'DynamoDB', category: 'other', aliases: ['dynamodb'] },
-  { display: 'Cloudflare Workers', category: 'other', aliases: ['cloudflare workers', 'cloudflare'] },
-  { display: 'AWS Lambda', category: 'other', aliases: ['aws lambda', 'lambda'] },
+type HardSkillSeed = {
+  display: string;
+  aliases?: string[];
+};
+
+const HARD_SKILL_CATEGORY_ORDER: HardSkillCategory[] = [
+  'backend',
+  'frontend',
+  'databases',
+  'cloud-devops',
+  'testing-automation',
+  'ai-ml',
+  'tools-methodologies',
+  'other',
 ];
 
-const HARD_SKILL_ALIAS_MAP = new Map<string, { display: string; category: HardSkillCategory }>();
+const HARD_SKILL_CATEGORY_SEEDS: Array<{
+  category: Exclude<HardSkillCategory, 'other'>;
+  skills: HardSkillSeed[];
+}> = [
+  {
+    category: 'backend',
+    skills: [
+      { display: 'Python', aliases: ['python'] },
+      { display: 'FastAPI', aliases: ['fastapi', 'fast api'] },
+      { display: 'Django', aliases: ['django'] },
+      { display: 'Django REST Framework', aliases: ['django rest framework', 'drf'] },
+      { display: 'Flask', aliases: ['flask'] },
+      { display: 'Pydantic', aliases: ['pydantic'] },
+      { display: 'Node.js', aliases: ['node.js', 'nodejs', 'node'] },
+      { display: 'Express.js', aliases: ['express.js', 'expressjs', 'express'] },
+      { display: 'NestJS', aliases: ['nestjs', 'nest.js', 'nest'] },
+      { display: 'Fastify', aliases: ['fastify'] },
+      { display: 'Koa', aliases: ['koa'] },
+      { display: 'Ruby on Rails', aliases: ['ruby on rails', 'rails'] },
+      { display: 'Go', aliases: ['go', 'golang'] },
+      { display: 'Gin', aliases: ['gin'] },
+      { display: 'Echo', aliases: ['echo'] },
+      { display: 'Java', aliases: ['java'] },
+      { display: 'Spring Boot', aliases: ['spring boot', 'springboot'] },
+      { display: 'Spring Framework', aliases: ['spring framework', 'spring'] },
+      { display: 'C#', aliases: ['c#'] },
+      { display: '.NET Core', aliases: ['.net core', 'dotnet core'] },
+      { display: 'PHP', aliases: ['php'] },
+      { display: 'Laravel', aliases: ['laravel'] },
+      { display: 'Symfony', aliases: ['symfony'] },
+      { display: 'Microservices Architecture', aliases: ['microservices architecture', 'microservices', 'microservice architecture'] },
+      { display: 'Event-Driven Architecture', aliases: ['event-driven architecture', 'event driven architecture'] },
+      { display: 'Domain-Driven Design (DDD)', aliases: ['domain-driven design', 'domain driven design', 'ddd'] },
+      { display: 'gRPC', aliases: ['grpc'] },
+      { display: 'WebSockets', aliases: ['websockets', 'websocket'] },
+      { display: 'Server-Sent Events', aliases: ['server-sent events', 'server sent events', 'sse'] },
+      { display: 'Celery', aliases: ['celery'] },
+      { display: 'RabbitMQ', aliases: ['rabbitmq'] },
+      { display: 'Apache Kafka', aliases: ['apache kafka', 'kafka'] },
+      { display: 'RESTful APIs', aliases: ['restful apis', 'restful api', 'rest apis', 'rest api'] },
+      { display: 'GraphQL', aliases: ['graphql'] },
+      { display: 'Asynchronous Processing', aliases: ['asynchronous processing', 'async processing'] },
+      { display: 'API Gateway Design', aliases: ['api gateway design', 'api gateway'] },
+      { display: 'Serverless Functions', aliases: ['serverless functions', 'serverless function'] },
+      { display: 'Background Jobs', aliases: ['background jobs', 'background job'] },
+      { display: 'Message Queues', aliases: ['message queues', 'message queue'] },
+    ],
+  },
+  {
+    category: 'frontend',
+    skills: [
+      { display: 'React.js', aliases: ['react.js', 'reactjs', 'react'] },
+      { display: 'React Hooks', aliases: ['react hooks', 'react hook'] },
+      { display: 'Angular', aliases: ['angular'] },
+      { display: 'Vue.js', aliases: ['vue.js', 'vuejs', 'vue'] },
+      { display: 'Next.js', aliases: ['next.js', 'nextjs', 'next'] },
+      { display: 'Nuxt.js', aliases: ['nuxt.js', 'nuxtjs', 'nuxt'] },
+      { display: 'TypeScript', aliases: ['typescript', 'ts'] },
+      { display: 'JavaScript', aliases: ['javascript', 'js', 'javascript (es6+)', 'es6+'] },
+      { display: 'Redux', aliases: ['redux'] },
+      { display: 'Redux Toolkit', aliases: ['redux toolkit'] },
+      { display: 'Zustand', aliases: ['zustand'] },
+      { display: 'MobX', aliases: ['mobx'] },
+      { display: 'RxJS', aliases: ['rxjs'] },
+      { display: 'HTML5', aliases: ['html5', 'html'] },
+      { display: 'CSS3', aliases: ['css3', 'css'] },
+      { display: 'SCSS', aliases: ['scss'] },
+      { display: 'SASS', aliases: ['sass'] },
+      { display: 'TailwindCSS', aliases: ['tailwindcss', 'tailwind css', 'tailwind'] },
+      { display: 'Bootstrap', aliases: ['bootstrap'] },
+      { display: 'Material UI (MUI)', aliases: ['material ui', 'material-ui', 'mui'] },
+      { display: 'Ant Design', aliases: ['ant design', 'antd'] },
+      { display: 'Chakra UI', aliases: ['chakra ui', 'chakra-ui'] },
+      { display: 'Styled Components', aliases: ['styled components', 'styled-components'] },
+      { display: 'Emotion', aliases: ['emotion'] },
+      { display: 'Chart.js', aliases: ['chart.js', 'chartjs'] },
+      { display: 'D3.js', aliases: ['d3.js', 'd3js', 'd3'] },
+      { display: 'Three.js', aliases: ['three.js', 'threejs'] },
+      { display: 'Responsive Design', aliases: ['responsive design'] },
+      { display: 'Mobile-First Design', aliases: ['mobile-first design', 'mobile first design'] },
+      { display: 'Progressive Web Apps (PWA)', aliases: ['progressive web apps', 'progressive web app', 'pwa'] },
+      { display: 'Webpack', aliases: ['webpack'] },
+      { display: 'Vite', aliases: ['vite'] },
+      { display: 'Rollup', aliases: ['rollup'] },
+      { display: 'Babel', aliases: ['babel'] },
+      { display: 'ESLint', aliases: ['eslint', 'es lint'] },
+      { display: 'Prettier', aliases: ['prettier'] },
+    ],
+  },
+  {
+    category: 'databases',
+    skills: [
+      { display: 'PostgreSQL', aliases: ['postgresql', 'postgres', 'psql'] },
+      { display: 'MySQL', aliases: ['mysql'] },
+      { display: 'SQL Server', aliases: ['sql server', 'mssql'] },
+      { display: 'Oracle Database', aliases: ['oracle database', 'oracle'] },
+      { display: 'MongoDB', aliases: ['mongodb', 'mongo'] },
+      { display: 'DynamoDB', aliases: ['dynamodb'] },
+      { display: 'Cassandra', aliases: ['cassandra'] },
+      { display: 'CouchDB', aliases: ['couchdb'] },
+      { display: 'Redis', aliases: ['redis'] },
+      { display: 'Memcached', aliases: ['memcached'] },
+      { display: 'Firebase Firestore', aliases: ['firebase firestore', 'firestore'] },
+      { display: 'Elasticsearch', aliases: ['elasticsearch', 'elastic search'] },
+      { display: 'Apache Solr', aliases: ['apache solr', 'solr'] },
+      { display: 'InfluxDB', aliases: ['influxdb'] },
+      { display: 'TimescaleDB', aliases: ['timescaledb'] },
+      { display: 'Neo4j', aliases: ['neo4j'] },
+      { display: 'ETL Pipelines', aliases: ['etl pipelines', 'etl pipeline', 'etl'] },
+      { display: 'Data Warehousing', aliases: ['data warehousing', 'data warehouse'] },
+      { display: 'Data Lakes', aliases: ['data lakes', 'data lake'] },
+      { display: 'SQLAlchemy', aliases: ['sqlalchemy'] },
+      { display: 'Prisma', aliases: ['prisma'] },
+      { display: 'TypeORM', aliases: ['typeorm'] },
+      { display: 'Sequelize', aliases: ['sequelize'] },
+      { display: 'Mongoose', aliases: ['mongoose'] },
+      { display: 'ActiveRecord', aliases: ['activerecord', 'active record'] },
+      { display: 'Query Optimization', aliases: ['query optimization', 'query optimisation'] },
+      { display: 'Database Indexing', aliases: ['database indexing', 'indexing'] },
+      { display: 'Sharding', aliases: ['sharding'] },
+      { display: 'Replication', aliases: ['replication'] },
+      { display: 'Data Modeling', aliases: ['data modeling', 'data modelling'] },
+      { display: 'Data Caching', aliases: ['data caching'] },
+      { display: 'Database Migration', aliases: ['database migration', 'database migrations'] },
+      { display: 'ACID Transactions', aliases: ['acid transactions', 'acid transaction', 'acid'] },
+    ],
+  },
+  {
+    category: 'cloud-devops',
+    skills: [
+      { display: 'AWS', aliases: ['aws', 'amazon web services'] },
+      { display: 'AWS Lambda', aliases: ['aws lambda', 'lambda'] },
+      { display: 'Amazon EKS', aliases: ['amazon eks', 'eks'] },
+      { display: 'Amazon ECS', aliases: ['amazon ecs', 'ecs'] },
+      { display: 'AWS Fargate', aliases: ['aws fargate', 'fargate'] },
+      { display: 'Amazon EC2', aliases: ['amazon ec2', 'ec2'] },
+      { display: 'Amazon S3', aliases: ['amazon s3', 's3'] },
+      { display: 'Amazon CloudFront', aliases: ['amazon cloudfront', 'cloudfront'] },
+      { display: 'Amazon RDS', aliases: ['amazon rds', 'rds'] },
+      { display: 'Amazon API Gateway', aliases: ['amazon api gateway', 'api gateway'] },
+      { display: 'CloudWatch', aliases: ['cloudwatch'] },
+      { display: 'SageMaker', aliases: ['sagemaker'] },
+      { display: 'Step Functions', aliases: ['step functions', 'aws step functions'] },
+      { display: 'SNS', aliases: ['sns', 'amazon sns'] },
+      { display: 'SQS', aliases: ['sqs', 'amazon sqs'] },
+      { display: 'IAM', aliases: ['iam', 'aws iam'] },
+      { display: 'VPC', aliases: ['vpc', 'amazon vpc'] },
+      { display: 'Route 53', aliases: ['route 53', 'route53'] },
+      { display: 'Google Cloud Platform (GCP)', aliases: ['google cloud platform', 'gcp', 'google cloud'] },
+      { display: 'Microsoft Azure', aliases: ['microsoft azure', 'azure'] },
+      { display: 'Docker', aliases: ['docker'] },
+      { display: 'Docker Compose', aliases: ['docker compose'] },
+      { display: 'Kubernetes', aliases: ['kubernetes', 'k8s', 'kube'] },
+      { display: 'Helm', aliases: ['helm'] },
+      { display: 'OpenShift', aliases: ['openshift'] },
+      { display: 'Terraform', aliases: ['terraform'] },
+      { display: 'CloudFormation', aliases: ['cloudformation', 'aws cloudformation'] },
+      { display: 'Ansible', aliases: ['ansible'] },
+      { display: 'Puppet', aliases: ['puppet'] },
+      { display: 'Chef', aliases: ['chef'] },
+      { display: 'GitHub Actions', aliases: ['github actions'] },
+      { display: 'Jenkins', aliases: ['jenkins'] },
+      { display: 'GitLab CI/CD', aliases: ['gitlab ci/cd', 'gitlab ci'] },
+      { display: 'CircleCI', aliases: ['circleci', 'circle ci'] },
+      { display: 'Travis CI', aliases: ['travis ci'] },
+      { display: 'ArgoCD', aliases: ['argocd', 'argo cd'] },
+      { display: 'Flux', aliases: ['flux'] },
+      { display: 'CI/CD Pipelines', aliases: ['ci/cd pipelines', 'ci/cd pipeline', 'cicd pipelines'] },
+      { display: 'Infrastructure as Code (IaC)', aliases: ['infrastructure as code', 'iac'] },
+      { display: 'Grafana', aliases: ['grafana'] },
+      { display: 'Prometheus', aliases: ['prometheus'] },
+      { display: 'Datadog', aliases: ['datadog'] },
+      { display: 'New Relic', aliases: ['new relic'] },
+      { display: 'ELK Stack', aliases: ['elk stack', 'elk'] },
+      { display: 'Istio', aliases: ['istio'] },
+      { display: 'Linkerd', aliases: ['linkerd'] },
+      { display: 'Load Balancing', aliases: ['load balancing', 'load balancer'] },
+      { display: 'Auto Scaling', aliases: ['auto scaling', 'auto-scaling'] },
+    ],
+  },
+  {
+    category: 'testing-automation',
+    skills: [
+      { display: 'PyTest', aliases: ['pytest', 'py test'] },
+      { display: 'Jest', aliases: ['jest'] },
+      { display: 'JUnit', aliases: ['junit'] },
+      { display: 'TestNG', aliases: ['testng'] },
+      { display: 'Mocha', aliases: ['mocha'] },
+      { display: 'Chai', aliases: ['chai'] },
+      { display: 'Jasmine', aliases: ['jasmine'] },
+      { display: 'Cypress', aliases: ['cypress'] },
+      { display: 'Playwright', aliases: ['playwright'] },
+      { display: 'Selenium', aliases: ['selenium'] },
+      { display: 'Puppeteer', aliases: ['puppeteer'] },
+      { display: 'WebDriverIO', aliases: ['webdriverio', 'webdriver io'] },
+      { display: 'Postman', aliases: ['postman'] },
+      { display: 'Insomnia', aliases: ['insomnia'] },
+      { display: 'REST Assured', aliases: ['rest assured'] },
+      { display: 'Locust', aliases: ['locust'] },
+      { display: 'k6', aliases: ['k6'] },
+      { display: 'JMeter', aliases: ['jmeter'] },
+      { display: 'Artillery', aliases: ['artillery'] },
+      { display: 'Unit Testing', aliases: ['unit testing'] },
+      { display: 'Integration Testing', aliases: ['integration testing'] },
+      { display: 'End-to-End Testing (E2E)', aliases: ['end-to-end testing', 'end to end testing', 'e2e'] },
+      { display: 'API Testing', aliases: ['api testing'] },
+      { display: 'Test-Driven Development (TDD)', aliases: ['test-driven development', 'test driven development', 'tdd'] },
+      { display: 'Behavior-Driven Development (BDD)', aliases: ['behavior-driven development', 'behaviour-driven development', 'bdd'] },
+      { display: 'Performance Testing', aliases: ['performance testing'] },
+      { display: 'Security Testing', aliases: ['security testing'] },
+      { display: 'Penetration Testing', aliases: ['penetration testing', 'pen testing', 'pentesting'] },
+      { display: 'Code Coverage', aliases: ['code coverage'] },
+      { display: 'SonarQube', aliases: ['sonarqube', 'sonar qube'] },
+      { display: 'Quality Assurance', aliases: ['quality assurance', 'qa'] },
+      { display: 'Test Automation Frameworks', aliases: ['test automation frameworks', 'test automation framework'] },
+    ],
+  },
+  {
+    category: 'ai-ml',
+    skills: [
+      { display: 'OpenAI GPT APIs', aliases: ['openai gpt apis', 'openai api', 'gpt api', 'gpt apis'] },
+      { display: 'ChatGPT', aliases: ['chatgpt'] },
+      { display: 'Claude API', aliases: ['claude api', 'anthropic api'] },
+      { display: 'LangChain', aliases: ['langchain'] },
+      { display: 'LlamaIndex', aliases: ['llamaindex', 'llama index'] },
+      { display: 'Hugging Face Transformers', aliases: ['hugging face transformers', 'transformers', 'huggingface transformers'] },
+      { display: 'TensorFlow', aliases: ['tensorflow', 'tensor flow'] },
+      { display: 'PyTorch', aliases: ['pytorch', 'py torch'] },
+      { display: 'Keras', aliases: ['keras'] },
+      { display: 'Scikit-learn', aliases: ['scikit-learn', 'sklearn'] },
+      { display: 'XGBoost', aliases: ['xgboost'] },
+      { display: 'LightGBM', aliases: ['lightgbm'] },
+      { display: 'SpaCy', aliases: ['spacy'] },
+      { display: 'NLTK', aliases: ['nltk'] },
+      { display: 'Pandas', aliases: ['pandas'] },
+      { display: 'NumPy', aliases: ['numpy'] },
+      { display: 'Matplotlib', aliases: ['matplotlib'] },
+      { display: 'Seaborn', aliases: ['seaborn'] },
+      { display: 'Jupyter Notebooks', aliases: ['jupyter notebooks', 'jupyter notebook', 'jupyter'] },
+      { display: 'FastAPI AI Agents', aliases: ['fastapi ai agents', 'fastapi ai agent'] },
+      { display: 'Prompt Engineering', aliases: ['prompt engineering'] },
+      { display: 'Model Fine-tuning', aliases: ['model fine-tuning', 'model fine tuning', 'fine-tuning', 'fine tuning'] },
+      { display: 'RAG (Retrieval-Augmented Generation)', aliases: ['rag', 'retrieval-augmented generation', 'retrieval augmented generation'] },
+      { display: 'Pinecone', aliases: ['pinecone'] },
+      { display: 'Chroma', aliases: ['chroma'] },
+      { display: 'Weaviate', aliases: ['weaviate'] },
+      { display: 'MLOps', aliases: ['mlops'] },
+      { display: 'Model Deployment', aliases: ['model deployment'] },
+      { display: 'Computer Vision', aliases: ['computer vision'] },
+      { display: 'Natural Language Processing (NLP)', aliases: ['natural language processing', 'nlp'] },
+      { display: 'Deep Learning', aliases: ['deep learning'] },
+      { display: 'Machine Learning', aliases: ['machine learning', 'ml'] },
+    ],
+  },
+  {
+    category: 'tools-methodologies',
+    skills: [
+      { display: 'Git', aliases: ['git'] },
+      { display: 'GitHub', aliases: ['github'] },
+      { display: 'GitLab', aliases: ['gitlab'] },
+      { display: 'Bitbucket', aliases: ['bitbucket'] },
+      { display: 'Jira', aliases: ['jira'] },
+      { display: 'Asana', aliases: ['asana'] },
+      { display: 'Trello', aliases: ['trello'] },
+      { display: 'Linear', aliases: ['linear'] },
+      { display: 'Monday.com', aliases: ['monday.com', 'monday'] },
+      { display: 'Confluence', aliases: ['confluence'] },
+      { display: 'Notion', aliases: ['notion'] },
+      { display: 'Swagger/OpenAPI', aliases: ['swagger/openapi', 'swagger', 'openapi'] },
+      { display: 'Figma', aliases: ['figma'] },
+      { display: 'Sketch', aliases: ['sketch'] },
+      { display: 'Adobe XD', aliases: ['adobe xd', 'xd'] },
+      { display: 'VSCode', aliases: ['vscode', 'vs code'] },
+      { display: 'PyCharm', aliases: ['pycharm'] },
+      { display: 'IntelliJ IDEA', aliases: ['intellij idea', 'intellij'] },
+      { display: 'WebStorm', aliases: ['webstorm'] },
+      { display: 'Sublime Text', aliases: ['sublime text', 'sublime'] },
+      { display: 'Vim', aliases: ['vim'] },
+      { display: 'Agile', aliases: ['agile'] },
+      { display: 'Scrum', aliases: ['scrum'] },
+      { display: 'Kanban', aliases: ['kanban'] },
+      { display: 'DevOps', aliases: ['devops'] },
+      { display: 'Microservices', aliases: ['microservices'] },
+      { display: 'Clean Architecture', aliases: ['clean architecture'] },
+      { display: 'SOLID Principles', aliases: ['solid principles', 'solid'] },
+      { display: 'Design Patterns', aliases: ['design patterns', 'design pattern'] },
+      { display: 'Code Review', aliases: ['code review', 'code reviews'] },
+      { display: 'Pair Programming', aliases: ['pair programming'] },
+      { display: 'npm', aliases: ['npm'] },
+      { display: 'yarn', aliases: ['yarn'] },
+      { display: 'pip', aliases: ['pip'] },
+      { display: 'poetry', aliases: ['poetry'] },
+      { display: 'Maven', aliases: ['maven'] },
+      { display: 'Gradle', aliases: ['gradle'] },
+    ],
+  },
+];
+
+const HARD_SKILL_DEFINITIONS: HardSkillDefinition[] = HARD_SKILL_CATEGORY_SEEDS.flatMap(
+  ({ category, skills }) =>
+    skills.map((skill, index) => ({
+      display: skill.display,
+      category,
+      aliases: uniqueCaseInsensitive([skill.display, ...(skill.aliases ?? [])]).map(normalizeHardSkillAlias),
+      priority: index,
+    }))
+);
+
+const HARD_SKILL_ALIAS_MAP = new Map<string, { display: string; category: HardSkillCategory; priority: number }>();
 for (const definition of HARD_SKILL_DEFINITIONS) {
   for (const alias of definition.aliases) {
-    HARD_SKILL_ALIAS_MAP.set(alias, { display: definition.display, category: definition.category });
+    HARD_SKILL_ALIAS_MAP.set(alias, {
+      display: definition.display,
+      category: definition.category,
+      priority: definition.priority,
+    });
   }
 }
+
+const HARD_SKILL_CATEGORY_WEIGHT: Record<HardSkillCategory, number> = {
+  backend: 0,
+  frontend: 1,
+  databases: 2,
+  'cloud-devops': 3,
+  'testing-automation': 4,
+  'ai-ml': 5,
+  'tools-methodologies': 6,
+  other: 7,
+};
+const JSON_ONLY_SYSTEM_PROMPT = 'You are a strict JSON generator. Return valid JSON only, with no markdown fences or extra text.';
+const TAILOR_RESUME_PROMPT_ID = 'tailor-resume';
 
 export function resolveAIProvider(model?: string): AIProvider {
   if (model === 'openai' || model?.startsWith('gpt-')) {
@@ -351,23 +671,125 @@ async function getOpenAIClient(): Promise<OpenAI> {
   return openaiClient;
 }
 
-async function getOpenRouterClient(): Promise<OpenAI> {
+type OpenRouterChatCompletionResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string | Array<{ type?: string; text?: string }>;
+    };
+  }>;
+  error?: {
+    message?: string;
+    code?: string | number;
+  };
+};
+
+async function createOpenRouterCompletion(input: {
+  model: string;
+  maxTokens: number;
+  temperature: number;
+  responseFormat: CompletionResponseFormat;
+  messages: ProviderChatMessage[];
+}): Promise<string> {
   const apiKey = await getProviderApiKey('openrouter');
   if (!apiKey) {
     throw new Error('OpenRouter API key is not set');
   }
 
-  if (!openRouterClient || openRouterClientKey !== apiKey) {
-    openRouterClient = new OpenAI({
-      apiKey,
-      baseURL: 'https://openrouter.ai/api/v1',
-    });
-    openRouterClientKey = apiKey;
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER || 'http://localhost:3001',
+      'X-Title': process.env.OPENROUTER_APP_NAME || 'Tailored Resume Builder',
+    },
+    body: JSON.stringify({
+      model: input.model,
+      max_tokens: input.maxTokens,
+      temperature: input.temperature,
+      top_p: 1,
+      ...(input.responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {}),
+      messages: input.messages,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenRouter API error (${response.status}): ${errorText}`);
   }
-  return openRouterClient;
+
+  const data = await response.json() as OpenRouterChatCompletionResponse;
+  const rawContent = data.choices?.[0]?.message?.content;
+
+  if (typeof rawContent === 'string' && rawContent.trim()) {
+    return rawContent;
+  }
+
+  if (Array.isArray(rawContent)) {
+    const text = rawContent
+      .filter((item) => item?.type === 'text' && typeof item.text === 'string')
+      .map((item) => item.text ?? '')
+      .join('')
+      .trim();
+
+    if (text) {
+      return text;
+    }
+  }
+
+  throw new Error('Unexpected response from OpenRouter');
 }
 
-async function createAnthropicMessage(prompt: string, maxTokens: number, temperature = 0): Promise<string> {
+async function createOpenAIChatCompletion(input: {
+  model: string;
+  maxTokens: number;
+  temperature: number;
+  responseFormat: CompletionResponseFormat;
+  messages: ProviderChatMessage[];
+}): Promise<string> {
+  const response = await (await getOpenAIClient()).chat.completions.create({
+    model: input.model,
+    max_completion_tokens: input.maxTokens,
+    temperature: input.temperature,
+    top_p: 1,
+    ...(input.responseFormat === 'json' ? { response_format: { type: 'json_object' as const } } : {}),
+    messages: input.messages,
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Unexpected response from OpenAI');
+  }
+
+  return content;
+}
+
+async function createAnthropicMessage(
+  prompt: string,
+  maxTokens: number,
+  temperature = 0,
+  modelName = DEFAULT_CLAUDE_MODEL
+): Promise<string> {
+  return createAnthropicStructuredMessage(
+    {
+      model: modelName,
+      max_tokens: maxTokens,
+      temperature,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    },
+    { logCacheUsage: false }
+  );
+}
+
+async function createAnthropicStructuredMessage(
+  request: AnthropicMessageRequestParams,
+  options?: { logCacheUsage?: boolean }
+): Promise<string> {
   const apiKey = await getProviderApiKey('claude');
   if (!apiKey) {
     throw new Error('Claude API key is not set');
@@ -398,17 +820,7 @@ async function createAnthropicMessage(prompt: string, maxTokens: number, tempera
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify({
-          model: CLAUDE_MODEL,
-          max_tokens: maxTokens,
-          temperature,
-          messages: [
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-        }),
+        body: JSON.stringify(request),
       });
 
       if (!response.ok) {
@@ -426,11 +838,18 @@ async function createAnthropicMessage(prompt: string, maxTokens: number, tempera
         continue;
       }
 
-      const data = await response.json() as { content?: Array<{ type: string; text?: string }> };
+      const data = await response.json() as AnthropicMessageResponse;
       const textBlock = data.content?.find((block) => block.type === 'text' && typeof block.text === 'string');
 
       if (!textBlock?.text) {
         throw new Error('Unexpected response from Anthropic');
+      }
+
+      if (options?.logCacheUsage && data.usage && !anthropicCacheUsageWarningShown) {
+        anthropicCacheUsageWarningShown = true;
+        console.info(
+          `Anthropic prompt caching usage: read=${data.usage.cache_read_input_tokens ?? 0}, created=${data.usage.cache_creation_input_tokens ?? 0}, uncached=${data.usage.input_tokens ?? 0}`
+        );
       }
 
       return textBlock.text;
@@ -457,19 +876,339 @@ async function createAnthropicMessage(prompt: string, maxTokens: number, tempera
   throw lastError ?? new Error('Anthropic request failed');
 }
 
-async function createTextCompletion(
+function toAnthropicCacheControl(ttl?: AnthropicCacheTtl): AnthropicCacheControl | undefined {
+  if (!ttl) return undefined;
+  return ttl === '1h'
+    ? { type: 'ephemeral', ttl: '1h' }
+    : { type: 'ephemeral' };
+}
+
+async function getPromptContentOrThrow(promptId: string): Promise<string> {
+  const prompt = await getPromptById(promptId);
+  const content = prompt?.content?.trim();
+  if (!content) {
+    throw new Error(`Prompt "${promptId}" was not found or has no content.`);
+  }
+  return content;
+}
+
+function getPromptValue(values: Record<string, string>, key: string, fallback: string): string {
+  const value = values[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function buildTailorResumeCandidateProfileBlock(values: Record<string, string>): string {
+  return [
+    'CANDIDATE PROFILE:',
+    getPromptValue(values, 'profileJson', '{}'),
+  ].join('\n');
+}
+
+function buildTailorResumeUserMessage(values: Record<string, string>): string {
+  return [
+    'JOB ANALYSIS:',
+    getPromptValue(values, 'jobAnalysisJson', '{}'),
+    '',
+    'HARD_SKILLS:',
+    getPromptValue(values, 'hardSkillsJSON', '[]'),
+    '',
+    'KEYWORDS:',
+    getPromptValue(values, 'keywordsJson', '[]'),
+    '',
+    'KEY_RESPONSIBILITIES:',
+    getPromptValue(values, 'keyResponsibilitiesJson', '[]'),
+    '',
+    'DOMAIN_KNOWLEDGE:',
+    getPromptValue(values, 'domainKnowledge', '[]'),
+    '',
+    'SOFT_SKILLS:',
+    getPromptValue(values, 'softSkillsJSON', '[]'),
+  ].join('\n');
+}
+
+async function buildTailorResumeChatMessages(
+  values: Record<string, string>,
+  responseFormat: CompletionResponseFormat
+): Promise<ProviderChatMessage[]> {
+  const messages: ProviderChatMessage[] = [];
+
+  if (responseFormat === 'json') {
+    messages.push({
+      role: 'system',
+      content: JSON_ONLY_SYSTEM_PROMPT,
+    });
+  }
+
+  messages.push({
+    role: 'system',
+    content: await getPromptContentOrThrow(TAILOR_RESUME_PROMPT_ID),
+  });
+  messages.push({
+    role: 'system',
+    content: buildTailorResumeCandidateProfileBlock(values),
+  });
+  messages.push({
+    role: 'user',
+    content: buildTailorResumeUserMessage(values),
+  });
+
+  return messages;
+}
+
+async function buildAnthropicTailorResumePromptRequest(input: {
+  values: Record<string, string>;
+  maxTokens: number;
+  temperature: number;
+  responseFormat: CompletionResponseFormat;
+  modelName: string;
+  cacheTtl?: AnthropicCacheTtl;
+}): Promise<AnthropicMessageRequestParams> {
+  const systemBlocks: AnthropicTextBlock[] = [];
+
+  if (input.responseFormat === 'json') {
+    systemBlocks.push({
+      type: 'text',
+      text: JSON_ONLY_SYSTEM_PROMPT,
+    });
+  }
+
+  systemBlocks.push({
+    type: 'text',
+    text: await getPromptContentOrThrow(TAILOR_RESUME_PROMPT_ID),
+    cache_control: toAnthropicCacheControl(input.cacheTtl),
+  });
+  systemBlocks.push({
+    type: 'text',
+    text: buildTailorResumeCandidateProfileBlock(input.values),
+    cache_control: toAnthropicCacheControl(input.cacheTtl),
+  });
+
+  return {
+    model: input.modelName,
+    max_tokens: input.maxTokens,
+    temperature: input.temperature,
+    system: systemBlocks,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: buildTailorResumeUserMessage(input.values),
+          },
+        ],
+      },
+    ],
+  };
+}
+
+async function buildAnthropicPromptRequest(input: {
+  promptId: string;
+  values: Record<string, string>;
+  maxTokens: number;
+  temperature: number;
+  responseFormat: CompletionResponseFormat;
+  modelName: string;
+  cacheTtl?: AnthropicCacheTtl;
+}): Promise<AnthropicMessageRequestParams> {
+  if (input.promptId === TAILOR_RESUME_PROMPT_ID) {
+    return buildAnthropicTailorResumePromptRequest(input);
+  }
+
+  const segments = await renderPromptSegments(input.promptId, input.values);
+  const systemBlocks: AnthropicTextBlock[] = [];
+
+  if (input.responseFormat === 'json') {
+    systemBlocks.push({
+      type: 'text',
+      text: JSON_ONLY_SYSTEM_PROMPT,
+    });
+  }
+
+  let leadingLiteralIndex = 0;
+  let leadingLiteralText = '';
+  while (leadingLiteralIndex < segments.length && !segments[leadingLiteralIndex].variableName) {
+    leadingLiteralText += segments[leadingLiteralIndex].text;
+    leadingLiteralIndex += 1;
+  }
+
+  if (leadingLiteralText.trim()) {
+    systemBlocks.push({
+      type: 'text',
+      text: leadingLiteralText,
+      cache_control: toAnthropicCacheControl(input.cacheTtl),
+    });
+  }
+
+  const userBlocks: AnthropicTextBlock[] = [];
+  for (const segment of segments.slice(leadingLiteralIndex)) {
+    if (!segment.text) {
+      continue;
+    }
+
+    const previous = userBlocks[userBlocks.length - 1];
+    if (previous && !previous.cache_control) {
+      previous.text += segment.text;
+    } else {
+      userBlocks.push({
+        type: 'text',
+        text: segment.text,
+      });
+    }
+  }
+
+  if (userBlocks.length === 0) {
+    userBlocks.push({
+      type: 'text',
+      text: leadingLiteralText || ' ',
+    });
+  }
+
+  return {
+    model: input.modelName,
+    max_tokens: input.maxTokens,
+    temperature: input.temperature,
+    ...(systemBlocks.length > 0 ? { system: systemBlocks } : {}),
+    messages: [
+      {
+        role: 'user',
+        content: userBlocks,
+      },
+    ],
+  };
+}
+
+async function createAnthropicPromptCompletion(input: {
+  promptId: string;
+  values: Record<string, string>;
+  maxTokens?: number;
+  temperature?: number;
+  responseFormat?: CompletionResponseFormat;
+  modelName?: string;
+  cacheTtl?: AnthropicCacheTtl;
+}): Promise<string> {
+  const request = await buildAnthropicPromptRequest({
+    promptId: input.promptId,
+    values: input.values,
+    maxTokens: input.maxTokens ?? 4000,
+    temperature: input.temperature ?? 0,
+    responseFormat: input.responseFormat ?? 'json',
+    modelName: input.modelName || DEFAULT_CLAUDE_MODEL,
+    cacheTtl: input.cacheTtl,
+  });
+
+  return createAnthropicStructuredMessage(request, { logCacheUsage: Boolean(input.cacheTtl) });
+}
+
+async function createAnthropicMessageBatch(
+  requests: Array<{ custom_id: string; params: AnthropicMessageRequestParams }>
+): Promise<AnthropicMessageBatchResponse> {
+  const apiKey = await getProviderApiKey('claude');
+  if (!apiKey) {
+    throw new Error('Claude API key is not set');
+  }
+
+  const response = await fetch('https://api.anthropic.com/v1/messages/batches', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({ requests }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Anthropic batch create failed (${response.status}): ${await response.text()}`);
+  }
+
+  return response.json() as Promise<AnthropicMessageBatchResponse>;
+}
+
+async function retrieveAnthropicMessageBatch(batchId: string): Promise<AnthropicMessageBatchResponse> {
+  const apiKey = await getProviderApiKey('claude');
+  if (!apiKey) {
+    throw new Error('Claude API key is not set');
+  }
+
+  const response = await fetch(`https://api.anthropic.com/v1/messages/batches/${batchId}`, {
+    method: 'GET',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Anthropic batch retrieve failed (${response.status}): ${await response.text()}`);
+  }
+
+  return response.json() as Promise<AnthropicMessageBatchResponse>;
+}
+
+async function waitForAnthropicMessageBatch(
+  batchId: string,
+  pollIntervalMs = 5000,
+  maxWaitMs = 20 * 60 * 1000
+): Promise<AnthropicMessageBatchResponse> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < maxWaitMs) {
+    const batch = await retrieveAnthropicMessageBatch(batchId);
+    if (batch.processing_status === 'ended') {
+      return batch;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  throw new Error(`Anthropic batch ${batchId} did not finish within ${Math.round(maxWaitMs / 60000)} minutes`);
+}
+
+async function readAnthropicMessageBatchResults(resultsUrl: string): Promise<AnthropicBatchResultLine[]> {
+  const apiKey = await getProviderApiKey('claude');
+  if (!apiKey) {
+    throw new Error('Claude API key is not set');
+  }
+
+  const response = await fetch(resultsUrl, {
+    method: 'GET',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Anthropic batch results download failed (${response.status}): ${await response.text()}`);
+  }
+
+  const jsonl = await response.text();
+  return jsonl
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as AnthropicBatchResultLine);
+}
+
+export async function createTextCompletion(
   prompt: string,
   provider: AIProvider = DEFAULT_PROVIDER,
   maxTokens = 4000,
   temperature = 0,
-  responseFormat: CompletionResponseFormat = 'json'
+  responseFormat: CompletionResponseFormat = 'json',
+  modelName?: string
 ): Promise<string> {
+  const settings = await getAIModelSettings();
+  if (!isProviderEnabled(provider, settings)) {
+    throw new Error(`Selected AI model provider '${provider}' is disabled by admin.`);
+  }
+
   if (provider === 'openai') {
-    const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
+    const messages: ProviderChatMessage[] = [];
     if (responseFormat === 'json') {
       messages.push({
         role: 'system',
-        content: 'You are a strict JSON generator. Return valid JSON only, with no markdown fences or extra text.',
+        content: JSON_ONLY_SYSTEM_PROMPT,
       });
     }
     messages.push({
@@ -477,29 +1216,21 @@ async function createTextCompletion(
       content: prompt,
     });
 
-    const response = await (await getOpenAIClient()).chat.completions.create({
-      model: OPENAI_MODEL,
-      max_completion_tokens: maxTokens,
+    return createOpenAIChatCompletion({
+      model: modelName || DEFAULT_OPENAI_MODEL,
+      maxTokens,
       temperature,
-      top_p: 1,
-      ...(responseFormat === 'json' ? { response_format: { type: 'json_object' as const } } : {}),
+      responseFormat,
       messages,
     });
-
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('Unexpected response from OpenAI');
-    }
-
-    return content;
   }
 
   if (provider === 'openrouter') {
-    const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
+    const messages: ProviderChatMessage[] = [];
     if (responseFormat === 'json') {
       messages.push({
         role: 'system',
-        content: 'You are a strict JSON generator. Return valid JSON only, with no markdown fences or extra text.',
+        content: JSON_ONLY_SYSTEM_PROMPT,
       });
     }
 
@@ -508,32 +1239,224 @@ async function createTextCompletion(
       content: prompt,
     });
 
-    const response = await (await getOpenRouterClient()).chat.completions.create(
-      {
-        model: OPENROUTER_MODEL,
-        max_tokens: maxTokens,
-        temperature,
-        top_p: 1,
-        ...(responseFormat === 'json' ? { response_format: { type: 'json_object' as const } } : {}),
-        messages,
-      },
-      {
-        headers: {
-          'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER || 'http://localhost:3001',
-          'X-Title': process.env.OPENROUTER_APP_NAME || 'Tailored Resume Builder',
-        },
-      }
-    );
-
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('Unexpected response from OpenRouter');
-    }
-
-    return content;
+    return createOpenRouterCompletion({
+      model: modelName || DEFAULT_OPENROUTER_MODEL,
+      maxTokens,
+      temperature,
+      responseFormat,
+      messages,
+    });
   }
 
-  return createAnthropicMessage(prompt, maxTokens, temperature);
+  return createAnthropicMessage(prompt, maxTokens, temperature, modelName || DEFAULT_CLAUDE_MODEL);
+}
+
+export async function resolvePromptExecutionConfig(
+  promptId: string,
+  fallbackProvider: AIProvider
+): Promise<{ provider: AIProvider; modelName?: string }> {
+  const prompt = await getPromptById(promptId);
+  if (!prompt?.modelProvider || !prompt.modelName) {
+    return { provider: fallbackProvider };
+  }
+
+  return {
+    provider: prompt.modelProvider,
+    modelName: prompt.modelName,
+  };
+}
+
+function isAnthropicOptimizedModel(modelName?: string): boolean {
+  return typeof modelName === 'string' && modelName.trim() === DEFAULT_CLAUDE_MODEL;
+}
+
+export async function shouldUseAnthropicOptimizationsForPrompt(
+  promptId: string,
+  requestedProvider: AIProvider
+): Promise<boolean> {
+  if (requestedProvider !== 'claude') {
+    return false;
+  }
+
+  const executionConfig = await resolvePromptExecutionConfig(promptId, requestedProvider);
+  if (executionConfig.provider !== 'claude') {
+    return false;
+  }
+
+  const settings = await getAIModelSettings();
+  if (!isProviderEnabled('claude', settings)) {
+    return false;
+  }
+
+  return isAnthropicOptimizedModel(executionConfig.modelName || DEFAULT_CLAUDE_MODEL);
+}
+
+export async function createPromptCompletion(input: {
+  promptId: string;
+  prompt: string;
+  promptValues?: Record<string, string>;
+  fallbackProvider?: AIProvider;
+  maxTokens?: number;
+  temperature?: number;
+  responseFormat?: CompletionResponseFormat;
+  anthropicCacheTtl?: AnthropicCacheTtl;
+}): Promise<string> {
+  const executionConfig = await resolvePromptExecutionConfig(
+    input.promptId,
+    input.fallbackProvider || DEFAULT_PROVIDER
+  );
+  const settings = await getAIModelSettings();
+  if (!isProviderEnabled(executionConfig.provider, settings)) {
+    throw new Error(`Selected AI model provider '${executionConfig.provider}' is disabled by admin.`);
+  }
+
+  if (input.promptId === TAILOR_RESUME_PROMPT_ID && input.promptValues) {
+    if (executionConfig.provider === 'claude') {
+      return createAnthropicPromptCompletion({
+        promptId: input.promptId,
+        values: input.promptValues,
+        maxTokens: input.maxTokens,
+        temperature: input.temperature,
+        responseFormat: input.responseFormat,
+        modelName: executionConfig.modelName,
+        cacheTtl: input.anthropicCacheTtl,
+      });
+    }
+
+    const messages = await buildTailorResumeChatMessages(
+      input.promptValues,
+      input.responseFormat ?? 'json'
+    );
+
+    if (executionConfig.provider === 'openai') {
+      return createOpenAIChatCompletion({
+        model: executionConfig.modelName || DEFAULT_OPENAI_MODEL,
+        maxTokens: input.maxTokens ?? 4000,
+        temperature: input.temperature ?? 0,
+        responseFormat: input.responseFormat ?? 'json',
+        messages,
+      });
+    }
+
+    if (executionConfig.provider === 'openrouter') {
+      return createOpenRouterCompletion({
+        model: executionConfig.modelName || DEFAULT_OPENROUTER_MODEL,
+        maxTokens: input.maxTokens ?? 4000,
+        temperature: input.temperature ?? 0,
+        responseFormat: input.responseFormat ?? 'json',
+        messages,
+      });
+    }
+  }
+
+  if (executionConfig.provider === 'claude' && input.promptValues) {
+    return createAnthropicPromptCompletion({
+      promptId: input.promptId,
+      values: input.promptValues,
+      maxTokens: input.maxTokens,
+      temperature: input.temperature,
+      responseFormat: input.responseFormat,
+      modelName: executionConfig.modelName,
+      cacheTtl: input.anthropicCacheTtl,
+    });
+  }
+
+  return createTextCompletion(
+    input.prompt,
+    executionConfig.provider,
+    input.maxTokens,
+    input.temperature,
+    input.responseFormat,
+    executionConfig.modelName
+  );
+}
+
+export async function canUseAnthropicBatchForPrompt(
+  promptId: string,
+  fallbackProvider: AIProvider
+): Promise<boolean> {
+  return shouldUseAnthropicOptimizationsForPrompt(promptId, fallbackProvider);
+}
+
+export async function batchCreatePromptCompletions(input: {
+  promptId: string;
+  items: Array<{
+    customId: string;
+    values: Record<string, string>;
+  }>;
+  fallbackProvider?: AIProvider;
+  maxTokens?: number;
+  temperature?: number;
+  responseFormat?: CompletionResponseFormat;
+  anthropicCacheTtl?: AnthropicCacheTtl;
+}): Promise<Map<string, { content?: string; error?: string }>> {
+  const executionConfig = await resolvePromptExecutionConfig(
+    input.promptId,
+    input.fallbackProvider || DEFAULT_PROVIDER
+  );
+  const settings = await getAIModelSettings();
+  if (!isProviderEnabled(executionConfig.provider, settings)) {
+    throw new Error(`Selected AI model provider '${executionConfig.provider}' is disabled by admin.`);
+  }
+
+  if (executionConfig.provider !== 'claude') {
+    throw new Error(`Prompt "${input.promptId}" is not configured to run on Anthropic.`);
+  }
+
+  const requests = await Promise.all(
+    input.items.map(async (item) => ({
+      custom_id: item.customId,
+      params: await buildAnthropicPromptRequest({
+        promptId: input.promptId,
+        values: item.values,
+        maxTokens: input.maxTokens ?? 4000,
+        temperature: input.temperature ?? 0,
+        responseFormat: input.responseFormat ?? 'json',
+        modelName: executionConfig.modelName || DEFAULT_CLAUDE_MODEL,
+        cacheTtl: input.anthropicCacheTtl,
+      }),
+    }))
+  );
+
+  const createdBatch = await createAnthropicMessageBatch(requests);
+  const finishedBatch = createdBatch.processing_status === 'ended'
+    ? createdBatch
+    : await waitForAnthropicMessageBatch(createdBatch.id);
+
+  if (!finishedBatch.results_url) {
+    throw new Error(`Anthropic batch ${finishedBatch.id} completed without a results URL.`);
+  }
+
+  const results = await readAnthropicMessageBatchResults(finishedBatch.results_url);
+  const resultMap = new Map<string, { content?: string; error?: string }>();
+
+  for (const item of results) {
+    if (item.result.type !== 'succeeded') {
+      const failureReason = item.result.error?.message || `Anthropic batch request ${item.result.type}`;
+      resultMap.set(item.custom_id, { error: failureReason });
+      continue;
+    }
+
+    const textBlock = item.result.message?.content?.find(
+      (block) => block.type === 'text' && typeof block.text === 'string'
+    );
+
+    if (!textBlock?.text) {
+      resultMap.set(item.custom_id, { error: 'Anthropic batch request returned no text content.' });
+      continue;
+    }
+
+    resultMap.set(item.custom_id, { content: textBlock.text });
+  }
+
+  if (input.anthropicCacheTtl && !anthropicCacheUsageWarningShown) {
+    anthropicCacheUsageWarningShown = true;
+    console.info(
+      `Anthropic prompt caching enabled for batch prompt "${input.promptId}" with TTL ${input.anthropicCacheTtl}. Inspect Anthropic usage metrics to confirm cache hit rates in your workspace.`
+    );
+  }
+
+  return resultMap;
 }
 
 function normalizeSkillsList(skills: string[] | undefined): string[] {
@@ -707,7 +1630,86 @@ function capitalizeHardSkill(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function resolveHardSkill(skill: string): { display: string; category: HardSkillCategory } | null {
+function inferHardSkillCategory(skillAlias: string): HardSkillCategory {
+  const rules: Array<{ category: HardSkillCategory; patterns: string[] }> = [
+    {
+      category: 'backend',
+      patterns: [
+        'python', 'fastapi', 'django', 'flask', 'pydantic', 'node', 'express', 'nestjs', 'fastify', 'koa',
+        'rails', 'gin', 'echo', 'spring', 'laravel', 'symfony', 'grpc', 'websocket', 'server-sent',
+        'microservice', 'event-driven', 'domain-driven', 'ddd', 'celery', 'rabbitmq', 'kafka', 'rest api',
+        'restful api', 'graphql', 'async', 'background job', 'message queue', 'serverless', 'api gateway',
+      ],
+    },
+    {
+      category: 'frontend',
+      patterns: [
+        'react', 'angular', 'vue', 'next', 'nuxt', 'typescript', 'javascript', 'redux', 'zustand', 'mobx',
+        'rxjs', 'html', 'css', 'scss', 'sass', 'tailwind', 'bootstrap', 'mui', 'material ui', 'ant design',
+        'chakra', 'styled component', 'emotion', 'chart.js', 'd3', 'three.js', 'responsive design',
+        'mobile-first', 'pwa', 'webpack', 'vite', 'rollup', 'babel', 'eslint', 'prettier',
+      ],
+    },
+    {
+      category: 'databases',
+      patterns: [
+        'postgres', 'mysql', 'sql server', 'oracle', 'mongodb', 'dynamodb', 'cassandra', 'couchdb', 'redis',
+        'memcached', 'firestore', 'elasticsearch', 'solr', 'influxdb', 'timescaledb', 'neo4j', 'etl',
+        'warehouse', 'data lake', 'sqlalchemy', 'prisma', 'typeorm', 'sequelize', 'mongoose', 'activerecord',
+        'query optimization', 'indexing', 'sharding', 'replication', 'data model', 'database migration', 'acid',
+      ],
+    },
+    {
+      category: 'cloud-devops',
+      patterns: [
+        'aws', 'lambda', 'eks', 'ecs', 'fargate', 'ec2', 's3', 'cloudfront', 'rds', 'cloudwatch', 'sagemaker',
+        'step function', 'sns', 'sqs', 'iam', 'vpc', 'route 53', 'gcp', 'google cloud', 'azure', 'docker',
+        'kubernetes', 'helm', 'openshift', 'terraform', 'cloudformation', 'ansible', 'puppet', 'chef',
+        'github actions', 'jenkins', 'gitlab ci', 'circleci', 'travis ci', 'argocd', 'flux', 'ci/cd',
+        'infrastructure as code', 'iac', 'grafana', 'prometheus', 'datadog', 'new relic', 'elk', 'istio',
+        'linkerd', 'load balancing', 'auto scaling',
+      ],
+    },
+    {
+      category: 'testing-automation',
+      patterns: [
+        'pytest', 'jest', 'junit', 'testng', 'mocha', 'chai', 'jasmine', 'cypress', 'playwright', 'selenium',
+        'puppeteer', 'webdriverio', 'postman', 'insomnia', 'rest assured', 'locust', 'k6', 'jmeter',
+        'artillery', 'unit testing', 'integration testing', 'end-to-end', 'e2e', 'api testing', 'tdd', 'bdd',
+        'performance testing', 'security testing', 'penetration testing', 'code coverage', 'sonarqube', 'qa',
+        'test automation',
+      ],
+    },
+    {
+      category: 'ai-ml',
+      patterns: [
+        'openai', 'chatgpt', 'claude api', 'langchain', 'llamaindex', 'transformers', 'tensorflow', 'pytorch',
+        'keras', 'scikit-learn', 'xgboost', 'lightgbm', 'spacy', 'nltk', 'pandas', 'numpy', 'matplotlib',
+        'seaborn', 'jupyter', 'prompt engineering', 'fine-tuning', 'rag', 'pinecone', 'chroma', 'weaviate',
+        'mlops', 'computer vision', 'natural language processing', 'nlp', 'deep learning', 'machine learning',
+      ],
+    },
+    {
+      category: 'tools-methodologies',
+      patterns: [
+        'git', 'github', 'gitlab', 'bitbucket', 'jira', 'asana', 'trello', 'linear', 'monday', 'confluence',
+        'notion', 'swagger', 'figma', 'sketch', 'adobe xd', 'vscode', 'pycharm', 'intellij', 'webstorm',
+        'sublime', 'vim', 'agile', 'scrum', 'kanban', 'devops', 'clean architecture', 'solid', 'design pattern',
+        'code review', 'pair programming', 'npm', 'yarn', 'pip', 'poetry', 'maven', 'gradle',
+      ],
+    },
+  ];
+
+  for (const rule of rules) {
+    if (rule.patterns.some((pattern) => skillAlias.includes(pattern))) {
+      return rule.category;
+    }
+  }
+
+  return 'other';
+}
+
+function resolveHardSkill(skill: string): { display: string; category: HardSkillCategory; priority: number } | null {
   const normalized = skill.trim().replace(/\s+/g, ' ');
   if (!normalized || normalized.length > 50 || /[.!?]/.test(normalized)) return null;
 
@@ -731,12 +1733,20 @@ function resolveHardSkill(skill: string): { display: string; category: HardSkill
     'terraform', 'testing', 'celery', 'flutter', 'lambda', 'cloudflare',
   ];
   if (techIndicators.some((term) => lower.includes(term))) {
-    return { display: capitalizeHardSkill(normalized), category: 'other' };
+    return {
+      display: capitalizeHardSkill(normalized),
+      category: inferHardSkillCategory(lower),
+      priority: Number.MAX_SAFE_INTEGER,
+    };
   }
 
   // Single-word tech (Airflow, dbt, Kafka) - allow if looks like a tool/framework name
   if (/^[a-z0-9][a-z0-9+\-./]*$/.test(lower) && lower.length >= 2) {
-    return { display: capitalizeHardSkill(normalized), category: 'other' };
+    return {
+      display: capitalizeHardSkill(normalized),
+      category: inferHardSkillCategory(lower),
+      priority: Number.MAX_SAFE_INTEGER,
+    };
   }
 
   return null;
@@ -757,6 +1767,23 @@ function normalizeAllowedHardSkills(skills: string[]): string[] {
   }
 
   return result;
+}
+
+function getHardSkillPriority(skill: string): number {
+  return hardSkillPriorityMap.get(skill.trim().toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+}
+
+function getProfileHardSkillInventory(profile?: Profile): Set<string> {
+  return new Set(normalizeAllowedHardSkills(profile?.skills ?? []).map((skill) => skill.toLowerCase()));
+}
+
+function restrictHardSkillsToProfileInventory(skills: string[], profile?: Profile): string[] {
+  const inventory = getProfileHardSkillInventory(profile);
+  if (inventory.size === 0) {
+    return skills;
+  }
+
+  return skills.filter((skill) => inventory.has(skill.toLowerCase()));
 }
 
 function isTechnicalSkill(skill: string): boolean {
@@ -846,9 +1873,103 @@ function inferHardSkillsFromText(text: string): string[] {
     .map((rule) => rule.canonical);
 }
 
-function prioritizeHardSkills(skills: string[], _jobAnalysis?: JobAnalysis): string[] {
-  // Keep normalized insertion order (no sorting).
-  return normalizeAllowedHardSkills(skills);
+function buildJobDescriptionSkillPriority(jobAnalysis?: JobAnalysis): Map<string, number> {
+  const normalized = normalizeAllowedHardSkills(getHardSkillChecklist(jobAnalysis));
+  const priorityMap = new Map<string, number>();
+
+  normalized.forEach((skill, index) => {
+    priorityMap.set(skill.toLowerCase(), index);
+  });
+
+  return priorityMap;
+}
+
+function prioritizeHardSkills(skills: string[], jobAnalysis?: JobAnalysis): string[] {
+  const normalized = normalizeAllowedHardSkills(skills);
+  const originalOrder = new Map<string, number>();
+  const jdPriority = buildJobDescriptionSkillPriority(jobAnalysis);
+
+  normalized.forEach((skill, index) => {
+    originalOrder.set(skill.toLowerCase(), index);
+  });
+
+  return [...normalized].sort((a, b) => {
+    const aResolved = resolveHardSkill(a);
+    const bResolved = resolveHardSkill(b);
+    const aCategory = aResolved?.category ?? 'other';
+    const bCategory = bResolved?.category ?? 'other';
+    const categoryDiff = HARD_SKILL_CATEGORY_WEIGHT[aCategory] - HARD_SKILL_CATEGORY_WEIGHT[bCategory];
+
+    if (categoryDiff !== 0) {
+      return categoryDiff;
+    }
+
+    const aJdOrder = jdPriority.get(a.toLowerCase());
+    const bJdOrder = jdPriority.get(b.toLowerCase());
+    const aInJd = typeof aJdOrder === 'number';
+    const bInJd = typeof bJdOrder === 'number';
+
+    if (aInJd !== bInJd) {
+      return aInJd ? -1 : 1;
+    }
+
+    if (aInJd && bInJd && aJdOrder !== bJdOrder) {
+      return (aJdOrder ?? 0) - (bJdOrder ?? 0);
+    }
+
+    const libraryPriorityDiff = getHardSkillPriority(a) - getHardSkillPriority(b);
+    if (libraryPriorityDiff !== 0) {
+      return libraryPriorityDiff;
+    }
+
+    const templatePriorityDiff = (aResolved?.priority ?? Number.MAX_SAFE_INTEGER)
+      - (bResolved?.priority ?? Number.MAX_SAFE_INTEGER);
+    if (templatePriorityDiff !== 0) {
+      return templatePriorityDiff;
+    }
+
+    return (originalOrder.get(a.toLowerCase()) ?? 0) - (originalOrder.get(b.toLowerCase()) ?? 0);
+  });
+}
+
+function finalizeHardSkills(skills: string[], jobAnalysis?: JobAnalysis): string[] {
+  const prioritized = prioritizeHardSkills(skills, jobAnalysis);
+  const categoryCounts = new Map<HardSkillCategory, number>();
+  const limited: string[] = [];
+
+  for (const skill of prioritized) {
+    const category = resolveHardSkill(skill)?.category ?? 'other';
+    const currentCount = categoryCounts.get(category) ?? 0;
+
+    if (currentCount >= MAX_HARD_SKILLS_PER_CATEGORY) {
+      continue;
+    }
+
+    limited.push(skill);
+    categoryCounts.set(category, currentCount + 1);
+
+    if (limited.length >= MAX_HARD_SKILLS) {
+      break;
+    }
+  }
+
+  return limited;
+}
+
+function sortHardSkillsByLibraryPriority(skills: string[]): string[] {
+  return [...skills].sort((a, b) => {
+    const priorityDiff = getHardSkillPriority(a) - getHardSkillPriority(b);
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    return a.localeCompare(b, undefined, { sensitivity: 'base' });
+  });
+}
+
+function finalizeSoftSkills(skills: string[]): string[] {
+  const condensed = prioritizeSoftSkills(normalizeSkillsList(skills)).map(condenseSoftSkill);
+  return uniqueCaseInsensitive(condensed).slice(0, MAX_SOFT_SKILLS);
 }
 
 function buildFallbackExperienceDescription(title: string, jobAnalysis?: JobAnalysis): string {
@@ -989,8 +2110,6 @@ function buildSimpleSeniorEngineerTitle(
 }
 
 function normalizeTailoredContent(content: TailoredContent, jobAnalysis?: JobAnalysis, profile?: Profile): TailoredContent {
-  const MAX_SOFT_SKILLS = 10;
-
   // Job analysis skills FIRST (required, preferred, keywords) - must appear in hard skills
   const jobHardRaw = getHardSkillChecklist(jobAnalysis);
   const combinedHardRaw = [
@@ -1002,25 +2121,16 @@ function normalizeTailoredContent(content: TailoredContent, jobAnalysis?: JobAna
   ];
 
   const atsSoftPriority = inferAtsSoftSkillsFromAnalysis(jobAnalysis);
-  const hardSkills = prioritizeHardSkills(
-    normalizeAllowedHardSkills(combinedHardRaw),
-    jobAnalysis
+  const hardSkills = sortHardSkillsByLibraryPriority(
+    finalizeHardSkills(
+      restrictHardSkillsToProfileInventory(normalizeAllowedHardSkills(combinedHardRaw), profile),
+      jobAnalysis
+    )
   );
   const softFromModel = normalizeSkillsList(content.softSkills);
   const softFromAnalysis = getSoftSkills(jobAnalysis);
   const softMerged = normalizeSkillsList([...atsSoftPriority, ...softFromModel, ...softFromAnalysis]);
-  const softSkills = prioritizeSoftSkills(softMerged);
-
-  const hardLimited = hardSkills; // No limit on hard skills
-  const softSlots = MAX_SOFT_SKILLS;
-  const condensed = softSkills.slice(0, softSlots).map(condenseSoftSkill);
-  const softSeen = new Set<string>();
-  const softLimited = condensed.filter((s) => {
-    const key = s.toLowerCase();
-    if (softSeen.has(key)) return false;
-    softSeen.add(key);
-    return true;
-  });
+  const softLimited = finalizeSoftSkills(softMerged);
 
   const trimIncompleteEnd = (s: string): string =>
     s.trim().replace(/,+\s*$/, '').replace(/\s+(and|or)\s*$/i, '').trim();
@@ -1148,20 +2258,40 @@ function normalizeTailoredContent(content: TailoredContent, jobAnalysis?: JobAna
       1
     ),
     experience: normalizedExperience,
-    hardSkills: hardLimited,
+    hardSkills,
     softSkills: softLimited,
     strengths: normalizedStrengths,
     // Keep legacy field aligned with hard skills for older templates/components.
-    skills: hardLimited,
+    skills: hardSkills,
   };
 }
 
 export async function analyzeJobDescription(jobDescription: string, provider: AIProvider = DEFAULT_PROVIDER): Promise<JobAnalysis> {
+  const promptValues = buildAnalyzeJobDescriptionPromptValues(jobDescription);
   const prompt = await renderPrompt('analyze-job-description', {
     jobDescription,
   });
-  const content = await createTextCompletion(prompt, provider, 7000, 0, 'json');
+  const content = await createPromptCompletion({
+    promptId: 'analyze-job-description',
+    prompt,
+    promptValues,
+    fallbackProvider: provider,
+    maxTokens: 7000,
+    temperature: 0,
+    responseFormat: 'json',
+    anthropicCacheTtl: '5m',
+  });
 
+  return parseJobAnalysisContent(content, jobDescription);
+}
+
+export function buildAnalyzeJobDescriptionPromptValues(jobDescription: string): Record<string, string> {
+  return {
+    jobDescription,
+  };
+}
+
+export function parseJobAnalysisContent(content: string, jobDescription: string): JobAnalysis {
   try {
     const jsonText = extractJSON(content);
     const parsed = JSON.parse(jsonText) as RawNestedJobAnalysis;
@@ -1172,61 +2302,164 @@ export async function analyzeJobDescription(jobDescription: string, provider: AI
   }
 }
 
+export async function batchAnalyzeJobDescriptions(input: {
+  items: Array<{
+    customId: string;
+    jobDescription: string;
+  }>;
+  provider?: AIProvider;
+  anthropicCacheTtl?: AnthropicCacheTtl;
+}): Promise<Map<string, { analysis?: JobAnalysis; error?: string }>> {
+  const provider = input.provider || DEFAULT_PROVIDER;
+  const canUseAnthropicBatch = input.items.length > 1
+    && await canUseAnthropicBatchForPrompt('analyze-job-description', provider);
+
+  if (!canUseAnthropicBatch) {
+    const resultMap = new Map<string, { analysis?: JobAnalysis; error?: string }>();
+    for (const item of input.items) {
+      try {
+        const analysis = await analyzeJobDescription(item.jobDescription, provider);
+        resultMap.set(item.customId, { analysis });
+      } catch (error) {
+        resultMap.set(item.customId, {
+          error: error instanceof Error ? error.message : 'Failed to analyze job description',
+        });
+      }
+    }
+    return resultMap;
+  }
+
+  const batchResults = await batchCreatePromptCompletions({
+    promptId: 'analyze-job-description',
+    items: input.items.map((item) => ({
+      customId: item.customId,
+      values: buildAnalyzeJobDescriptionPromptValues(item.jobDescription),
+    })),
+    fallbackProvider: provider,
+    maxTokens: 7000,
+    temperature: 0,
+    responseFormat: 'json',
+    anthropicCacheTtl: input.anthropicCacheTtl ?? '1h',
+  });
+
+  const resultMap = new Map<string, { analysis?: JobAnalysis; error?: string }>();
+  for (const item of input.items) {
+    const result = batchResults.get(item.customId);
+    if (!result?.content) {
+      resultMap.set(item.customId, {
+        error: result?.error || 'Analysis request failed',
+      });
+      continue;
+    }
+
+    try {
+      const analysis = parseJobAnalysisContent(result.content, item.jobDescription);
+      resultMap.set(item.customId, { analysis });
+    } catch (error) {
+      resultMap.set(item.customId, {
+        error: error instanceof Error ? error.message : 'Failed to parse job analysis response',
+      });
+    }
+  }
+
+  return resultMap;
+}
+
+export function buildTailorResumePromptValues(
+  profile: Profile,
+  jobAnalysis: JobAnalysis
+): Record<string, string> {
+  const { sourceJobDescription: _sourceJobDescription, ...jobAnalysisForPrompt } = jobAnalysis;
+
+  return {
+    profileJson: JSON.stringify(profile, null, 2),
+    jobAnalysisJson: JSON.stringify(jobAnalysisForPrompt, null, 2),
+    jobTitle: getJobAnalysisTitle(jobAnalysis),
+    hardSkillsJSON: JSON.stringify([
+      ...jobAnalysis.skills.preferred,
+      ...jobAnalysis.skills.required,
+      ...jobAnalysis.skills.technologies,
+      ...jobAnalysis.skills.tools,
+    ]),
+    softSkillsJSON: JSON.stringify([...jobAnalysis.softSkills]),
+    keywordsJson: JSON.stringify([
+      ...jobAnalysis.keywords.actionVerbs,
+      ...jobAnalysis.keywords.buzzwords,
+      ...jobAnalysis.keywords.mustInclude,
+    ]),
+    keyResponsibilitiesJson: JSON.stringify([...jobAnalysis.responsibilities]),
+    domainKnowledge: JSON.stringify([...jobAnalysis.domainKnowledge, jobAnalysis.jobMeta.industry]),
+  };
+}
+
+export function parseTailoredResumeContent(
+  content: string,
+  profile: Profile,
+  jobAnalysis: JobAnalysis
+): TailoredContent {
+  const jsonText = extractJSON(content);
+  const parsed = JSON.parse(jsonText) as TailoredContent;
+  const finalResult = normalizeTailoredContent(parsed, jobAnalysis, profile);
+  const tailoringSourceText = getTailoringSourceText(jobAnalysis);
+
+  const {
+    confirmedSkills: confirmedHardSkills,
+    unconfirmedSkills: unconfirmedHardSkills,
+  } = reconcileSkillBuckets({
+    extractedSkills: extractTechSkills(tailoringSourceText),
+    modelSkills: finalResult.hardSkills,
+    referenceSkills: technicalSkills,
+    supplementSkills: supplimentTechSkills,
+    minimumCount: 20,
+    finalizeSkills: (skills) => finalizeHardSkills(restrictHardSkillsToProfileInventory(skills, profile), jobAnalysis),
+  });
+
+  const {
+    confirmedSkills: confirmedSoftSkills,
+    unconfirmedSkills: unconfirmedSoftSkills,
+  } = reconcileSkillBuckets({
+    extractedSkills: extractSoftSkills(tailoringSourceText),
+    modelSkills: finalResult.softSkills,
+    referenceSkills: softSkills,
+    supplementSkills: supplimentSoftSkills,
+    minimumCount: 5,
+    finalizeSkills: finalizeSoftSkills,
+  });
+
+  return {
+    ...finalResult,
+    hardSkills: sortHardSkillsByLibraryPriority(confirmedHardSkills),
+    softSkills: confirmedSoftSkills,
+    unconfirmedHardSkills,
+    unconfirmedSoftSkills,
+    skills: sortHardSkillsByLibraryPriority(confirmedHardSkills),
+  };
+}
+
 export async function tailorResume(
   profile: Profile,
   jobAnalysis: JobAnalysis,
   provider: AIProvider = DEFAULT_PROVIDER
 ): Promise<TailoredContent> {
-  const { sourceJobDescription: _sourceJobDescription, ...jobAnalysisForPrompt } = jobAnalysis;
-  const prompt = await renderPrompt('tailor-resume', {
-    profileJson: JSON.stringify(profile, null, 2),
-    jobAnalysisJson: JSON.stringify(jobAnalysisForPrompt, null, 2),
-    jobTitle: getJobAnalysisTitle(jobAnalysis),
-    hardSkillsJSON: JSON.stringify([...jobAnalysis.skills.preferred, ...jobAnalysis.skills.required, ...jobAnalysis.skills.technologies, ...jobAnalysis.skills.tools]),
-    softSkillsJSON: JSON.stringify([...jobAnalysis.softSkills]),
-    keywordsJson: JSON.stringify([...jobAnalysis.keywords.actionVerbs, ...jobAnalysis.keywords.buzzwords, ...jobAnalysis.keywords.mustInclude]),
-    keyResponsibilitiesJson: JSON.stringify([...jobAnalysis.responsibilities]),
-    domainKnowledge: JSON.stringify([...jobAnalysis.domainKnowledge, jobAnalysis.jobMeta.industry])
+  const promptValues = buildTailorResumePromptValues(profile, jobAnalysis);
+  const prompt = await renderPrompt('tailor-resume', promptValues);
+  const shouldUseAnthropicOptimizations = await shouldUseAnthropicOptimizationsForPrompt(
+    'tailor-resume',
+    provider
+  );
+  const content = await createPromptCompletion({
+    promptId: 'tailor-resume',
+    prompt,
+    promptValues,
+    fallbackProvider: provider,
+    maxTokens: 11000,
+    temperature: 0.2,
+    responseFormat: 'json',
+    anthropicCacheTtl: shouldUseAnthropicOptimizations ? '5m' : undefined,
   });
-  const content = await createTextCompletion(prompt, provider, 11000, 0.2, 'json');
 
   try {
-    const jsonText = extractJSON(content);
-    const parsed = JSON.parse(jsonText) as TailoredContent;
-    const finalResult = normalizeTailoredContent(parsed, jobAnalysis, profile);
-    const tailoringSourceText = getTailoringSourceText(jobAnalysis);
-
-    const {
-      confirmedSkills: confirmedHardSkills,
-      unconfirmedSkills: unconfirmedHardSkills,
-    } = reconcileSkillBuckets({
-      extractedSkills: extractTechSkills(tailoringSourceText),
-      modelSkills: finalResult.hardSkills,
-      referenceSkills: technicalSkills,
-      supplementSkills: supplimentTechSkills,
-      minimumCount: 20,
-    });
-
-    const {
-      confirmedSkills: confirmedSoftSkills,
-      unconfirmedSkills: unconfirmedSoftSkills,
-    } = reconcileSkillBuckets({
-      extractedSkills: extractSoftSkills(tailoringSourceText),
-      modelSkills: finalResult.softSkills,
-      referenceSkills: softSkills,
-      supplementSkills: supplimentSoftSkills,
-      minimumCount: 5,
-    });
-
-    return {
-      ...finalResult,
-      hardSkills: confirmedHardSkills,
-      softSkills: confirmedSoftSkills,
-      unconfirmedHardSkills,
-      unconfirmedSoftSkills,
-      // Keep legacy field aligned with the post-processed hard skills.
-      skills: confirmedHardSkills,
-    };
+    return parseTailoredResumeContent(content, profile, jobAnalysis);
   } catch {
     console.error('Failed to parse model response:', content);
     throw new Error('Failed to parse tailored resume response');
@@ -1243,12 +2476,26 @@ export async function generateCoverLetter(
   role: string,
   provider: AIProvider = DEFAULT_PROVIDER
 ): Promise<string> {
-  const prompt = await renderPrompt('generate-cover-letter', {
+  const promptValues = {
     profileJson: JSON.stringify(profile, null, 2),
     companyName,
     role,
+  };
+  const prompt = await renderPrompt('generate-cover-letter', {
+    profileJson: promptValues.profileJson,
+    companyName,
+    role,
   });
-  const content = await createTextCompletion(prompt, provider, 1500, 0.7, 'text');
+  const content = await createPromptCompletion({
+    promptId: 'generate-cover-letter',
+    prompt,
+    promptValues,
+    fallbackProvider: provider,
+    maxTokens: 1500,
+    temperature: 0.7,
+    responseFormat: 'text',
+    anthropicCacheTtl: '5m',
+  });
   return content.trim();
 }
 
@@ -1257,16 +2504,24 @@ export async function extractTemplateFromPDF(
   templateName: string,
   provider: AIProvider = DEFAULT_PROVIDER
 ): Promise<{ html: string; css: string; sections: string[] }> {
-  const content = await createTextCompletion(
-    await renderPrompt('extract-template-from-pdf', {
-      pdfText,
-      templateName,
-    }),
-    provider,
-    8000,
-    0,
-    'json'
-  );
+  const promptValues = {
+    pdfText,
+    templateName,
+  };
+  const prompt = await renderPrompt('extract-template-from-pdf', {
+    pdfText,
+    templateName,
+  });
+  const content = await createPromptCompletion({
+    promptId: 'extract-template-from-pdf',
+    prompt,
+    promptValues,
+    fallbackProvider: provider,
+    maxTokens: 8000,
+    temperature: 0,
+    responseFormat: 'json',
+    anthropicCacheTtl: '5m',
+  });
 
   try {
     const jsonText = extractJSON(content);
@@ -1281,15 +2536,22 @@ export async function extractProfileFromResume(
   resumeText: string,
   provider: AIProvider = DEFAULT_PROVIDER
 ): Promise<Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>> {
-  const content = await createTextCompletion(
-    await renderPrompt('extract-profile-from-resume', {
-      resumeText,
-    }),
-    provider,
-    4000,
-    0,
-    'json'
-  );
+  const promptValues = {
+    resumeText,
+  };
+  const prompt = await renderPrompt('extract-profile-from-resume', {
+    resumeText,
+  });
+  const content = await createPromptCompletion({
+    promptId: 'extract-profile-from-resume',
+    prompt,
+    promptValues,
+    fallbackProvider: provider,
+    maxTokens: 4000,
+    temperature: 0,
+    responseFormat: 'json',
+    anthropicCacheTtl: '5m',
+  });
 
   try {
     const jsonText = extractJSON(content);

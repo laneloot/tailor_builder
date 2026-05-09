@@ -86,10 +86,63 @@ export type GoogleSheetsUpdateRangeResponse = {
     updatedColumns: number;
     updatedCells: number;
 };
+export type GoogleSheetsColumnValuesUpdate = {
+    col?: unknown;
+    values?: unknown;
+};
+export type GoogleSheetsBatchColumnUpdateRequest = {
+    sheetId?: unknown;
+    tabName?: unknown;
+    startRow?: unknown;
+    updates?: unknown;
+};
+export type GoogleSheetsBatchColumnUpdateResponse = {
+    spreadsheetId: string;
+    spreadsheetTitle: string;
+    selectedTab: string;
+    updatedRanges: string[];
+    updatedRows: number;
+    updatedColumns: number;
+    updatedCells: number;
+};
+export type GoogleSheetsSingleRowCellUpdate = {
+    col?: unknown;
+    value?: unknown;
+};
+export type GoogleSheetsSingleRowUpdateRequest = {
+    sheetId?: unknown;
+    tabName?: unknown;
+    row?: unknown;
+    updates?: unknown;
+};
+export type GoogleSheetsSingleRowUpdateResponse = {
+    spreadsheetId: string;
+    spreadsheetTitle: string;
+    selectedTab: string;
+    row: number;
+    updatedRanges: string[];
+    updatedColumns: number;
+    updatedCells: number;
+};
+export type GoogleSheetsColumnValuesRequest = {
+    sheetId?: unknown;
+    tabName?: unknown;
+    col?: unknown;
+};
+export type GoogleSheetsColumnValuesResponse = {
+    spreadsheetId: string;
+    spreadsheetTitle: string;
+    selectedTab: string;
+    column: number;
+    values: string[];
+};
 export declare class GoogleSheetsRequestError extends Error {
     statusCode: number;
     constructor(statusCode: number, message: string);
 }
 export declare function fetchGoogleSheetsRange(input: GoogleSheetsRangeRequest): Promise<GoogleSheetsRangeResponse>;
 export declare function updateGoogleSheetsRange(input: GoogleSheetsUpdateRangeRequest): Promise<GoogleSheetsUpdateRangeResponse>;
+export declare function batchUpdateGoogleSheetsColumns(input: GoogleSheetsBatchColumnUpdateRequest): Promise<GoogleSheetsBatchColumnUpdateResponse>;
+export declare function fetchGoogleSheetsColumnValues(input: GoogleSheetsColumnValuesRequest): Promise<GoogleSheetsColumnValuesResponse>;
+export declare function updateGoogleSheetsRow(input: GoogleSheetsSingleRowUpdateRequest): Promise<GoogleSheetsSingleRowUpdateResponse>;
 //# sourceMappingURL=googleSheets.d.ts.map

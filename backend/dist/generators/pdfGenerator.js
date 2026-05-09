@@ -330,11 +330,13 @@ function normalizeHardSkillAlias(skill) {
     return skill.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 const ALLOWED_TECH_SKILLS = new Set();
+let hardSkillPriorityMap = (0, skillsDatabase_1.readHardSkillPriorityMap)();
 function loadAllowedTechSkills() {
     ALLOWED_TECH_SKILLS.clear();
     for (const skill of (0, skillsDatabase_1.readSkills)('hard')) {
         ALLOWED_TECH_SKILLS.add(normalizeHardSkillAlias(skill));
     }
+    hardSkillPriorityMap = (0, skillsDatabase_1.readHardSkillPriorityMap)();
 }
 loadAllowedTechSkills();
 function refreshAllowedTechSkills() {
@@ -395,12 +397,20 @@ function prioritizeSoftSkills(skills) {
     const remainder = skills.filter((skill) => !SOFT_SKILL_SIGNALS.some((signal) => skill.toLowerCase().includes(signal)));
     return [...prioritized, ...remainder];
 }
+function sortHardSkillsByPriority(skills) {
+    return [...normalizeSkills(skills)].sort((a, b) => {
+        const aPriority = hardSkillPriorityMap.get(normalizeHardSkillAlias(a)) ?? Number.MAX_SAFE_INTEGER;
+        const bPriority = hardSkillPriorityMap.get(normalizeHardSkillAlias(b)) ?? Number.MAX_SAFE_INTEGER;
+        if (aPriority !== bPriority) {
+            return aPriority - bPriority;
+        }
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+    });
+}
 function applySkillsLimit(data) {
     const MAX_SOFT_SKILLS = 10;
     const combinedHardRaw = data.hardSkills ?? data.skills ?? [];
-    // const hardFiltered = normalizeSkills(combinedHardRaw as unknown[]).filter(isTechnicalSkill);
-    // const hardLimited = hardFiltered.map(capitalizeHardSkill);
-    const hardLimited = combinedHardRaw;
+    const hardLimited = sortHardSkillsByPriority(combinedHardRaw);
     const softRaw = prioritizeSoftSkills(normalizeSkills(data.softSkills));
     const softCondensed = softRaw.slice(0, MAX_SOFT_SKILLS).map(condenseSoftSkill);
     const softSeen = new Set();

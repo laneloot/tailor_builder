@@ -1,3 +1,5 @@
+import type { AIProvider } from './template';
+
 export type PromptResponseFormat = 'json' | 'text';
 
 export interface PromptVariableDefinition {
@@ -16,6 +18,8 @@ export interface PromptSummary {
   name: string;
   description: string;
   responseFormat: PromptResponseFormat;
+  modelProvider?: AIProvider;
+  modelName?: string;
   allowedVariables: PromptVariableDefinition[];
   validation: PromptValidation;
   isBuiltIn: boolean;
@@ -33,6 +37,8 @@ export interface PromptCreateInput {
   description?: string;
   content: string;
   responseFormat?: PromptResponseFormat;
+  modelProvider?: AIProvider;
+  modelName?: string;
   allowedVariables?: PromptVariableDefinition[];
 }
 
@@ -41,6 +47,8 @@ export interface PromptUpdateInput {
   description?: string;
   content: string;
   responseFormat?: PromptResponseFormat;
+  modelProvider?: AIProvider;
+  modelName?: string;
   allowedVariables?: PromptVariableDefinition[];
 }
 

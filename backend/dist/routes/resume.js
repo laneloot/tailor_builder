@@ -68,6 +68,87 @@ router.post('/analyze', async (req, res) => {
         });
     }
 });
+router.post('/analyze-multi-job', async (req, res) => {
+    try {
+        const { jobs, model, } = req.body;
+        if (!Array.isArray(jobs) || jobs.length === 0) {
+            res.status(400).json({ error: 'At least one job is required' });
+            return;
+        }
+        const settings = await (0, aiModelConfig_1.getAIModelSettings)();
+        const requestedProvider = (0, claude_1.resolveAIProvider)(model);
+        const provider = (0, aiModelConfig_1.isProviderEnabled)(requestedProvider, settings)
+            ? requestedProvider
+            : (0, aiModelConfig_1.getDefaultEnabledProvider)(settings);
+        const validJobs = [];
+        const failures = [];
+        for (const [index, job] of jobs.entries()) {
+            const companyName = typeof job.companyName === 'string' ? job.companyName.trim() : '';
+            const jobDescription = typeof job.jobDescription === 'string' ? job.jobDescription.trim() : '';
+            if (!companyName) {
+                failures.push({
+                    companyName: `Job ${index + 1}`,
+                    sourceRowNumber: job.sourceRowNumber,
+                    error: 'Company name is required',
+                });
+                continue;
+            }
+            if (jobDescription.length < 50) {
+                failures.push({
+                    companyName,
+                    sourceRowNumber: job.sourceRowNumber,
+                    error: 'Job description must be at least 50 characters',
+                });
+                continue;
+            }
+            validJobs.push({
+                customId: `job_${index + 1}`,
+                companyName,
+                jobDescription,
+                sourceRowNumber: job.sourceRowNumber,
+            });
+        }
+        const analysesByCustomId = await (0, claude_1.batchAnalyzeJobDescriptions)({
+            items: validJobs.map((job) => ({
+                customId: job.customId,
+                jobDescription: job.jobDescription,
+            })),
+            provider,
+            anthropicCacheTtl: '1h',
+        });
+        const analyses = [];
+        for (const job of validJobs) {
+            const result = analysesByCustomId.get(job.customId);
+            if (!result?.analysis) {
+                failures.push({
+                    companyName: job.companyName,
+                    sourceRowNumber: job.sourceRowNumber,
+                    error: result?.error || 'Analysis failed',
+                });
+                continue;
+            }
+            analyses.push({
+                companyName: job.companyName,
+                sourceRowNumber: job.sourceRowNumber,
+                jobDescription: job.jobDescription,
+                analysis: result.analysis,
+            });
+        }
+        res.json({
+            provider,
+            analyzed: analyses.length,
+            analyses,
+            failed: failures.length,
+            failures,
+        });
+    }
+    catch (error) {
+        console.error('Error analyzing multiple job descriptions:', error);
+        res.status(500).json({
+            error: error instanceof Error ? error.message : 'Failed to analyze job descriptions',
+        });
+    }
+});
 // Load all non-disabled profiles
 async function loadAllProfiles(profileIds) {
     const selectedIds = Array.isArray(profileIds)
@@ -92,6 +173,140 @@ async function loadAllProfiles(profileIds) {
         }
     }
     return profiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+}
+function collectUnconfirmedSkillMaps(content, hardMap, softMap) {
+    if (!content)
+        return;
+    for (const skill of content.unconfirmedHardSkills ?? []) {
+        const key = skill.trim().toLowerCase();
+        if (key && !hardMap.has(key)) {
+            hardMap.set(key, skill.trim());
+        }
+    }
+    for (const skill of content.unconfirmedSoftSkills ?? []) {
+        const key = skill.trim().toLowerCase();
+        if (key && !softMap.has(key)) {
+            softMap.set(key, skill.trim());
+        }
+    }
+}
+function toAnthropicBatchCustomId(profileId, index) {
+    const sanitized = profileId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48) || `profile_${index + 1}`;
+    return `resume_${index + 1}_${sanitized}`.slice(0, 64);
+}
+async function tailorResumesForBatchItems(items, provider) {
+    const tailoredByCustomId = new Map();
+    const failures = [];
+    const itemByCustomId = new Map(items.map((item) => [item.customId, item]));
+    const unconfirmedHardMap = new Map();
+    const unconfirmedSoftMap = new Map();
+    const shouldUseAnthropicBatch = items.length > 1
+        && await (0, claude_1.canUseAnthropicBatchForPrompt)('tailor-resume', provider);
+    if (shouldUseAnthropicBatch) {
+        const batchResults = await (0, claude_1.batchCreatePromptCompletions)({
+            promptId: 'tailor-resume',
+            items: items.map((item) => ({
+                customId: item.customId,
+                values: (0, claude_1.buildTailorResumePromptValues)(item.profile, item.analysis),
+            })),
+            fallbackProvider: provider,
+            maxTokens: 11000,
+            temperature: 0.2,
+            responseFormat: 'json',
+            anthropicCacheTtl: '1h',
+        });
+        for (const [customId, result] of batchResults.entries()) {
+            const item = itemByCustomId.get(customId);
+            if (!item)
+                continue;
+            if (!result.content) {
+                failures.push({
+                    customId,
+                    profileId: item.profile.id,
+                    profileName: item.profile.name,
+                    error: result.error || 'Tailoring request failed',
+                    meta: item.meta,
+                });
+                continue;
+            }
+            try {
+                const tailored = (0, claude_1.parseTailoredResumeContent)(result.content, item.profile, item.analysis);
+                tailoredByCustomId.set(customId, tailored);
+                collectUnconfirmedSkillMaps(tailored, unconfirmedHardMap, unconfirmedSoftMap);
+            }
+            catch (error) {
+                failures.push({
+                    customId,
+                    profileId: item.profile.id,
+                    profileName: item.profile.name,
+                    error: error instanceof Error ? error.message : 'Failed to parse tailored resume response',
+                    meta: item.meta,
+                });
+            }
+        }
+        for (const item of items) {
+            if (tailoredByCustomId.has(item.customId) || failures.some((failure) => failure.customId === item.customId)) {
+                continue;
+            }
+            failures.push({
+                customId: item.customId,
+                profileId: item.profile.id,
+                profileName: item.profile.name,
+                error: 'No Anthropic batch result returned for this request',
+                meta: item.meta,
+            });
+        }
+    }
+    else {
+        for (const item of items) {
+            try {
+                const tailored = await (0, claude_1.tailorResume)(item.profile, item.analysis, provider);
+                tailoredByCustomId.set(item.customId, tailored);
+                collectUnconfirmedSkillMaps(tailored, unconfirmedHardMap, unconfirmedSoftMap);
+            }
+            catch (error) {
+                failures.push({
+                    customId: item.customId,
+                    profileId: item.profile.id,
+                    profileName: item.profile.name,
+                    error: error instanceof Error ? error.message : 'Failed to tailor resume',
+                    meta: item.meta,
+                });
+            }
+        }
+    }
+    return {
+        tailoredByCustomId,
+        failures,
+        unconfirmedHardSkills: Array.from(unconfirmedHardMap.values()),
+        unconfirmedSoftSkills: Array.from(unconfirmedSoftMap.values()),
+    };
+}
+async function tailorResumesForProfiles(profiles, analysis, provider) {
+    const items = profiles.map((profile, index) => ({
+        customId: toAnthropicBatchCustomId(profile.id, index),
+        profile,
+        analysis,
+        meta: { profileId: profile.id },
+    }));
+    const batchResult = await tailorResumesForBatchItems(items, provider);
+    const tailoredByProfileId = new Map();
+    for (const item of items) {
+        const tailored = batchResult.tailoredByCustomId.get(item.customId);
+        if (tailored) {
+            tailoredByProfileId.set(item.profile.id, tailored);
+        }
+    }
+    return {
+        tailoredByProfileId,
+        failures: batchResult.failures.map((failure) => ({
+            profileId: failure.profileId,
+            profileName: failure.profileName,
+            error: failure.error,
+        })),
+        unconfirmedHardSkills: batchResult.unconfirmedHardSkills,
+        unconfirmedSoftSkills: batchResult.unconfirmedSoftSkills,
+    };
 }
 // Generate for all profiles at once
 router.post('/generate-all', async (req, res) => {
@@ -134,6 +349,12 @@ router.post('/generate-all', async (req, res) => {
         const unconfirmedSoftMap = new Map();
         const formatNorm = format === 'both' ? 'both' : format === 'docx' ? 'docx' : 'pdf';
         const generateCoverLetterDocx = shouldGenerateCoverLetterDocx(includeCoverLetterDocx);
+        const shouldUseBulkTailoring = analysis
+            ? await (0, claude_1.canUseAnthropicBatchForPrompt)('tailor-resume', selectedModel)
+            : false;
+        const bulkTailoring = shouldUseBulkTailoring && analysis
+            ? await tailorResumesForProfiles(profiles, analysis, selectedModel)
+            : null;
         for (const profile of profiles) {
             if (!profile)
                 continue;
@@ -145,24 +366,17 @@ router.post('/generate-all', async (req, res) => {
                 if (!template || template.disabled) {
                     throw new Error('Default template not available');
                 }
+                const batchFailure = bulkTailoring?.failures.find((item) => item.profileId === profile.id);
+                if (batchFailure) {
+                    throw new Error(batchFailure.error);
+                }
                 let tailoredContent;
                 if (analysis) {
-                    tailoredContent = await (0, claude_1.tailorResume)(profile, analysis, selectedModel);
+                    tailoredContent = bulkTailoring
+                        ? bulkTailoring.tailoredByProfileId.get(profile.id)
+                        : await (0, claude_1.tailorResume)(profile, analysis, selectedModel);
                 }
-                if (tailoredContent) {
-                    for (const skill of tailoredContent.unconfirmedHardSkills ?? []) {
-                        const key = skill.trim().toLowerCase();
-                        if (key && !unconfirmedHardMap.has(key)) {
-                            unconfirmedHardMap.set(key, skill.trim());
-                        }
-                    }
-                    for (const skill of tailoredContent.unconfirmedSoftSkills ?? []) {
-                        const key = skill.trim().toLowerCase();
-                        if (key && !unconfirmedSoftMap.has(key)) {
-                            unconfirmedSoftMap.set(key, skill.trim());
-                        }
-                    }
-                }
+                collectUnconfirmedSkillMaps(tailoredContent, unconfirmedHardMap, unconfirmedSoftMap);
                 let coverLetterBody;
                 if (tailoredContent?.coverLetter?.trim()) {
                     coverLetterBody = tailoredContent.coverLetter.trim();
@@ -215,14 +429,168 @@ router.post('/generate-all', async (req, res) => {
             failures,
             failedCompanies: failures.length > 0 ? [normalizedCompanyName] : [],
             tailored: !!analysis,
-            unconfirmedHardSkills: Array.from(unconfirmedHardMap.values()),
-            unconfirmedSoftSkills: Array.from(unconfirmedSoftMap.values()),
+            unconfirmedHardSkills: bulkTailoring?.unconfirmedHardSkills ?? Array.from(unconfirmedHardMap.values()),
+            unconfirmedSoftSkills: bulkTailoring?.unconfirmedSoftSkills ?? Array.from(unconfirmedSoftMap.values()),
         });
     }
     catch (error) {
         console.error('Error generating resumes for all profiles:', error);
         res.status(500).json({
             error: error instanceof Error ? error.message : 'Failed to generate resumes'
+        });
+    }
+});
+router.post('/generate-multi-job', async (req, res) => {
+    try {
+        const { templateId, jobs, model, profileIds, format = 'both', includeCoverLetterDocx, } = req.body;
+        const settings = await (0, aiModelConfig_1.getAIModelSettings)();
+        const appSettings = await (0, aiModelConfig_1.getPublicAppSettings)();
+        const selectedModel = (0, claude_1.resolveAIProvider)(model);
+        if (!(0, aiModelConfig_1.isProviderEnabled)(selectedModel, settings)) {
+            res.status(400).json({ error: `Selected AI model '${selectedModel}' is disabled by admin` });
+            return;
+        }
+        if (!Array.isArray(jobs) || jobs.length === 0) {
+            res.status(400).json({ error: 'At least one job is required' });
+            return;
+        }
+        const profiles = await loadAllProfiles(profileIds);
+        if (profiles.length === 0) {
+            res.status(400).json({ error: 'No matching profiles available. Add profiles in Admin or update group members.' });
+            return;
+        }
+        await (0, templateExtractor_1.createDefaultTemplate)();
+        const normalizedJobs = jobs.map((job, index) => {
+            const normalizedCompanyName = typeof job.companyName === 'string' ? job.companyName.trim() : '';
+            const trimmedJobDescription = typeof job.jobDescription === 'string' ? job.jobDescription.trim() : '';
+            if (!normalizedCompanyName) {
+                throw new Error(`Job ${index + 1} is missing a company name`);
+            }
+            const analysis = job.jobAnalysis;
+            const resolvedRole = resolveGenerationRole(job.role, analysis);
+            if (appSettings.outputPathUsesJobTitle && !resolvedRole) {
+                throw new Error(`Job ${index + 1} (${normalizedCompanyName}) is missing a role`);
+            }
+            return {
+                companyName: normalizedCompanyName,
+                role: resolvedRole,
+                jobDescription: trimmedJobDescription,
+                analysis,
+                sourceRowNumber: job.sourceRowNumber,
+            };
+        });
+        const batchItems = [];
+        for (const [jobIndex, job] of normalizedJobs.entries()) {
+            if (!job.analysis) {
+                continue;
+            }
+            for (const [profileIndex, profile] of profiles.entries()) {
+                batchItems.push({
+                    customId: toAnthropicBatchCustomId(`${profile.id}_${jobIndex + 1}`, jobIndex * profiles.length + profileIndex),
+                    profile,
+                    analysis: job.analysis,
+                    meta: { jobIndex },
+                });
+            }
+        }
+        const bulkTailoring = batchItems.length > 0
+            ? await tailorResumesForBatchItems(batchItems, selectedModel)
+            : null;
+        const formatNorm = format === 'both' ? 'both' : format === 'docx' ? 'docx' : 'pdf';
+        const generateCoverLetterDocx = shouldGenerateCoverLetterDocx(includeCoverLetterDocx);
+        const results = [];
+        const failures = [];
+        const failedCompanies = new Set();
+        const unconfirmedHardMap = new Map();
+        const unconfirmedSoftMap = new Map();
+        for (const [jobIndex, job] of normalizedJobs.entries()) {
+            for (const profile of profiles) {
+                try {
+                    const profileTemplateId = profile.preferredTemplate ?? templateId ?? 'default';
+                    let template = await (0, templateExtractor_1.getTemplateById)(profileTemplateId);
+                    if (!template || template.disabled)
+                        template = await (0, templateExtractor_1.getTemplateById)('default');
+                    if (!template || template.disabled) {
+                        throw new Error('Default template not available');
+                    }
+                    let tailoredContent;
+                    if (job.analysis) {
+                        const customId = batchItems.find((item) => item.profile.id === profile.id && item.meta.jobIndex === jobIndex)?.customId;
+                        const batchFailure = customId
+                            ? bulkTailoring?.failures.find((failure) => failure.customId === customId)
+                            : undefined;
+                        if (batchFailure) {
+                            throw new Error(batchFailure.error);
+                        }
+                        tailoredContent = customId
+                            ? bulkTailoring?.tailoredByCustomId.get(customId)
+                            : await (0, claude_1.tailorResume)(profile, job.analysis, selectedModel);
+                    }
+                    collectUnconfirmedSkillMaps(tailoredContent, unconfirmedHardMap, unconfirmedSoftMap);
+                    let coverLetterBody;
+                    if (tailoredContent?.coverLetter?.trim()) {
+                        coverLetterBody = tailoredContent.coverLetter.trim();
+                    }
+                    else {
+                        coverLetterBody = await (0, claude_1.generateCoverLetter)(profile, job.companyName, job.role, selectedModel);
+                    }
+                    const pathInfo = await (0, generatedPath_1.getGeneratedOutputPath)(profile, job.companyName, job.role);
+                    const coverLetterPdfPath = await (0, coverLetterGenerator_1.saveCoverLetter)(profile, coverLetterBody, pathInfo);
+                    const coverLetterDocxPath = generateCoverLetterDocx
+                        ? await (0, coverLetterGenerator_1.saveCoverLetterDOCX)(profile, coverLetterBody, pathInfo)
+                        : undefined;
+                    const entry = {
+                        profileId: profile.id,
+                        profileName: profile.name,
+                        companyName: job.companyName,
+                        role: job.role,
+                        coverLetterPdf: coverLetterPdfPath,
+                        coverLetterDocx: coverLetterDocxPath,
+                    };
+                    if (formatNorm === 'both') {
+                        const [pdfFilename, docxFilename] = await Promise.all([
+                            (0, pdfGenerator_1.generateResumePDF)(profile, template, tailoredContent, pathInfo, job.companyName, job.role),
+                            (0, docxGenerator_1.generateResumeDOCX)(profile, tailoredContent, pathInfo, job.companyName, job.role),
+                        ]);
+                        entry.pdf = pdfFilename;
+                        entry.docx = docxFilename;
+                    }
+                    else {
+                        const filename = formatNorm === 'docx'
+                            ? await (0, docxGenerator_1.generateResumeDOCX)(profile, tailoredContent, pathInfo, job.companyName, job.role)
+                            : await (0, pdfGenerator_1.generateResumePDF)(profile, template, tailoredContent, pathInfo, job.companyName, job.role);
+                        entry[formatNorm] = filename;
+                    }
+                    results.push(entry);
+                }
+                catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed to generate resume';
+                    console.error(`Error generating resume for profile ${profile.id} (${profile.name}) at ${job.companyName}:`, error);
+                    failures.push({
+                        profileId: profile.id,
+                        profileName: profile.name,
+                        companyName: job.companyName,
+                        error: message,
+                    });
+                    failedCompanies.add(job.companyName);
+                }
+            }
+        }
+        res.json({
+            generated: results.length,
+            failed: failures.length,
+            results,
+            failures,
+            failedCompanies: Array.from(failedCompanies),
+            tailored: batchItems.length > 0,
+            unconfirmedHardSkills: bulkTailoring?.unconfirmedHardSkills ?? Array.from(unconfirmedHardMap.values()),
+            unconfirmedSoftSkills: bulkTailoring?.unconfirmedSoftSkills ?? Array.from(unconfirmedSoftMap.values()),
+        });
+    }
+    catch (error) {
+        console.error('Error generating resumes for multiple jobs:', error);
+        res.status(500).json({
+            error: error instanceof Error ? error.message : 'Failed to generate resumes for multiple jobs',
         });
     }
 });
@@ -251,6 +619,18 @@ router.post('/preview-all', async (req, res) => {
         const previews = [];
         const unconfirmedHardMap = new Map();
         const unconfirmedSoftMap = new Map();
+        const shouldUseBulkTailoring = analysis
+            ? await (0, claude_1.canUseAnthropicBatchForPrompt)('tailor-resume', selectedModel)
+            : false;
+        const bulkTailoring = shouldUseBulkTailoring && analysis
+            ? await tailorResumesForProfiles(profiles, analysis, selectedModel)
+            : null;
+        if (bulkTailoring && bulkTailoring.failures.length > 0) {
+            throw new Error(`Failed to tailor ${bulkTailoring.failures.length} profile(s): ${bulkTailoring.failures
+                .slice(0, 3)
+                .map((item) => `${item.profileName}: ${item.error}`)
+                .join(' | ')}${bulkTailoring.failures.length > 3 ? ' | ...' : ''}`);
+        }
         for (const profile of profiles) {
             if (!profile)
                 continue;
@@ -262,24 +642,12 @@ router.post('/preview-all', async (req, res) => {
                 res.status(500).json({ error: 'Default template not available' });
                 return;
             }
-            let tailoredContent;
-            if (analysis) {
-                tailoredContent = await (0, claude_1.tailorResume)(profile, analysis, selectedModel);
-            }
-            if (tailoredContent) {
-                for (const skill of tailoredContent.unconfirmedHardSkills ?? []) {
-                    const key = skill.trim().toLowerCase();
-                    if (key && !unconfirmedHardMap.has(key)) {
-                        unconfirmedHardMap.set(key, skill.trim());
-                    }
-                }
-                for (const skill of tailoredContent.unconfirmedSoftSkills ?? []) {
-                    const key = skill.trim().toLowerCase();
-                    if (key && !unconfirmedSoftMap.has(key)) {
-                        unconfirmedSoftMap.set(key, skill.trim());
-                    }
-                }
-            }
+            const tailoredContent = analysis
+                ? bulkTailoring
+                    ? bulkTailoring.tailoredByProfileId.get(profile.id)
+                    : await (0, claude_1.tailorResume)(profile, analysis, selectedModel)
+                : undefined;
+            collectUnconfirmedSkillMaps(tailoredContent, unconfirmedHardMap, unconfirmedSoftMap);
             const html = await (0, pdfGenerator_1.generatePreviewHTML)(profile, template, tailoredContent);
             previews.push({
                 profileId: profile.id,
@@ -291,8 +659,8 @@ router.post('/preview-all', async (req, res) => {
         res.json({
             previews,
             tailored: !!analysis,
-            unconfirmedHardSkills: Array.from(unconfirmedHardMap.values()),
-            unconfirmedSoftSkills: Array.from(unconfirmedSoftMap.values()),
+            unconfirmedHardSkills: bulkTailoring?.unconfirmedHardSkills ?? Array.from(unconfirmedHardMap.values()),
+            unconfirmedSoftSkills: bulkTailoring?.unconfirmedSoftSkills ?? Array.from(unconfirmedSoftMap.values()),
         });
     }
     catch (error) {

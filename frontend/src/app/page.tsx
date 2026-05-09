@@ -353,6 +353,34 @@ export default function Home() {
     resolvedRole: string;
     tailoredContentByProfileId?: Map<string, TailoredContent | undefined>;
   }) => {
+    if (!tailoredContentByProfileId) {
+      updateGenerationProgress(
+        targetProfiles.length,
+        0,
+        'Submitting batch resume generation',
+        undefined,
+        targetCompanyName
+      );
+
+      const result = await resumeApi.generateAll({
+        profileIds: targetProfiles.map((profile) => profile.id),
+        jobDescription,
+        jobAnalysis: analysis,
+        companyName: targetCompanyName,
+        role: resolvedRole,
+        model: selectedModel,
+        ...getDefaultGenerationOptions(),
+      });
+      updateGenerationProgress(
+        targetProfiles.length,
+        targetProfiles.length,
+        'Batch resume generation completed',
+        undefined,
+        targetCompanyName
+      );
+      return result;
+    }
+
     const failures: GenerationFailure[] = [];
     const unconfirmedHardMap = new Map<string, string>();
     const unconfirmedSoftMap = new Map<string, string>();
@@ -429,62 +457,87 @@ export default function Home() {
     const failedCompanies = new Set<string>();
     const totalBuilds = selectedProfiles.length * normalizedJobs.length;
     let completedBuilds = 0;
+    const jobsToGenerate: Array<{
+      companyName: string;
+      role: string;
+      jobDescription: string;
+      jobAnalysis?: JobAnalysis;
+      sourceRowNumber: number;
+    }> = [];
 
     try {
       updateGenerationProgress(totalBuilds, 0, 'Preparing imported jobs');
-      for (let jobIndex = 0; jobIndex < normalizedJobs.length; jobIndex += 1) {
-        const job = normalizedJobs[jobIndex];
-        const trimmedJobDescription = job.jobDescription.trim();
-        let analysis: JobAnalysis | undefined;
+      setGenerationStep(`Analyzing ${normalizedJobs.length} imported job(s)`);
+      updateGenerationProgress(totalBuilds, completedBuilds, 'Analyzing imported jobs');
 
-        try {
-          setGenerationStep(`Analyzing ${job.companyName} (${jobIndex + 1}/${normalizedJobs.length})`);
-          updateGenerationProgress(totalBuilds, completedBuilds, 'Analyzing imported job', undefined, job.companyName.trim());
-          analysis =
-            trimmedJobDescription.length >= 50
-              ? await resumeApi.analyze(trimmedJobDescription, selectedModel)
-              : undefined;
-        } catch (err) {
-          failedCompanies.add(job.companyName.trim());
-          failures.push(
-            `Row ${job.sourceRowNumber} / ${job.companyName}: ${err instanceof Error ? err.message : 'Analysis failed'}`
-          );
-          completedBuilds += selectedProfiles.length;
+      const analysisResult = await resumeApi.analyzeMultiJob({
+        jobs: normalizedJobs.map((job) => ({
+          companyName: job.companyName.trim(),
+          jobDescription: job.jobDescription.trim(),
+          sourceRowNumber: job.sourceRowNumber,
+        })),
+        model: selectedModel,
+      });
+
+      const analysisByRow = new Map<number, JobAnalysis>();
+      for (const item of analysisResult.analyses) {
+        if (typeof item.sourceRowNumber === 'number') {
+          analysisByRow.set(item.sourceRowNumber, item.analysis);
+        }
+      }
+
+      for (const failure of analysisResult.failures) {
+        failedCompanies.add(failure.companyName.trim());
+        failures.push(
+          `Row ${failure.sourceRowNumber ?? '?'} / ${failure.companyName}: ${failure.error}`
+        );
+        completedBuilds += selectedProfiles.length;
+      }
+
+      const firstSuccessfulAnalysis = analysisResult.analyses[0]?.analysis;
+      if (firstSuccessfulAnalysis) {
+        setJobAnalysis(firstSuccessfulAnalysis);
+      }
+
+      for (const job of normalizedJobs) {
+        const trimmedJobDescription = job.jobDescription.trim();
+        const analysis = analysisByRow.get(job.sourceRowNumber);
+        if (!analysis) {
           continue;
         }
 
-        if (jobIndex === 0 && analysis) {
-          setJobAnalysis(analysis);
+        jobsToGenerate.push({
+          companyName: job.companyName.trim(),
+          role: shouldShowRoleInput ? job.jobTitle.trim() : (job.jobTitle.trim() || getAnalysisJobTitle(analysis) || ''),
+          jobDescription: trimmedJobDescription,
+          jobAnalysis: analysis,
+          sourceRowNumber: job.sourceRowNumber,
+        });
+      }
+
+      if (jobsToGenerate.length > 0) {
+        setGenerationStep(
+          `Generating ${completedBuilds + 1}-${totalBuilds}: ${selectedProfiles.length} profile(s) x ${jobsToGenerate.length} imported job(s)`
+        );
+        updateGenerationProgress(totalBuilds, completedBuilds, 'Submitting batch resume generation');
+
+        const result = await resumeApi.generateMultiJob({
+          profileIds: selectedProfiles.map((profile) => profile.id),
+          jobs: jobsToGenerate,
+          model: selectedModel,
+          ...getDefaultGenerationOptions(),
+        });
+
+        completedBuilds = totalBuilds;
+        updateGenerationProgress(totalBuilds, completedBuilds, 'Batch resume generation completed');
+        result.failedCompanies.forEach((company) => failedCompanies.add(company));
+
+        for (const failure of result.failures) {
+          failures.push(`${failure.companyName} / ${failure.profileName}: ${failure.error}`);
         }
 
-        for (let profileIndex = 0; profileIndex < selectedProfiles.length; profileIndex += 1) {
-          const profile = selectedProfiles[profileIndex];
-          setGenerationStep(
-            `Generating ${completedBuilds + 1}/${totalBuilds}: ${profile.name} x ${job.companyName}`
-          );
-          updateGenerationProgress(totalBuilds, completedBuilds, 'Building resumes', profile.name, job.companyName.trim());
-
-          try {
-            await resumeApi.generate({
-              profileId: profile.id,
-              templateId: profile.preferredTemplate || 'default',
-              jobDescription: trimmedJobDescription,
-              jobAnalysis: analysis,
-              companyName: job.companyName.trim(),
-              role: shouldShowRoleInput ? job.jobTitle.trim() : (job.jobTitle.trim() || getAnalysisJobTitle(analysis) || ''),
-              model: selectedModel,
-              ...getDefaultGenerationOptions(),
-            });
-          } catch (err) {
-            failedCompanies.add(job.companyName.trim());
-            failures.push(
-              `Row ${job.sourceRowNumber} / ${job.companyName} / ${profile.name}: ${err instanceof Error ? err.message : 'Generation failed'}`
-            );
-          } finally {
-            completedBuilds += 1;
-            updateGenerationProgress(totalBuilds, completedBuilds, 'Building resumes', profile.name, job.companyName.trim());
-          }
-        }
+        setUnconfirmedHardSkills(toUnconfirmedItems(result.unconfirmedHardSkills ?? []));
+        setUnconfirmedSoftSkills(toUnconfirmedItems(result.unconfirmedSoftSkills ?? []));
       }
 
       const generatedCount = totalBuilds - failures.length;

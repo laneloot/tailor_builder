@@ -9,6 +9,7 @@ import {
   updatePrompt,
   validatePromptDraft,
 } from '../services/promptService';
+import { listAIModelOptions } from '../services/aiModelCatalog';
 import { PromptCreateInput, PromptPreviewInput, PromptUpdateInput } from '../types/prompt';
 
 const router = Router();
@@ -47,6 +48,10 @@ router.post('/preview', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Failed to generate prompt preview',
     });
   }
+});
+
+router.get('/models', (_req: Request, res: Response) => {
+  res.json(listAIModelOptions());
 });
 
 router.get('/:id', async (req: Request<{ id: string }>, res: Response) => {

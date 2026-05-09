@@ -13,8 +13,10 @@ exports.deletePrompt = deletePrompt;
 exports.previewPrompt = previewPrompt;
 exports.validatePromptDraft = validatePromptDraft;
 exports.renderPrompt = renderPrompt;
+exports.renderPromptSegments = renderPromptSegments;
 const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
+const aiModelCatalog_1 = require("./aiModelCatalog");
 const DATA_DIR = process.env.TAILOR_DATA_DIR
     ? path_1.default.resolve(process.env.TAILOR_DATA_DIR)
     : path_1.default.join(__dirname, '../../data');
@@ -216,6 +218,52 @@ Node.js, TypeScript, PostgreSQL, AWS`,
             },
         ],
     },
+    {
+        id: 'filter-google-sheet-job',
+        name: 'Filter Google Sheet Job',
+        description: 'Analyzes scraped job-page content and returns structured job attributes for Google Sheets.',
+        usage: 'Live prompt used by the Google Sheets job filter flow.',
+        responseFormat: 'json',
+        allowedVariables: [
+            {
+                name: 'jobContent',
+                description: 'Scraped text content from the full job page.',
+                sampleValue: `Senior Software Engineer
+
+Remote - United States
+
+We are hiring a remote backend engineer based in the US. This role is fully remote, does not require a security clearance, and is not in the healthcare industry.
+
+Compensation: $180,000 - $220,000 base salary plus equity.
+
+Requirements:
+- 5+ years of backend engineering experience
+- Node.js, TypeScript, PostgreSQL
+- Strong written communication`,
+            },
+            {
+                name: 'jobDescription',
+                description: 'Legacy alias for jobContent so older prompts continue to render.',
+                sampleValue: `Senior Software Engineer
+
+Remote - United States
+
+We are hiring a remote backend engineer based in the US. This role is fully remote, does not require a security clearance, and is not in the healthcare industry.
+
+Compensation: $180,000 - $220,000 base salary plus equity.
+
+Requirements:
+- 5+ years of backend engineering experience
+- Node.js, TypeScript, PostgreSQL
+- Strong written communication`,
+            },
+            {
+                name: 'jobLink',
+                description: 'Original job URL for the scraped page.',
+                sampleValue: 'https://jobs.example.com/openings/senior-software-engineer',
+            },
+        ],
+    },
 ];
 function isBuiltInPrompt(id) {
     return BUILT_IN_PROMPTS.some((prompt) => prompt.id === id);
@@ -356,6 +404,37 @@ function renderPromptText(content, sampleValues) {
         missingVariables: [...missing],
     };
 }
+function renderPromptSegmentsFromText(content, values) {
+    const missing = new Set();
+    const segments = [];
+    let lastIndex = 0;
+    let match;
+    VARIABLE_PATTERN.lastIndex = 0;
+    while ((match = VARIABLE_PATTERN.exec(content)) !== null) {
+        const [rawMatch, rawVariableName] = match;
+        const variableName = normalizeVariableName(rawVariableName);
+        const literalText = content.slice(lastIndex, match.index);
+        if (literalText) {
+            segments.push({ text: literalText });
+        }
+        if (!(variableName in values)) {
+            missing.add(variableName);
+            segments.push({ text: `[[${variableName}]]`, variableName });
+        }
+        else {
+            segments.push({ text: values[variableName] ?? '', variableName });
+        }
+        lastIndex = match.index + rawMatch.length;
+    }
+    const tailText = content.slice(lastIndex);
+    if (tailText) {
+        segments.push({ text: tailText });
+    }
+    return {
+        segments,
+        missingVariables: [...missing],
+    };
+}
 function assertValidPromptDraft(content, allowedVariables) {
     const validation = validatePromptContent(content, allowedVariables);
     if (validation.unknownVariables.length > 0) {
@@ -426,11 +505,14 @@ async function readBuiltInPromptRecord(definition) {
         return null;
     }
     const validation = validatePromptContent(stored.content, definition.allowedVariables);
+    const modelSelection = (0, aiModelCatalog_1.normalizePromptModelSelection)(stored.parsed.modelProvider ?? definition.modelProvider, stored.parsed.modelName ?? definition.modelName);
     return {
         id: definition.id,
         name: definition.name,
         description: definition.description,
         responseFormat: definition.responseFormat,
+        modelProvider: modelSelection?.provider,
+        modelName: modelSelection?.modelName,
         allowedVariables: definition.allowedVariables,
         validation,
         isBuiltIn: true,
@@ -449,11 +531,14 @@ async function readCustomPromptFile(id) {
     if (!stored)
         return null;
     const parsed = stored.parsed;
+    const modelSelection = (0, aiModelCatalog_1.normalizePromptModelSelection)(parsed.modelProvider, parsed.modelName);
     return {
         id: typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id.trim() : id,
         name: normalizePromptName(typeof parsed.name === 'string' ? parsed.name : id),
         description: normalizePromptDescription(typeof parsed.description === 'string' ? parsed.description : ''),
         responseFormat: normalizeResponseFormat(parsed.responseFormat),
+        modelProvider: modelSelection?.provider,
+        modelName: modelSelection?.modelName,
         allowedVariables: normalizeAllowedVariables(Array.isArray(parsed.allowedVariables) ? parsed.allowedVariables : []),
         createdAt: typeof parsed.createdAt === 'string' && parsed.createdAt.trim()
             ? parsed.createdAt.trim()
@@ -476,6 +561,8 @@ async function readCustomPromptRecord(id) {
         name: prompt.name,
         description: prompt.description,
         responseFormat: prompt.responseFormat,
+        modelProvider: prompt.modelProvider,
+        modelName: prompt.modelName,
         allowedVariables: prompt.allowedVariables,
         validation: validatePromptContent(prompt.content, prompt.allowedVariables),
         isBuiltIn: false,
@@ -490,6 +577,8 @@ function toPromptSummary(record) {
         name: record.name,
         description: record.description,
         responseFormat: record.responseFormat,
+        modelProvider: record.modelProvider,
+        modelName: record.modelName,
         allowedVariables: record.allowedVariables,
         validation: record.validation,
         isBuiltIn: record.isBuiltIn,
@@ -528,6 +617,7 @@ async function createPrompt(input) {
     const description = normalizePromptDescription(input.description);
     const content = normalizePromptContent(input.content);
     const responseFormat = normalizeResponseFormat(input.responseFormat);
+    const modelSelection = (0, aiModelCatalog_1.normalizePromptModelSelection)(input.modelProvider, input.modelName);
     const allowedVariables = normalizeAllowedVariables(input.allowedVariables);
     if (!name) {
         throw new Error('Prompt name is required');
@@ -543,6 +633,8 @@ async function createPrompt(input) {
         name,
         description,
         responseFormat,
+        modelProvider: modelSelection?.provider,
+        modelName: modelSelection?.modelName,
         allowedVariables,
         createdAt: now,
         updatedAt: now,
@@ -565,11 +657,14 @@ async function updatePrompt(id, input) {
         const definition = getBuiltInPrompt(id);
         if (!definition)
             return null;
+        const modelSelection = (0, aiModelCatalog_1.normalizePromptModelSelection)(input.modelProvider, input.modelName);
         assertValidPromptDraft(content, definition.allowedVariables);
         const existing = await readPromptJson(id);
         await writePromptJson(id, {
             id,
             content,
+            modelProvider: modelSelection?.provider,
+            modelName: modelSelection?.modelName,
             createdAt: typeof existing?.parsed.createdAt === 'string'
                 ? existing.parsed.createdAt
                 : new Date().toISOString(),
@@ -583,6 +678,7 @@ async function updatePrompt(id, input) {
     const name = normalizePromptName(input.name ?? current.name);
     const description = normalizePromptDescription(input.description ?? current.description);
     const responseFormat = normalizeResponseFormat(input.responseFormat ?? current.responseFormat);
+    const modelSelection = (0, aiModelCatalog_1.normalizePromptModelSelection)(input.modelProvider ?? current.modelProvider, input.modelName ?? current.modelName);
     const allowedVariables = normalizeAllowedVariables(input.allowedVariables ?? current.allowedVariables);
     if (!name) {
         throw new Error('Prompt name is required');
@@ -593,6 +689,8 @@ async function updatePrompt(id, input) {
         name,
         description,
         responseFormat,
+        modelProvider: modelSelection?.provider,
+        modelName: modelSelection?.modelName,
         allowedVariables,
         updatedAt: new Date().toISOString(),
         content,
@@ -668,5 +766,19 @@ async function renderPrompt(id, values) {
         throw new Error(`Prompt "${id}" is missing runtime values for: ${missingVariables.join(', ')}`);
     }
     return renderedContent;
+}
+async function renderPromptSegments(id, values) {
+    const prompt = await getPromptById(id);
+    if (!prompt) {
+        throw new Error(`Prompt "${id}" not found`);
+    }
+    if (prompt.validation.unknownVariables.length > 0) {
+        throw new Error(`Prompt "${id}" contains unknown variables: ${prompt.validation.unknownVariables.join(', ')}`);
+    }
+    const { segments, missingVariables } = renderPromptSegmentsFromText(prompt.content, values);
+    if (missingVariables.length > 0) {
+        throw new Error(`Prompt "${id}" is missing runtime values for: ${missingVariables.join(', ')}`);
+    }
+    return segments;
 }
 //# sourceMappingURL=promptService.js.map

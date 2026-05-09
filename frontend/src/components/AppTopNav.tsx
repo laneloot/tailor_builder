@@ -9,6 +9,8 @@ type Props = {
 
 const NAV_ITEMS = [
   { href: '/', label: 'Builder' },
+  { href: '/jobs', label: 'LinkedIn Jobs' },
+  { href: '/jobs/filter', label: 'Job Filter' },
   { href: '/test', label: 'Test' },
   { href: '/admin/profiles', label: 'Profiles' },
   { href: '/admin/templates', label: 'Templates' },
@@ -34,7 +36,7 @@ export default function AppTopNav({ onLogout }: Props) {
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-6">
           <Link href="/" className="shrink-0 py-4 text-lg font-bold text-gray-900 dark:text-white">
-            Tailored Resume Builder
+            TRB
           </Link>
           <nav className="hidden flex-wrap items-center gap-2 md:flex">
             {NAV_ITEMS.map((item) => {
