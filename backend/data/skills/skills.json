@@ -1,0 +1,7041 @@
+{
+  "hard": [
+    {
+      "skill": "Bash",
+      "priority": 1
+    },
+    {
+      "skill": "C#",
+      "priority": 1
+    },
+    {
+      "skill": "C++",
+      "priority": 1
+    },
+    {
+      "skill": "CSS Grid",
+      "priority": 1
+    },
+    {
+      "skill": "CSS Modules",
+      "priority": 1
+    },
+    {
+      "skill": "Dart",
+      "priority": 1
+    },
+    {
+      "skill": "Elixir",
+      "priority": 1
+    },
+    {
+      "skill": "Go",
+      "priority": 1
+    },
+    {
+      "skill": "Go Test",
+      "priority": 1
+    },
+    {
+      "skill": "Groovy",
+      "priority": 1
+    },
+    {
+      "skill": "HTML",
+      "priority": 1
+    },
+    {
+      "skill": "Java",
+      "priority": 1
+    },
+    {
+      "skill": "JavaScript",
+      "priority": 1
+    },
+    {
+      "skill": "Kotlin",
+      "priority": 1
+    },
+    {
+      "skill": "Kotlin Multiplatform",
+      "priority": 1
+    },
+    {
+      "skill": "Lua",
+      "priority": 1
+    },
+    {
+      "skill": "MATLAB",
+      "priority": 1
+    },
+    {
+      "skill": "Objective-C",
+      "priority": 1
+    },
+    {
+      "skill": "Perl",
+      "priority": 1
+    },
+    {
+      "skill": "PHP",
+      "priority": 1
+    },
+    {
+      "skill": "PowerShell",
+      "priority": 1
+    },
+    {
+      "skill": "Python",
+      "priority": 1
+    },
+    {
+      "skill": "Python test automation",
+      "priority": 1
+    },
+    {
+      "skill": "Ruby",
+      "priority": 1
+    },
+    {
+      "skill": "Ruby on Rails",
+      "priority": 1
+    },
+    {
+      "skill": "Rust",
+      "priority": 1
+    },
+    {
+      "skill": "Scala",
+      "priority": 1
+    },
+    {
+      "skill": "Shell Scripting",
+      "priority": 1
+    },
+    {
+      "skill": "SQL",
+      "priority": 1
+    },
+    {
+      "skill": "SQL Alchemy",
+      "priority": 1
+    },
+    {
+      "skill": "SQL Injection",
+      "priority": 1
+    },
+    {
+      "skill": "SQL Injection Prevention",
+      "priority": 1
+    },
+    {
+      "skill": "SQL Server",
+      "priority": 1
+    },
+    {
+      "skill": "Swift",
+      "priority": 1
+    },
+    {
+      "skill": "TypeScript",
+      "priority": 1
+    },
+    {
+      "skill": "Angular",
+      "priority": 2
+    },
+    {
+      "skill": "Babel",
+      "priority": 2
+    },
+    {
+      "skill": "Blockchain",
+      "priority": 2
+    },
+    {
+      "skill": "Bootstrap",
+      "priority": 2
+    },
+    {
+      "skill": "Chai",
+      "priority": 2
+    },
+    {
+      "skill": "Chakra UI",
+      "priority": 2
+    },
+    {
+      "skill": "Cypress",
+      "priority": 2
+    },
+    {
+      "skill": "Django",
+      "priority": 2
+    },
+    {
+      "skill": "Django REST Framework",
+      "priority": 2
+    },
+    {
+      "skill": "Emotion",
+      "priority": 2
+    },
+    {
+      "skill": "ESLint",
+      "priority": 2
+    },
+    {
+      "skill": "Express",
+      "priority": 2
+    },
+    {
+      "skill": "Express.js",
+      "priority": 2
+    },
+    {
+      "skill": "FastAPI",
+      "priority": 2
+    },
+    {
+      "skill": "Flask",
+      "priority": 2
+    },
+    {
+      "skill": "i18next",
+      "priority": 2
+    },
+    {
+      "skill": "Jest",
+      "priority": 2
+    },
+    {
+      "skill": "jQuery",
+      "priority": 2
+    },
+    {
+      "skill": "JUnit",
+      "priority": 2
+    },
+    {
+      "skill": "Keras",
+      "priority": 2
+    },
+    {
+      "skill": "LangChain",
+      "priority": 2
+    },
+    {
+      "skill": "Laravel",
+      "priority": 2
+    },
+    {
+      "skill": "LlamaIndex",
+      "priority": 2
+    },
+    {
+      "skill": "Material UI",
+      "priority": 2
+    },
+    {
+      "skill": "Mocha",
+      "priority": 2
+    },
+    {
+      "skill": "NestJS",
+      "priority": 2
+    },
+    {
+      "skill": "Next.js",
+      "priority": 2
+    },
+    {
+      "skill": "NextAuth.js",
+      "priority": 2
+    },
+    {
+      "skill": "NumPy",
+      "priority": 2
+    },
+    {
+      "skill": "Pandas",
+      "priority": 2
+    },
+    {
+      "skill": "Playwright",
+      "priority": 2
+    },
+    {
+      "skill": "Preact",
+      "priority": 2
+    },
+    {
+      "skill": "Prettier",
+      "priority": 2
+    },
+    {
+      "skill": "PrimeReact",
+      "priority": 2
+    },
+    {
+      "skill": "Pytest",
+      "priority": 2
+    },
+    {
+      "skill": "PyTorch",
+      "priority": 2
+    },
+    {
+      "skill": "Rails",
+      "priority": 2
+    },
+    {
+      "skill": "React",
+      "priority": 2
+    },
+    {
+      "skill": "React Hook Form",
+      "priority": 2
+    },
+    {
+      "skill": "React Native",
+      "priority": 2
+    },
+    {
+      "skill": "React Router",
+      "priority": 2
+    },
+    {
+      "skill": "React Testing Library",
+      "priority": 2
+    },
+    {
+      "skill": "Reactive Programming",
+      "priority": 2
+    },
+    {
+      "skill": "Redux",
+      "priority": 2
+    },
+    {
+      "skill": "Redux Toolkit",
+      "priority": 2
+    },
+    {
+      "skill": "Sass",
+      "priority": 2
+    },
+    {
+      "skill": "SASS/SCSS",
+      "priority": 2
+    },
+    {
+      "skill": "scikit-learn",
+      "priority": 2
+    },
+    {
+      "skill": "SCSS",
+      "priority": 2
+    },
+    {
+      "skill": "Selenium",
+      "priority": 2
+    },
+    {
+      "skill": "Spring Batch",
+      "priority": 2
+    },
+    {
+      "skill": "Spring Boot",
+      "priority": 2
+    },
+    {
+      "skill": "Spring Cloud",
+      "priority": 2
+    },
+    {
+      "skill": "Spring Data",
+      "priority": 2
+    },
+    {
+      "skill": "Spring Integration",
+      "priority": 2
+    },
+    {
+      "skill": "Spring Kafka",
+      "priority": 2
+    },
+    {
+      "skill": "Spring MVC",
+      "priority": 2
+    },
+    {
+      "skill": "Spring Security",
+      "priority": 2
+    },
+    {
+      "skill": "Spring WebFlux",
+      "priority": 2
+    },
+    {
+      "skill": "Supply Chain Security",
+      "priority": 2
+    },
+    {
+      "skill": "Symfony",
+      "priority": 2
+    },
+    {
+      "skill": "Tailwind",
+      "priority": 2
+    },
+    {
+      "skill": "Tailwind CSS",
+      "priority": 2
+    },
+    {
+      "skill": "TensorFlow",
+      "priority": 2
+    },
+    {
+      "skill": "TestNG",
+      "priority": 2
+    },
+    {
+      "skill": "Vite",
+      "priority": 2
+    },
+    {
+      "skill": "Vitest",
+      "priority": 2
+    },
+    {
+      "skill": "Vue",
+      "priority": 2
+    },
+    {
+      "skill": "Vue Test Utils",
+      "priority": 2
+    },
+    {
+      "skill": "Vue.js",
+      "priority": 2
+    },
+    {
+      "skill": "Vuex",
+      "priority": 2
+    },
+    {
+      "skill": "Webpack",
+      "priority": 2
+    },
+    {
+      "skill": "Webpack Module Federation",
+      "priority": 2
+    },
+    {
+      "skill": "Amazon DynamoDB",
+      "priority": 3
+    },
+    {
+      "skill": "AWS CloudFormation",
+      "priority": 3
+    },
+    {
+      "skill": "AWS DynamoDB",
+      "priority": 3
+    },
+    {
+      "skill": "AWS Lake Formation",
+      "priority": 3
+    },
+    {
+      "skill": "Azure SQL Database",
+      "priority": 3
+    },
+    {
+      "skill": "BigQuery",
+      "priority": 3
+    },
+    {
+      "skill": "Cassandra",
+      "priority": 3
+    },
+    {
+      "skill": "Cassandra Query Language",
+      "priority": 3
+    },
+    {
+      "skill": "Cloud Firestore",
+      "priority": 3
+    },
+    {
+      "skill": "Cloud platforms",
+      "priority": 3
+    },
+    {
+      "skill": "CloudFormation",
+      "priority": 3
+    },
+    {
+      "skill": "CouchDB",
+      "priority": 3
+    },
+    {
+      "skill": "Cypher Query Language",
+      "priority": 3
+    },
+    {
+      "skill": "Data Formats (JSON/XML)",
+      "priority": 3
+    },
+    {
+      "skill": "Database Design",
+      "priority": 3
+    },
+    {
+      "skill": "Database Migration",
+      "priority": 3
+    },
+    {
+      "skill": "Database Observability",
+      "priority": 3
+    },
+    {
+      "skill": "Database schema design",
+      "priority": 3
+    },
+    {
+      "skill": "Database Seeding",
+      "priority": 3
+    },
+    {
+      "skill": "Denormalization",
+      "priority": 3
+    },
+    {
+      "skill": "DynamoDB",
+      "priority": 3
+    },
+    {
+      "skill": "Elasticsearch",
+      "priority": 3
+    },
+    {
+      "skill": "ETL Orchestration",
+      "priority": 3
+    },
+    {
+      "skill": "ETL Pipelines",
+      "priority": 3
+    },
+    {
+      "skill": "Firebase Realtime Database",
+      "priority": 3
+    },
+    {
+      "skill": "Firestore",
+      "priority": 3
+    },
+    {
+      "skill": "Formik",
+      "priority": 3
+    },
+    {
+      "skill": "Google Cloud Platform",
+      "priority": 3
+    },
+    {
+      "skill": "Hugging Face Transformers",
+      "priority": 3
+    },
+    {
+      "skill": "Index Optimization",
+      "priority": 3
+    },
+    {
+      "skill": "Index Tuning",
+      "priority": 3
+    },
+    {
+      "skill": "IndexedDB",
+      "priority": 3
+    },
+    {
+      "skill": "Indexing",
+      "priority": 3
+    },
+    {
+      "skill": "InfluxDB",
+      "priority": 3
+    },
+    {
+      "skill": "Logical Replication",
+      "priority": 3
+    },
+    {
+      "skill": "Memcached",
+      "priority": 3
+    },
+    {
+      "skill": "Microsoft SQL Server",
+      "priority": 3
+    },
+    {
+      "skill": "Mobile Performance Optimization",
+      "priority": 3
+    },
+    {
+      "skill": "MongoDB",
+      "priority": 3
+    },
+    {
+      "skill": "MongoDB Aggregation",
+      "priority": 3
+    },
+    {
+      "skill": "Mongoose",
+      "priority": 3
+    },
+    {
+      "skill": "MySQL",
+      "priority": 3
+    },
+    {
+      "skill": "Neo4j",
+      "priority": 3
+    },
+    {
+      "skill": "Netlify",
+      "priority": 3
+    },
+    {
+      "skill": "Normalization",
+      "priority": 3
+    },
+    {
+      "skill": "Oracle Database",
+      "priority": 3
+    },
+    {
+      "skill": "Oracle DB",
+      "priority": 3
+    },
+    {
+      "skill": "ORM",
+      "priority": 3
+    },
+    {
+      "skill": "Performance Baselines",
+      "priority": 3
+    },
+    {
+      "skill": "Performance Profiling",
+      "priority": 3
+    },
+    {
+      "skill": "Performance Testing",
+      "priority": 3
+    },
+    {
+      "skill": "Postgres SQL",
+      "priority": 3
+    },
+    {
+      "skill": "PostgreSQL",
+      "priority": 3
+    },
+    {
+      "skill": "PostgreSQL schema design",
+      "priority": 3
+    },
+    {
+      "skill": "Prisma",
+      "priority": 3
+    },
+    {
+      "skill": "Prisma Migrate",
+      "priority": 3
+    },
+    {
+      "skill": "Query Optimization",
+      "priority": 3
+    },
+    {
+      "skill": "Query Planning",
+      "priority": 3
+    },
+    {
+      "skill": "Query Tuning",
+      "priority": 3
+    },
+    {
+      "skill": "Redis",
+      "priority": 3
+    },
+    {
+      "skill": "Redis Cluster",
+      "priority": 3
+    },
+    {
+      "skill": "Redis Sentinel",
+      "priority": 3
+    },
+    {
+      "skill": "Redis Streams",
+      "priority": 3
+    },
+    {
+      "skill": "RedisInsight",
+      "priority": 3
+    },
+    {
+      "skill": "Replication",
+      "priority": 3
+    },
+    {
+      "skill": "Reverse ETL",
+      "priority": 3
+    },
+    {
+      "skill": "Room Database",
+      "priority": 3
+    },
+    {
+      "skill": "Schema Design",
+      "priority": 3
+    },
+    {
+      "skill": "Schema Registry",
+      "priority": 3
+    },
+    {
+      "skill": "Schema Validation",
+      "priority": 3
+    },
+    {
+      "skill": "Schema Validation Testing",
+      "priority": 3
+    },
+    {
+      "skill": "Sentence Transformers",
+      "priority": 3
+    },
+    {
+      "skill": "Sequelize",
+      "priority": 3
+    },
+    {
+      "skill": "Sharding",
+      "priority": 3
+    },
+    {
+      "skill": "Solr",
+      "priority": 3
+    },
+    {
+      "skill": "TanStack Query",
+      "priority": 3
+    },
+    {
+      "skill": "Terraform",
+      "priority": 3
+    },
+    {
+      "skill": "TimescaleDB",
+      "priority": 3
+    },
+    {
+      "skill": "TypeORM",
+      "priority": 3
+    },
+    {
+      "skill": "Amazon API Gateway",
+      "priority": 4
+    },
+    {
+      "skill": "Amazon CloudFront",
+      "priority": 4
+    },
+    {
+      "skill": "Amazon EC2",
+      "priority": 4
+    },
+    {
+      "skill": "Amazon ECS",
+      "priority": 4
+    },
+    {
+      "skill": "Amazon EKS",
+      "priority": 4
+    },
+    {
+      "skill": "Amazon RDS",
+      "priority": 4
+    },
+    {
+      "skill": "Amazon Route 53",
+      "priority": 4
+    },
+    {
+      "skill": "Amazon S3",
+      "priority": 4
+    },
+    {
+      "skill": "Amazon VPC",
+      "priority": 4
+    },
+    {
+      "skill": "Ansible",
+      "priority": 4
+    },
+    {
+      "skill": "API gateway",
+      "priority": 4
+    },
+    {
+      "skill": "API Gateways",
+      "priority": 4
+    },
+    {
+      "skill": "App Store Deployment",
+      "priority": 4
+    },
+    {
+      "skill": "Architecture Decision Records",
+      "priority": 4
+    },
+    {
+      "skill": "ArgoCD",
+      "priority": 4
+    },
+    {
+      "skill": "Auto Scaling",
+      "priority": 4
+    },
+    {
+      "skill": "AWS",
+      "priority": 4
+    },
+    {
+      "skill": "AWS App Runner",
+      "priority": 4
+    },
+    {
+      "skill": "AWS AppSync",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Athena",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Backup",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Batch",
+      "priority": 4
+    },
+    {
+      "skill": "AWS CDK",
+      "priority": 4
+    },
+    {
+      "skill": "AWS CloudTrail",
+      "priority": 4
+    },
+    {
+      "skill": "AWS CodeBuild",
+      "priority": 4
+    },
+    {
+      "skill": "AWS CodeDeploy",
+      "priority": 4
+    },
+    {
+      "skill": "AWS CodePipeline",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Cognito",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Config",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Control Tower",
+      "priority": 4
+    },
+    {
+      "skill": "AWS ECS",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Elastic Beanstalk",
+      "priority": 4
+    },
+    {
+      "skill": "AWS EventBridge",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Fargate",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Global Accelerator",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Glue",
+      "priority": 4
+    },
+    {
+      "skill": "AWS IAM",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Inspector",
+      "priority": 4
+    },
+    {
+      "skill": "AWS KMS",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Lambda",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Macie",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Organizations",
+      "priority": 4
+    },
+    {
+      "skill": "AWS PrivateLink",
+      "priority": 4
+    },
+    {
+      "skill": "AWS RDS",
+      "priority": 4
+    },
+    {
+      "skill": "AWS S3",
+      "priority": 4
+    },
+    {
+      "skill": "AWS SAM",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Secrets Manager",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Security Hub",
+      "priority": 4
+    },
+    {
+      "skill": "Aws Services",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Shield",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Step Functions",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Systems Manager",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Transit Gateway",
+      "priority": 4
+    },
+    {
+      "skill": "AWS Trusted Advisor",
+      "priority": 4
+    },
+    {
+      "skill": "AWS WAF",
+      "priority": 4
+    },
+    {
+      "skill": "AWS X-Ray",
+      "priority": 4
+    },
+    {
+      "skill": "Azure",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Active Directory",
+      "priority": 4
+    },
+    {
+      "skill": "Azure API Management",
+      "priority": 4
+    },
+    {
+      "skill": "Azure App Service",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Bicep",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Blob Storage",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Container Apps",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Data Factory",
+      "priority": 4
+    },
+    {
+      "skill": "Azure DevOps",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Event Grid",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Event Hubs",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Firewall",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Front Door",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Functions",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Functions Durable",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Key Vault",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Kubernetes Service",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Logic Apps",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Monitor",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Pipelines",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Policy",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Resource Manager",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Sentinel",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Service Bus",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Synapse Analytics",
+      "priority": 4
+    },
+    {
+      "skill": "Azure Virtual Machines",
+      "priority": 4
+    },
+    {
+      "skill": "Blue-Green Deployment",
+      "priority": 4
+    },
+    {
+      "skill": "Canary Deployment",
+      "priority": 4
+    },
+    {
+      "skill": "Chef",
+      "priority": 4
+    },
+    {
+      "skill": "CI/CD",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud architecture",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Armor",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Billing Analysis",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Build",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud CDN",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Computing",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud DNS",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Functions",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud infrastructure",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud IoT integration",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Load Balancing",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Logging",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Migration",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Monitoring",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Run",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud services",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Spanner",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud SQL",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud Storage",
+      "priority": 4
+    },
+    {
+      "skill": "Cloud-Native Development",
+      "priority": 4
+    },
+    {
+      "skill": "Cloudflare Pages",
+      "priority": 4
+    },
+    {
+      "skill": "Cloudflare Workers",
+      "priority": 4
+    },
+    {
+      "skill": "CloudFront",
+      "priority": 4
+    },
+    {
+      "skill": "CloudTrail",
+      "priority": 4
+    },
+    {
+      "skill": "CloudWatch",
+      "priority": 4
+    },
+    {
+      "skill": "CSS3",
+      "priority": 4
+    },
+    {
+      "skill": "Datadog",
+      "priority": 4
+    },
+    {
+      "skill": "Datadog APM",
+      "priority": 4
+    },
+    {
+      "skill": "Docker",
+      "priority": 4
+    },
+    {
+      "skill": "Docker Compose",
+      "priority": 4
+    },
+    {
+      "skill": "Dockerfile",
+      "priority": 4
+    },
+    {
+      "skill": "EC2",
+      "priority": 4
+    },
+    {
+      "skill": "ECS",
+      "priority": 4
+    },
+    {
+      "skill": "EKS",
+      "priority": 4
+    },
+    {
+      "skill": "Elastic Load Balancing",
+      "priority": 4
+    },
+    {
+      "skill": "ELK Stack",
+      "priority": 4
+    },
+    {
+      "skill": "Flux",
+      "priority": 4
+    },
+    {
+      "skill": "Flux CD",
+      "priority": 4
+    },
+    {
+      "skill": "GCP",
+      "priority": 4
+    },
+    {
+      "skill": "GitLab CI/CD",
+      "priority": 4
+    },
+    {
+      "skill": "Google Cloud Armor WAF",
+      "priority": 4
+    },
+    {
+      "skill": "Google IAM",
+      "priority": 4
+    },
+    {
+      "skill": "Google Kubernetes Engine",
+      "priority": 4
+    },
+    {
+      "skill": "Google Play Deployment",
+      "priority": 4
+    },
+    {
+      "skill": "Grafana",
+      "priority": 4
+    },
+    {
+      "skill": "Grafana Mimir",
+      "priority": 4
+    },
+    {
+      "skill": "Grafana Tempo",
+      "priority": 4
+    },
+    {
+      "skill": "Helm",
+      "priority": 4
+    },
+    {
+      "skill": "Helmfile",
+      "priority": 4
+    },
+    {
+      "skill": "Hybrid Cloud",
+      "priority": 4
+    },
+    {
+      "skill": "IAM",
+      "priority": 4
+    },
+    {
+      "skill": "Immutable Infrastructure",
+      "priority": 4
+    },
+    {
+      "skill": "Infrastructure",
+      "priority": 4
+    },
+    {
+      "skill": "Infrastructure Automation",
+      "priority": 4
+    },
+    {
+      "skill": "Istio",
+      "priority": 4
+    },
+    {
+      "skill": "Kubernetes",
+      "priority": 4
+    },
+    {
+      "skill": "Lambda",
+      "priority": 4
+    },
+    {
+      "skill": "Linkerd",
+      "priority": 4
+    },
+    {
+      "skill": "Load Balancing",
+      "priority": 4
+    },
+    {
+      "skill": "Mobile CI/CD",
+      "priority": 4
+    },
+    {
+      "skill": "Multi-cloud",
+      "priority": 4
+    },
+    {
+      "skill": "Multi-Cloud Strategy",
+      "priority": 4
+    },
+    {
+      "skill": "Network Latency",
+      "priority": 4
+    },
+    {
+      "skill": "Network Security",
+      "priority": 4
+    },
+    {
+      "skill": "Network Troubleshooting",
+      "priority": 4
+    },
+    {
+      "skill": "New Relic",
+      "priority": 4
+    },
+    {
+      "skill": "OpenShift",
+      "priority": 4
+    },
+    {
+      "skill": "Prometheus",
+      "priority": 4
+    },
+    {
+      "skill": "Puppet",
+      "priority": 4
+    },
+    {
+      "skill": "Puppeteer",
+      "priority": 4
+    },
+    {
+      "skill": "RDS",
+      "priority": 4
+    },
+    {
+      "skill": "Rolling Deployment",
+      "priority": 4
+    },
+    {
+      "skill": "S3",
+      "priority": 4
+    },
+    {
+      "skill": "VictoriaMetrics",
+      "priority": 4
+    },
+    {
+      "skill": "VPC",
+      "priority": 4
+    },
+    {
+      "skill": "Zero-Downtime Deployment",
+      "priority": 4
+    },
+    {
+      "skill": "A/B Experiment Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "A/B Testing",
+      "priority": 5
+    },
+    {
+      "skill": "ABAC",
+      "priority": 5
+    },
+    {
+      "skill": "ABAP",
+      "priority": 5
+    },
+    {
+      "skill": "Abuse Case Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "Abuse Prevention",
+      "priority": 5
+    },
+    {
+      "skill": "Acceptance Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Access Reviews",
+      "priority": 5
+    },
+    {
+      "skill": "Accessibility Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Accessibility Testing Automation",
+      "priority": 5
+    },
+    {
+      "skill": "Accuracy",
+      "priority": 5
+    },
+    {
+      "skill": "ACID",
+      "priority": 5
+    },
+    {
+      "skill": "ACID Compliance",
+      "priority": 5
+    },
+    {
+      "skill": "ActionScript",
+      "priority": 5
+    },
+    {
+      "skill": "ActiveJob",
+      "priority": 5
+    },
+    {
+      "skill": "Actix Web",
+      "priority": 5
+    },
+    {
+      "skill": "Actix-web",
+      "priority": 5
+    },
+    {
+      "skill": "Ada",
+      "priority": 5
+    },
+    {
+      "skill": "ADR Writing",
+      "priority": 5
+    },
+    {
+      "skill": "AG Grid",
+      "priority": 5
+    },
+    {
+      "skill": "Agile Development",
+      "priority": 5
+    },
+    {
+      "skill": "AI/ML",
+      "priority": 5
+    },
+    {
+      "skill": "Airflow",
+      "priority": 5
+    },
+    {
+      "skill": "AKS",
+      "priority": 5
+    },
+    {
+      "skill": "Alembic",
+      "priority": 5
+    },
+    {
+      "skill": "Alerting",
+      "priority": 5
+    },
+    {
+      "skill": "Alertmanager",
+      "priority": 5
+    },
+    {
+      "skill": "Allure Reports",
+      "priority": 5
+    },
+    {
+      "skill": "Alpine Linux",
+      "priority": 5
+    },
+    {
+      "skill": "Alpine.js",
+      "priority": 5
+    },
+    {
+      "skill": "Amazon Aurora",
+      "priority": 5
+    },
+    {
+      "skill": "Amazon ElastiCache",
+      "priority": 5
+    },
+    {
+      "skill": "Amazon EMR",
+      "priority": 5
+    },
+    {
+      "skill": "Amazon Kinesis",
+      "priority": 5
+    },
+    {
+      "skill": "Amazon SNS",
+      "priority": 5
+    },
+    {
+      "skill": "Amazon SQS",
+      "priority": 5
+    },
+    {
+      "skill": "AMQP",
+      "priority": 5
+    },
+    {
+      "skill": "Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "Analytics Integration",
+      "priority": 5
+    },
+    {
+      "skill": "Android",
+      "priority": 5
+    },
+    {
+      "skill": "Android Development",
+      "priority": 5
+    },
+    {
+      "skill": "Android SDK",
+      "priority": 5
+    },
+    {
+      "skill": "Anomaly Detection",
+      "priority": 5
+    },
+    {
+      "skill": "Ant Design",
+      "priority": 5
+    },
+    {
+      "skill": "Anycast",
+      "priority": 5
+    },
+    {
+      "skill": "Apache Airflow",
+      "priority": 5
+    },
+    {
+      "skill": "Apache Avro",
+      "priority": 5
+    },
+    {
+      "skill": "Apache Beam",
+      "priority": 5
+    },
+    {
+      "skill": "Apache Camel",
+      "priority": 5
+    },
+    {
+      "skill": "Apache Flink",
+      "priority": 5
+    },
+    {
+      "skill": "Apache HTTP Server",
+      "priority": 5
+    },
+    {
+      "skill": "Apache Hudi",
+      "priority": 5
+    },
+    {
+      "skill": "Apache Iceberg",
+      "priority": 5
+    },
+    {
+      "skill": "Apache Kafka",
+      "priority": 5
+    },
+    {
+      "skill": "Apache Spark",
+      "priority": 5
+    },
+    {
+      "skill": "Apache Struts",
+      "priority": 5
+    },
+    {
+      "skill": "Apache ZooKeeper",
+      "priority": 5
+    },
+    {
+      "skill": "Apex",
+      "priority": 5
+    },
+    {
+      "skill": "ApexCharts",
+      "priority": 5
+    },
+    {
+      "skill": "API automation",
+      "priority": 5
+    },
+    {
+      "skill": "API Contracts",
+      "priority": 5
+    },
+    {
+      "skill": "API design",
+      "priority": 5
+    },
+    {
+      "skill": "API development",
+      "priority": 5
+    },
+    {
+      "skill": "API Documentation",
+      "priority": 5
+    },
+    {
+      "skill": "API integration",
+      "priority": 5
+    },
+    {
+      "skill": "API integrations",
+      "priority": 5
+    },
+    {
+      "skill": "API management",
+      "priority": 5
+    },
+    {
+      "skill": "API Security",
+      "priority": 5
+    },
+    {
+      "skill": "API Testing",
+      "priority": 5
+    },
+    {
+      "skill": "API Versioning",
+      "priority": 5
+    },
+    {
+      "skill": "Apigee",
+      "priority": 5
+    },
+    {
+      "skill": "APIs",
+      "priority": 5
+    },
+    {
+      "skill": "Apollo Client",
+      "priority": 5
+    },
+    {
+      "skill": "App Engine",
+      "priority": 5
+    },
+    {
+      "skill": "App Signing",
+      "priority": 5
+    },
+    {
+      "skill": "AppArmor",
+      "priority": 5
+    },
+    {
+      "skill": "Appium",
+      "priority": 5
+    },
+    {
+      "skill": "Application Security",
+      "priority": 5
+    },
+    {
+      "skill": "ArangoDB",
+      "priority": 5
+    },
+    {
+      "skill": "Argo CD",
+      "priority": 5
+    },
+    {
+      "skill": "Argon2",
+      "priority": 5
+    },
+    {
+      "skill": "ASP.NET",
+      "priority": 5
+    },
+    {
+      "skill": "ASP.NET Core",
+      "priority": 5
+    },
+    {
+      "skill": "Assembly",
+      "priority": 5
+    },
+    {
+      "skill": "Astro",
+      "priority": 5
+    },
+    {
+      "skill": "Async I/O",
+      "priority": 5
+    },
+    {
+      "skill": "Async Programming",
+      "priority": 5
+    },
+    {
+      "skill": "Async/Await",
+      "priority": 5
+    },
+    {
+      "skill": "AsyncAPI",
+      "priority": 5
+    },
+    {
+      "skill": "ATDD",
+      "priority": 5
+    },
+    {
+      "skill": "Attribute-Based Access Control",
+      "priority": 5
+    },
+    {
+      "skill": "Audit Logging",
+      "priority": 5
+    },
+    {
+      "skill": "Audit Readiness",
+      "priority": 5
+    },
+    {
+      "skill": "Aurora",
+      "priority": 5
+    },
+    {
+      "skill": "Auth0 SDK",
+      "priority": 5
+    },
+    {
+      "skill": "Authentication Middleware",
+      "priority": 5
+    },
+    {
+      "skill": "Authorization Policies",
+      "priority": 5
+    },
+    {
+      "skill": "Auto-scaling",
+      "priority": 5
+    },
+    {
+      "skill": "Automated testing",
+      "priority": 5
+    },
+    {
+      "skill": "Automation",
+      "priority": 5
+    },
+    {
+      "skill": "Avro",
+      "priority": 5
+    },
+    {
+      "skill": "Awk",
+      "priority": 5
+    },
+    {
+      "skill": "awk/sed",
+      "priority": 5
+    },
+    {
+      "skill": "Axum",
+      "priority": 5
+    },
+    {
+      "skill": "Backbone.js",
+      "priority": 5
+    },
+    {
+      "skill": "Backend APIs",
+      "priority": 5
+    },
+    {
+      "skill": "Backend development",
+      "priority": 5
+    },
+    {
+      "skill": "Backend for Frontend",
+      "priority": 5
+    },
+    {
+      "skill": "Background Job Processing",
+      "priority": 5
+    },
+    {
+      "skill": "Backlog Grooming",
+      "priority": 5
+    },
+    {
+      "skill": "Backpressure",
+      "priority": 5
+    },
+    {
+      "skill": "Backup and Recovery",
+      "priority": 5
+    },
+    {
+      "skill": "Backward Compatibility",
+      "priority": 5
+    },
+    {
+      "skill": "Bamboo",
+      "priority": 5
+    },
+    {
+      "skill": "Base64",
+      "priority": 5
+    },
+    {
+      "skill": "Batch Processing",
+      "priority": 5
+    },
+    {
+      "skill": "Bazel",
+      "priority": 5
+    },
+    {
+      "skill": "Bcrypt",
+      "priority": 5
+    },
+    {
+      "skill": "BDD",
+      "priority": 5
+    },
+    {
+      "skill": "Beam",
+      "priority": 5
+    },
+    {
+      "skill": "Bearer Token Authentication",
+      "priority": 5
+    },
+    {
+      "skill": "Beego",
+      "priority": 5
+    },
+    {
+      "skill": "Behave",
+      "priority": 5
+    },
+    {
+      "skill": "Behavior-Driven Development",
+      "priority": 5
+    },
+    {
+      "skill": "BEM",
+      "priority": 5
+    },
+    {
+      "skill": "Benchmark Automation",
+      "priority": 5
+    },
+    {
+      "skill": "Benchmarking",
+      "priority": 5
+    },
+    {
+      "skill": "BFF Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "BGP Basics",
+      "priority": 5
+    },
+    {
+      "skill": "BI Tools",
+      "priority": 5
+    },
+    {
+      "skill": "BigTable",
+      "priority": 5
+    },
+    {
+      "skill": "Binary Protocols",
+      "priority": 5
+    },
+    {
+      "skill": "Biometric Auth",
+      "priority": 5
+    },
+    {
+      "skill": "BIOS/UEFI",
+      "priority": 5
+    },
+    {
+      "skill": "Bitbucket",
+      "priority": 5
+    },
+    {
+      "skill": "Blackbox Exporter",
+      "priority": 5
+    },
+    {
+      "skill": "Blob Storage",
+      "priority": 5
+    },
+    {
+      "skill": "Blue-Green",
+      "priority": 5
+    },
+    {
+      "skill": "Bluetooth Low Energy",
+      "priority": 5
+    },
+    {
+      "skill": "Bot Protection",
+      "priority": 5
+    },
+    {
+      "skill": "Boundary Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Branching Strategy",
+      "priority": 5
+    },
+    {
+      "skill": "Browser DevTools",
+      "priority": 5
+    },
+    {
+      "skill": "Bug Reproduction",
+      "priority": 5
+    },
+    {
+      "skill": "Build Caching",
+      "priority": 5
+    },
+    {
+      "skill": "Builder Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "Buildkite",
+      "priority": 5
+    },
+    {
+      "skill": "Bulkhead Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "Bull/BullMQ",
+      "priority": 5
+    },
+    {
+      "skill": "Bulma",
+      "priority": 5
+    },
+    {
+      "skill": "Bun",
+      "priority": 5
+    },
+    {
+      "skill": "Business Intelligence",
+      "priority": 5
+    },
+    {
+      "skill": "C",
+      "priority": 5
+    },
+    {
+      "skill": "C4 Model",
+      "priority": 5
+    },
+    {
+      "skill": "Caching",
+      "priority": 5
+    },
+    {
+      "skill": "Caching Layers",
+      "priority": 5
+    },
+    {
+      "skill": "Caching Strategies",
+      "priority": 5
+    },
+    {
+      "skill": "Caching Strategy",
+      "priority": 5
+    },
+    {
+      "skill": "cAdvisor",
+      "priority": 5
+    },
+    {
+      "skill": "CakePHP",
+      "priority": 5
+    },
+    {
+      "skill": "Calico",
+      "priority": 5
+    },
+    {
+      "skill": "Canary Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "Canvas API",
+      "priority": 5
+    },
+    {
+      "skill": "CAP Theorem",
+      "priority": 5
+    },
+    {
+      "skill": "Capacitor",
+      "priority": 5
+    },
+    {
+      "skill": "Capacity Forecasting",
+      "priority": 5
+    },
+    {
+      "skill": "Capacity Planning",
+      "priority": 5
+    },
+    {
+      "skill": "CatBoost",
+      "priority": 5
+    },
+    {
+      "skill": "Causal Inference",
+      "priority": 5
+    },
+    {
+      "skill": "CDC",
+      "priority": 5
+    },
+    {
+      "skill": "CDK",
+      "priority": 5
+    },
+    {
+      "skill": "CDN",
+      "priority": 5
+    },
+    {
+      "skill": "CDN Integration",
+      "priority": 5
+    },
+    {
+      "skill": "Celery",
+      "priority": 5
+    },
+    {
+      "skill": "Celery Beat",
+      "priority": 5
+    },
+    {
+      "skill": "CentOS",
+      "priority": 5
+    },
+    {
+      "skill": "Certificate Management",
+      "priority": 5
+    },
+    {
+      "skill": "Certificate Pinning",
+      "priority": 5
+    },
+    {
+      "skill": "Cgroups",
+      "priority": 5
+    },
+    {
+      "skill": "Change Data Capture",
+      "priority": 5
+    },
+    {
+      "skill": "Change Management",
+      "priority": 5
+    },
+    {
+      "skill": "Changelog Management",
+      "priority": 5
+    },
+    {
+      "skill": "Changelog Writing",
+      "priority": 5
+    },
+    {
+      "skill": "Chaos Engineering",
+      "priority": 5
+    },
+    {
+      "skill": "Chaos Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Chart.js",
+      "priority": 5
+    },
+    {
+      "skill": "Chroma",
+      "priority": 5
+    },
+    {
+      "skill": "CIDR",
+      "priority": 5
+    },
+    {
+      "skill": "Cilium",
+      "priority": 5
+    },
+    {
+      "skill": "CircleCI",
+      "priority": 5
+    },
+    {
+      "skill": "Circuit Breaker",
+      "priority": 5
+    },
+    {
+      "skill": "Circuit Breaker Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "Classification Models",
+      "priority": 5
+    },
+    {
+      "skill": "Clean Architecture",
+      "priority": 5
+    },
+    {
+      "skill": "ClickHouse",
+      "priority": 5
+    },
+    {
+      "skill": "Clojure",
+      "priority": 5
+    },
+    {
+      "skill": "Closures",
+      "priority": 5
+    },
+    {
+      "skill": "Clustering",
+      "priority": 5
+    },
+    {
+      "skill": "CMake",
+      "priority": 5
+    },
+    {
+      "skill": "COBOL",
+      "priority": 5
+    },
+    {
+      "skill": "CockroachDB",
+      "priority": 5
+    },
+    {
+      "skill": "Code Coverage",
+      "priority": 5
+    },
+    {
+      "skill": "Code Quality Gates",
+      "priority": 5
+    },
+    {
+      "skill": "Code Review",
+      "priority": 5
+    },
+    {
+      "skill": "Code Signing",
+      "priority": 5
+    },
+    {
+      "skill": "CodeIgniter",
+      "priority": 5
+    },
+    {
+      "skill": "CoffeeScript",
+      "priority": 5
+    },
+    {
+      "skill": "Command Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "Common Lisp",
+      "priority": 5
+    },
+    {
+      "skill": "Compliance Automation",
+      "priority": 5
+    },
+    {
+      "skill": "Component Libraries",
+      "priority": 5
+    },
+    {
+      "skill": "Component Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Compression",
+      "priority": 5
+    },
+    {
+      "skill": "Computer Vision",
+      "priority": 5
+    },
+    {
+      "skill": "Concurrency",
+      "priority": 5
+    },
+    {
+      "skill": "Concurrency Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Configuration Management",
+      "priority": 5
+    },
+    {
+      "skill": "Connection Pooling",
+      "priority": 5
+    },
+    {
+      "skill": "Consul",
+      "priority": 5
+    },
+    {
+      "skill": "Containerd",
+      "priority": 5
+    },
+    {
+      "skill": "Containerization",
+      "priority": 5
+    },
+    {
+      "skill": "Content Security Policy",
+      "priority": 5
+    },
+    {
+      "skill": "Contract Mocking",
+      "priority": 5
+    },
+    {
+      "skill": "Contract Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Control Groups",
+      "priority": 5
+    },
+    {
+      "skill": "Conventional Commits",
+      "priority": 5
+    },
+    {
+      "skill": "Copilot",
+      "priority": 5
+    },
+    {
+      "skill": "Cordova",
+      "priority": 5
+    },
+    {
+      "skill": "Core Data",
+      "priority": 5
+    },
+    {
+      "skill": "Core Web Vitals",
+      "priority": 5
+    },
+    {
+      "skill": "CORS",
+      "priority": 5
+    },
+    {
+      "skill": "Cosign",
+      "priority": 5
+    },
+    {
+      "skill": "Cosmos DB",
+      "priority": 5
+    },
+    {
+      "skill": "Cost Optimization",
+      "priority": 5
+    },
+    {
+      "skill": "Couchbase",
+      "priority": 5
+    },
+    {
+      "skill": "Coverage Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "CPU Profiling",
+      "priority": 5
+    },
+    {
+      "skill": "CQRS",
+      "priority": 5
+    },
+    {
+      "skill": "Crashlytics",
+      "priority": 5
+    },
+    {
+      "skill": "CRI-O",
+      "priority": 5
+    },
+    {
+      "skill": "Cron",
+      "priority": 5
+    },
+    {
+      "skill": "Cron Jobs",
+      "priority": 5
+    },
+    {
+      "skill": "Cross-Browser Compatibility",
+      "priority": 5
+    },
+    {
+      "skill": "Cross-Device Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Cross-functional Leadership",
+      "priority": 5
+    },
+    {
+      "skill": "Crystal",
+      "priority": 5
+    },
+    {
+      "skill": "CSP",
+      "priority": 5
+    },
+    {
+      "skill": "CSP Headers",
+      "priority": 5
+    },
+    {
+      "skill": "CSRF Prevention",
+      "priority": 5
+    },
+    {
+      "skill": "CSRF Protection",
+      "priority": 5
+    },
+    {
+      "skill": "CSRF Tokens",
+      "priority": 5
+    },
+    {
+      "skill": "Cucumber",
+      "priority": 5
+    },
+    {
+      "skill": "CUDA",
+      "priority": 5
+    },
+    {
+      "skill": "CUDA Optimization",
+      "priority": 5
+    },
+    {
+      "skill": "curl",
+      "priority": 5
+    },
+    {
+      "skill": "Cybersecurity",
+      "priority": 5
+    },
+    {
+      "skill": "D3.js",
+      "priority": 5
+    },
+    {
+      "skill": "Dagster",
+      "priority": 5
+    },
+    {
+      "skill": "Dask",
+      "priority": 5
+    },
+    {
+      "skill": "DAST",
+      "priority": 5
+    },
+    {
+      "skill": "Data Annotation",
+      "priority": 5
+    },
+    {
+      "skill": "Data Catalog",
+      "priority": 5
+    },
+    {
+      "skill": "Data Cleaning",
+      "priority": 5
+    },
+    {
+      "skill": "Data Drift Detection",
+      "priority": 5
+    },
+    {
+      "skill": "Data Encryption",
+      "priority": 5
+    },
+    {
+      "skill": "Data Governance",
+      "priority": 5
+    },
+    {
+      "skill": "Data Lineage",
+      "priority": 5
+    },
+    {
+      "skill": "Data Masking",
+      "priority": 5
+    },
+    {
+      "skill": "Data Modeling",
+      "priority": 5
+    },
+    {
+      "skill": "Data Quality Monitoring",
+      "priority": 5
+    },
+    {
+      "skill": "Data Validation",
+      "priority": 5
+    },
+    {
+      "skill": "Data Versioning",
+      "priority": 5
+    },
+    {
+      "skill": "Data Visualization",
+      "priority": 5
+    },
+    {
+      "skill": "Data Warehousing",
+      "priority": 5
+    },
+    {
+      "skill": "Databricks SQL",
+      "priority": 5
+    },
+    {
+      "skill": "DataGrip",
+      "priority": 5
+    },
+    {
+      "skill": "DataTables",
+      "priority": 5
+    },
+    {
+      "skill": "DBeaver",
+      "priority": 5
+    },
+    {
+      "skill": "dbt",
+      "priority": 5
+    },
+    {
+      "skill": "DDD",
+      "priority": 5
+    },
+    {
+      "skill": "DDoS Mitigation",
+      "priority": 5
+    },
+    {
+      "skill": "Dead Letter Queue",
+      "priority": 5
+    },
+    {
+      "skill": "Debezium",
+      "priority": 5
+    },
+    {
+      "skill": "Debian",
+      "priority": 5
+    },
+    {
+      "skill": "Debugging",
+      "priority": 5
+    },
+    {
+      "skill": "Decorator Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "Deep Linking",
+      "priority": 5
+    },
+    {
+      "skill": "Defect Triage",
+      "priority": 5
+    },
+    {
+      "skill": "DeFi",
+      "priority": 5
+    },
+    {
+      "skill": "Delphi",
+      "priority": 5
+    },
+    {
+      "skill": "Delta Lake",
+      "priority": 5
+    },
+    {
+      "skill": "Deno",
+      "priority": 5
+    },
+    {
+      "skill": "Dependency Injection",
+      "priority": 5
+    },
+    {
+      "skill": "Dependency Management",
+      "priority": 5
+    },
+    {
+      "skill": "Dependency Scanning",
+      "priority": 5
+    },
+    {
+      "skill": "Deprecation Strategy",
+      "priority": 5
+    },
+    {
+      "skill": "Deserialization",
+      "priority": 5
+    },
+    {
+      "skill": "Design Docs",
+      "priority": 5
+    },
+    {
+      "skill": "Design Patterns",
+      "priority": 5
+    },
+    {
+      "skill": "Design Systems",
+      "priority": 5
+    },
+    {
+      "skill": "DevOps",
+      "priority": 5
+    },
+    {
+      "skill": "DevSecOps",
+      "priority": 5
+    },
+    {
+      "skill": "DHCP",
+      "priority": 5
+    },
+    {
+      "skill": "DigitalOcean",
+      "priority": 5
+    },
+    {
+      "skill": "Dimensionality Reduction",
+      "priority": 5
+    },
+    {
+      "skill": "Disaster Recovery",
+      "priority": 5
+    },
+    {
+      "skill": "Distributed Locking",
+      "priority": 5
+    },
+    {
+      "skill": "Distributed Systems",
+      "priority": 5
+    },
+    {
+      "skill": "Distributed Tracing",
+      "priority": 5
+    },
+    {
+      "skill": "DNS",
+      "priority": 5
+    },
+    {
+      "skill": "Document Conversion",
+      "priority": 5
+    },
+    {
+      "skill": "Domain-Driven Design",
+      "priority": 5
+    },
+    {
+      "skill": "Dramatiq",
+      "priority": 5
+    },
+    {
+      "skill": "Drone CI",
+      "priority": 5
+    },
+    {
+      "skill": "Dropwizard",
+      "priority": 5
+    },
+    {
+      "skill": "DRY",
+      "priority": 5
+    },
+    {
+      "skill": "DuckDB",
+      "priority": 5
+    },
+    {
+      "skill": "Dynamic Application Security Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Dynatrace",
+      "priority": 5
+    },
+    {
+      "skill": "E2E Testing",
+      "priority": 5
+    },
+    {
+      "skill": "eBPF",
+      "priority": 5
+    },
+    {
+      "skill": "eBPF Basics",
+      "priority": 5
+    },
+    {
+      "skill": "Echo",
+      "priority": 5
+    },
+    {
+      "skill": "Edge case testing",
+      "priority": 5
+    },
+    {
+      "skill": "Edge Computing",
+      "priority": 5
+    },
+    {
+      "skill": "ElastiCache",
+      "priority": 5
+    },
+    {
+      "skill": "Eleventy",
+      "priority": 5
+    },
+    {
+      "skill": "Elm",
+      "priority": 5
+    },
+    {
+      "skill": "Email Delivery Systems",
+      "priority": 5
+    },
+    {
+      "skill": "Embeddings",
+      "priority": 5
+    },
+    {
+      "skill": "Encryption",
+      "priority": 5
+    },
+    {
+      "skill": "Encryption at Rest",
+      "priority": 5
+    },
+    {
+      "skill": "Encryption in Transit",
+      "priority": 5
+    },
+    {
+      "skill": "End-to-End Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Engineering Practices",
+      "priority": 5
+    },
+    {
+      "skill": "Entity Framework",
+      "priority": 5
+    },
+    {
+      "skill": "Envoy",
+      "priority": 5
+    },
+    {
+      "skill": "epoll",
+      "priority": 5
+    },
+    {
+      "skill": "ERD",
+      "priority": 5
+    },
+    {
+      "skill": "Erlang",
+      "priority": 5
+    },
+    {
+      "skill": "Error Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "Error Budgets",
+      "priority": 5
+    },
+    {
+      "skill": "Error Monitoring",
+      "priority": 5
+    },
+    {
+      "skill": "esbuild",
+      "priority": 5
+    },
+    {
+      "skill": "ETag",
+      "priority": 5
+    },
+    {
+      "skill": "etcd",
+      "priority": 5
+    },
+    {
+      "skill": "Event Hub",
+      "priority": 5
+    },
+    {
+      "skill": "Event Sourcing",
+      "priority": 5
+    },
+    {
+      "skill": "Event-Driven",
+      "priority": 5
+    },
+    {
+      "skill": "Event-driven architecture",
+      "priority": 5
+    },
+    {
+      "skill": "Event-Driven Services",
+      "priority": 5
+    },
+    {
+      "skill": "Eventual Consistency",
+      "priority": 5
+    },
+    {
+      "skill": "Experiment Tracking",
+      "priority": 5
+    },
+    {
+      "skill": "Explain Analyze",
+      "priority": 5
+    },
+    {
+      "skill": "Expo",
+      "priority": 5
+    },
+    {
+      "skill": "Extreme Programming",
+      "priority": 5
+    },
+    {
+      "skill": "F#",
+      "priority": 5
+    },
+    {
+      "skill": "Factory Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "Faiss",
+      "priority": 5
+    },
+    {
+      "skill": "Falco",
+      "priority": 5
+    },
+    {
+      "skill": "Falcon",
+      "priority": 5
+    },
+    {
+      "skill": "Fallback Strategy",
+      "priority": 5
+    },
+    {
+      "skill": "Fastify",
+      "priority": 5
+    },
+    {
+      "skill": "Fastlane",
+      "priority": 5
+    },
+    {
+      "skill": "Fault Tolerance",
+      "priority": 5
+    },
+    {
+      "skill": "Feature Engineering",
+      "priority": 5
+    },
+    {
+      "skill": "Feature Flags",
+      "priority": 5
+    },
+    {
+      "skill": "Feature Stores",
+      "priority": 5
+    },
+    {
+      "skill": "Feign",
+      "priority": 5
+    },
+    {
+      "skill": "Fiber",
+      "priority": 5
+    },
+    {
+      "skill": "FIDO2 Awareness",
+      "priority": 5
+    },
+    {
+      "skill": "Figma",
+      "priority": 5
+    },
+    {
+      "skill": "File Permissions",
+      "priority": 5
+    },
+    {
+      "skill": "File Processing Pipelines",
+      "priority": 5
+    },
+    {
+      "skill": "Filesystem Types",
+      "priority": 5
+    },
+    {
+      "skill": "Fine-Tuning",
+      "priority": 5
+    },
+    {
+      "skill": "FinOps",
+      "priority": 5
+    },
+    {
+      "skill": "Firebase Mobile SDK",
+      "priority": 5
+    },
+    {
+      "skill": "Firewall Rules",
+      "priority": 5
+    },
+    {
+      "skill": "Flaky Tests",
+      "priority": 5
+    },
+    {
+      "skill": "Flame Graphs",
+      "priority": 5
+    },
+    {
+      "skill": "Flexbox",
+      "priority": 5
+    },
+    {
+      "skill": "Flink",
+      "priority": 5
+    },
+    {
+      "skill": "Fluent Bit",
+      "priority": 5
+    },
+    {
+      "skill": "Fluentd",
+      "priority": 5
+    },
+    {
+      "skill": "Flutter",
+      "priority": 5
+    },
+    {
+      "skill": "Fly.io",
+      "priority": 5
+    },
+    {
+      "skill": "Flyway",
+      "priority": 5
+    },
+    {
+      "skill": "Font Optimization",
+      "priority": 5
+    },
+    {
+      "skill": "Fortran",
+      "priority": 5
+    },
+    {
+      "skill": "Framer Motion",
+      "priority": 5
+    },
+    {
+      "skill": "Fraud Detection Controls",
+      "priority": 5
+    },
+    {
+      "skill": "FTP",
+      "priority": 5
+    },
+    {
+      "skill": "FTP/SFTP",
+      "priority": 5
+    },
+    {
+      "skill": "Full-Text Search",
+      "priority": 5
+    },
+    {
+      "skill": "Functional Programming",
+      "priority": 5
+    },
+    {
+      "skill": "Functional Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Fuzz Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Gatling",
+      "priority": 5
+    },
+    {
+      "skill": "Gatsby",
+      "priority": 5
+    },
+    {
+      "skill": "GCC/Clang",
+      "priority": 5
+    },
+    {
+      "skill": "GDPR",
+      "priority": 5
+    },
+    {
+      "skill": "GDPR Awareness",
+      "priority": 5
+    },
+    {
+      "skill": "Generics",
+      "priority": 5
+    },
+    {
+      "skill": "Gin",
+      "priority": 5
+    },
+    {
+      "skill": "Git",
+      "priority": 5
+    },
+    {
+      "skill": "Git Flow",
+      "priority": 5
+    },
+    {
+      "skill": "GitFlow",
+      "priority": 5
+    },
+    {
+      "skill": "GitHub",
+      "priority": 5
+    },
+    {
+      "skill": "GitHub Actions",
+      "priority": 5
+    },
+    {
+      "skill": "GitLab",
+      "priority": 5
+    },
+    {
+      "skill": "GitLab CI",
+      "priority": 5
+    },
+    {
+      "skill": "GitOps",
+      "priority": 5
+    },
+    {
+      "skill": "GKE",
+      "priority": 5
+    },
+    {
+      "skill": "GoF Patterns",
+      "priority": 5
+    },
+    {
+      "skill": "Golden File Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Golden Signals Monitoring",
+      "priority": 5
+    },
+    {
+      "skill": "Google Artifact Registry",
+      "priority": 5
+    },
+    {
+      "skill": "Google Composer",
+      "priority": 5
+    },
+    {
+      "skill": "Google Compute Engine",
+      "priority": 5
+    },
+    {
+      "skill": "Google Dataflow",
+      "priority": 5
+    },
+    {
+      "skill": "Google Secret Manager",
+      "priority": 5
+    },
+    {
+      "skill": "Google Vertex AI",
+      "priority": 5
+    },
+    {
+      "skill": "Google Workflows",
+      "priority": 5
+    },
+    {
+      "skill": "GPU Computing",
+      "priority": 5
+    },
+    {
+      "skill": "GraphQL",
+      "priority": 5
+    },
+    {
+      "skill": "GraphQL API",
+      "priority": 5
+    },
+    {
+      "skill": "Great Expectations",
+      "priority": 5
+    },
+    {
+      "skill": "gRPC",
+      "priority": 5
+    },
+    {
+      "skill": "gRPC Services",
+      "priority": 5
+    },
+    {
+      "skill": "Grype",
+      "priority": 5
+    },
+    {
+      "skill": "GSAP",
+      "priority": 5
+    },
+    {
+      "skill": "Gunicorn",
+      "priority": 5
+    },
+    {
+      "skill": "Hack",
+      "priority": 5
+    },
+    {
+      "skill": "Hanami",
+      "priority": 5
+    },
+    {
+      "skill": "Hapi.js",
+      "priority": 5
+    },
+    {
+      "skill": "HAProxy",
+      "priority": 5
+    },
+    {
+      "skill": "Harbor",
+      "priority": 5
+    },
+    {
+      "skill": "Hardware Security Modules",
+      "priority": 5
+    },
+    {
+      "skill": "HashiCorp Vault",
+      "priority": 5
+    },
+    {
+      "skill": "Hashing",
+      "priority": 5
+    },
+    {
+      "skill": "Haskell",
+      "priority": 5
+    },
+    {
+      "skill": "Haystack",
+      "priority": 5
+    },
+    {
+      "skill": "HBase",
+      "priority": 5
+    },
+    {
+      "skill": "HCL",
+      "priority": 5
+    },
+    {
+      "skill": "Headless UI",
+      "priority": 5
+    },
+    {
+      "skill": "Heroku",
+      "priority": 5
+    },
+    {
+      "skill": "Hexagonal Architecture",
+      "priority": 5
+    },
+    {
+      "skill": "Hibernate",
+      "priority": 5
+    },
+    {
+      "skill": "High Availability",
+      "priority": 5
+    },
+    {
+      "skill": "Highcharts",
+      "priority": 5
+    },
+    {
+      "skill": "Higher-Order Functions",
+      "priority": 5
+    },
+    {
+      "skill": "HIPAA",
+      "priority": 5
+    },
+    {
+      "skill": "HIPAA Awareness",
+      "priority": 5
+    },
+    {
+      "skill": "Hive",
+      "priority": 5
+    },
+    {
+      "skill": "HSTS",
+      "priority": 5
+    },
+    {
+      "skill": "HTML5",
+      "priority": 5
+    },
+    {
+      "skill": "HTTP",
+      "priority": 5
+    },
+    {
+      "skill": "HTTP APIs",
+      "priority": 5
+    },
+    {
+      "skill": "HTTP Caching",
+      "priority": 5
+    },
+    {
+      "skill": "HTTP/1.1",
+      "priority": 5
+    },
+    {
+      "skill": "HTTP/2",
+      "priority": 5
+    },
+    {
+      "skill": "HTTP/3",
+      "priority": 5
+    },
+    {
+      "skill": "HTTP/HTTPS",
+      "priority": 5
+    },
+    {
+      "skill": "HTTPS",
+      "priority": 5
+    },
+    {
+      "skill": "HuggingFace",
+      "priority": 5
+    },
+    {
+      "skill": "Hugo",
+      "priority": 5
+    },
+    {
+      "skill": "i18n",
+      "priority": 5
+    },
+    {
+      "skill": "IAST",
+      "priority": 5
+    },
+    {
+      "skill": "IBM Db2",
+      "priority": 5
+    },
+    {
+      "skill": "Icinga",
+      "priority": 5
+    },
+    {
+      "skill": "Idempotency",
+      "priority": 5
+    },
+    {
+      "skill": "Identity and Access Management",
+      "priority": 5
+    },
+    {
+      "skill": "Image Optimization",
+      "priority": 5
+    },
+    {
+      "skill": "Image Processing",
+      "priority": 5
+    },
+    {
+      "skill": "IMAP",
+      "priority": 5
+    },
+    {
+      "skill": "Immutability",
+      "priority": 5
+    },
+    {
+      "skill": "In-App Purchases",
+      "priority": 5
+    },
+    {
+      "skill": "Incident Response",
+      "priority": 5
+    },
+    {
+      "skill": "Incremental Static Regeneration",
+      "priority": 5
+    },
+    {
+      "skill": "Inference Optimization",
+      "priority": 5
+    },
+    {
+      "skill": "Input Sanitization",
+      "priority": 5
+    },
+    {
+      "skill": "Input Validation",
+      "priority": 5
+    },
+    {
+      "skill": "Insomnia",
+      "priority": 5
+    },
+    {
+      "skill": "Integration Testing",
+      "priority": 5
+    },
+    {
+      "skill": "IntelliJ",
+      "priority": 5
+    },
+    {
+      "skill": "Intersection Observer API",
+      "priority": 5
+    },
+    {
+      "skill": "Intrusion Detection",
+      "priority": 5
+    },
+    {
+      "skill": "Intrusion Prevention",
+      "priority": 5
+    },
+    {
+      "skill": "io_uring",
+      "priority": 5
+    },
+    {
+      "skill": "IoC",
+      "priority": 5
+    },
+    {
+      "skill": "Ionic",
+      "priority": 5
+    },
+    {
+      "skill": "iOS Development",
+      "priority": 5
+    },
+    {
+      "skill": "IPC",
+      "priority": 5
+    },
+    {
+      "skill": "IPv4",
+      "priority": 5
+    },
+    {
+      "skill": "IPv6",
+      "priority": 5
+    },
+    {
+      "skill": "ISO 27001",
+      "priority": 5
+    },
+    {
+      "skill": "Jaeger",
+      "priority": 5
+    },
+    {
+      "skill": "Jakarta EE",
+      "priority": 5
+    },
+    {
+      "skill": "JanusGraph",
+      "priority": 5
+    },
+    {
+      "skill": "Jasmine",
+      "priority": 5
+    },
+    {
+      "skill": "JAX",
+      "priority": 5
+    },
+    {
+      "skill": "Jenkins",
+      "priority": 5
+    },
+    {
+      "skill": "Jetpack Compose",
+      "priority": 5
+    },
+    {
+      "skill": "JFrog Artifactory",
+      "priority": 5
+    },
+    {
+      "skill": "Jira",
+      "priority": 5
+    },
+    {
+      "skill": "JMeter",
+      "priority": 5
+    },
+    {
+      "skill": "Jotai",
+      "priority": 5
+    },
+    {
+      "skill": "JPA",
+      "priority": 5
+    },
+    {
+      "skill": "jq",
+      "priority": 5
+    },
+    {
+      "skill": "JSS",
+      "priority": 5
+    },
+    {
+      "skill": "Julia",
+      "priority": 5
+    },
+    {
+      "skill": "Just-in-Time Access",
+      "priority": 5
+    },
+    {
+      "skill": "JWT",
+      "priority": 5
+    },
+    {
+      "skill": "K3s",
+      "priority": 5
+    },
+    {
+      "skill": "K6",
+      "priority": 5
+    },
+    {
+      "skill": "K9s",
+      "priority": 5
+    },
+    {
+      "skill": "K9s/Lens",
+      "priority": 5
+    },
+    {
+      "skill": "Kafka",
+      "priority": 5
+    },
+    {
+      "skill": "Kafka Streams",
+      "priority": 5
+    },
+    {
+      "skill": "Kanban",
+      "priority": 5
+    },
+    {
+      "skill": "Kernel Tuning",
+      "priority": 5
+    },
+    {
+      "skill": "Key Rotation",
+      "priority": 5
+    },
+    {
+      "skill": "Kind",
+      "priority": 5
+    },
+    {
+      "skill": "Kinesis",
+      "priority": 5
+    },
+    {
+      "skill": "KISS",
+      "priority": 5
+    },
+    {
+      "skill": "Kitura",
+      "priority": 5
+    },
+    {
+      "skill": "Knex.js",
+      "priority": 5
+    },
+    {
+      "skill": "Knowledge Base Maintenance",
+      "priority": 5
+    },
+    {
+      "skill": "Koa.js",
+      "priority": 5
+    },
+    {
+      "skill": "Kong Gateway",
+      "priority": 5
+    },
+    {
+      "skill": "KrakenD",
+      "priority": 5
+    },
+    {
+      "skill": "Ktor",
+      "priority": 5
+    },
+    {
+      "skill": "kubectl",
+      "priority": 5
+    },
+    {
+      "skill": "Kubeflow",
+      "priority": 5
+    },
+    {
+      "skill": "Kustomize",
+      "priority": 5
+    },
+    {
+      "skill": "Kyverno",
+      "priority": 5
+    },
+    {
+      "skill": "l10n",
+      "priority": 5
+    },
+    {
+      "skill": "LabVIEW",
+      "priority": 5
+    },
+    {
+      "skill": "Lakehouse Architecture",
+      "priority": 5
+    },
+    {
+      "skill": "Leader Election",
+      "priority": 5
+    },
+    {
+      "skill": "Leaflet",
+      "priority": 5
+    },
+    {
+      "skill": "Lean Software Development",
+      "priority": 5
+    },
+    {
+      "skill": "Least Privilege",
+      "priority": 5
+    },
+    {
+      "skill": "Legacy Modernization",
+      "priority": 5
+    },
+    {
+      "skill": "Less",
+      "priority": 5
+    },
+    {
+      "skill": "LevelDB",
+      "priority": 5
+    },
+    {
+      "skill": "Lift-and-Shift",
+      "priority": 5
+    },
+    {
+      "skill": "LightGBM",
+      "priority": 5
+    },
+    {
+      "skill": "Lighthouse",
+      "priority": 5
+    },
+    {
+      "skill": "Linode",
+      "priority": 5
+    },
+    {
+      "skill": "Linting",
+      "priority": 5
+    },
+    {
+      "skill": "Linux",
+      "priority": 5
+    },
+    {
+      "skill": "Linux Administration",
+      "priority": 5
+    },
+    {
+      "skill": "Linux Namespaces",
+      "priority": 5
+    },
+    {
+      "skill": "Liquibase",
+      "priority": 5
+    },
+    {
+      "skill": "Lit",
+      "priority": 5
+    },
+    {
+      "skill": "LLM",
+      "priority": 5
+    },
+    {
+      "skill": "LLM Observability",
+      "priority": 5
+    },
+    {
+      "skill": "LLVM",
+      "priority": 5
+    },
+    {
+      "skill": "Load Testing",
+      "priority": 5
+    },
+    {
+      "skill": "LocalStorage",
+      "priority": 5
+    },
+    {
+      "skill": "Locust",
+      "priority": 5
+    },
+    {
+      "skill": "Log Aggregation",
+      "priority": 5
+    },
+    {
+      "skill": "Log Rotation",
+      "priority": 5
+    },
+    {
+      "skill": "Log4j",
+      "priority": 5
+    },
+    {
+      "skill": "Logback",
+      "priority": 5
+    },
+    {
+      "skill": "Logs",
+      "priority": 5
+    },
+    {
+      "skill": "Loki",
+      "priority": 5
+    },
+    {
+      "skill": "Lombok",
+      "priority": 5
+    },
+    {
+      "skill": "Looker",
+      "priority": 5
+    },
+    {
+      "skill": "LoRA Fine-Tuning",
+      "priority": 5
+    },
+    {
+      "skill": "Macros",
+      "priority": 5
+    },
+    {
+      "skill": "Make",
+      "priority": 5
+    },
+    {
+      "skill": "Makefile",
+      "priority": 5
+    },
+    {
+      "skill": "Manual functional testing",
+      "priority": 5
+    },
+    {
+      "skill": "Mapbox GL JS",
+      "priority": 5
+    },
+    {
+      "skill": "MapStruct",
+      "priority": 5
+    },
+    {
+      "skill": "MariaDB",
+      "priority": 5
+    },
+    {
+      "skill": "Mass Assignment Protection",
+      "priority": 5
+    },
+    {
+      "skill": "MassTransit",
+      "priority": 5
+    },
+    {
+      "skill": "Master Data Management",
+      "priority": 5
+    },
+    {
+      "skill": "Materialized Views",
+      "priority": 5
+    },
+    {
+      "skill": "Math",
+      "priority": 5
+    },
+    {
+      "skill": "Matplotlib",
+      "priority": 5
+    },
+    {
+      "skill": "MediaRecorder API",
+      "priority": 5
+    },
+    {
+      "skill": "MediatR",
+      "priority": 5
+    },
+    {
+      "skill": "Meilisearch",
+      "priority": 5
+    },
+    {
+      "skill": "Memory Profiling",
+      "priority": 5
+    },
+    {
+      "skill": "Mercurial",
+      "priority": 5
+    },
+    {
+      "skill": "Merge Conflict Resolution",
+      "priority": 5
+    },
+    {
+      "skill": "Message Consumers",
+      "priority": 5
+    },
+    {
+      "skill": "Metabase",
+      "priority": 5
+    },
+    {
+      "skill": "Metaprogramming",
+      "priority": 5
+    },
+    {
+      "skill": "Metrics Collection",
+      "priority": 5
+    },
+    {
+      "skill": "MFA/2FA",
+      "priority": 5
+    },
+    {
+      "skill": "Micro Frontends",
+      "priority": 5
+    },
+    {
+      "skill": "Micro-frontends",
+      "priority": 5
+    },
+    {
+      "skill": "Micronaut",
+      "priority": 5
+    },
+    {
+      "skill": "Microservice architecture",
+      "priority": 5
+    },
+    {
+      "skill": "Microservices",
+      "priority": 5
+    },
+    {
+      "skill": "Microservices architecture",
+      "priority": 5
+    },
+    {
+      "skill": "Migrations",
+      "priority": 5
+    },
+    {
+      "skill": "Milvus",
+      "priority": 5
+    },
+    {
+      "skill": "Minikube",
+      "priority": 5
+    },
+    {
+      "skill": "Minitest",
+      "priority": 5
+    },
+    {
+      "skill": "MLflow",
+      "priority": 5
+    },
+    {
+      "skill": "MLOps",
+      "priority": 5
+    },
+    {
+      "skill": "Mob Programming",
+      "priority": 5
+    },
+    {
+      "skill": "Mobile Accessibility",
+      "priority": 5
+    },
+    {
+      "skill": "Mobile Analytics",
+      "priority": 5
+    },
+    {
+      "skill": "Mobile app architecture",
+      "priority": 5
+    },
+    {
+      "skill": "Mobile app testing",
+      "priority": 5
+    },
+    {
+      "skill": "Mobile UI Testing",
+      "priority": 5
+    },
+    {
+      "skill": "MobX",
+      "priority": 5
+    },
+    {
+      "skill": "Mock Service Worker",
+      "priority": 5
+    },
+    {
+      "skill": "Mocking",
+      "priority": 5
+    },
+    {
+      "skill": "Mocking Frameworks",
+      "priority": 5
+    },
+    {
+      "skill": "Model Drift Detection",
+      "priority": 5
+    },
+    {
+      "skill": "Model Monitoring",
+      "priority": 5
+    },
+    {
+      "skill": "Model Serving",
+      "priority": 5
+    },
+    {
+      "skill": "Module Federation",
+      "priority": 5
+    },
+    {
+      "skill": "Monit",
+      "priority": 5
+    },
+    {
+      "skill": "Monolith",
+      "priority": 5
+    },
+    {
+      "skill": "Monolith Modernization",
+      "priority": 5
+    },
+    {
+      "skill": "Monorepo",
+      "priority": 5
+    },
+    {
+      "skill": "Monorepo Management",
+      "priority": 5
+    },
+    {
+      "skill": "MQTT",
+      "priority": 5
+    },
+    {
+      "skill": "MuleSoft",
+      "priority": 5
+    },
+    {
+      "skill": "Multi-region",
+      "priority": 5
+    },
+    {
+      "skill": "Multi-Tenant Architecture",
+      "priority": 5
+    },
+    {
+      "skill": "Multipart Upload Handling",
+      "priority": 5
+    },
+    {
+      "skill": "Mutation Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Mutex",
+      "priority": 5
+    },
+    {
+      "skill": "Mutual TLS",
+      "priority": 5
+    },
+    {
+      "skill": "Nagios",
+      "priority": 5
+    },
+    {
+      "skill": "Namespaces",
+      "priority": 5
+    },
+    {
+      "skill": "NAT",
+      "priority": 5
+    },
+    {
+      "skill": "NATS",
+      "priority": 5
+    },
+    {
+      "skill": "NATS JetStream",
+      "priority": 5
+    },
+    {
+      "skill": "Natural Language Processing",
+      "priority": 5
+    },
+    {
+      "skill": "Nexus Repository",
+      "priority": 5
+    },
+    {
+      "skill": "Nginx",
+      "priority": 5
+    },
+    {
+      "skill": "NGINX Unit",
+      "priority": 5
+    },
+    {
+      "skill": "ngrok",
+      "priority": 5
+    },
+    {
+      "skill": "Nim",
+      "priority": 5
+    },
+    {
+      "skill": "NLTK",
+      "priority": 5
+    },
+    {
+      "skill": "Node Exporter",
+      "priority": 5
+    },
+    {
+      "skill": "Node.js",
+      "priority": 5
+    },
+    {
+      "skill": "Nomad",
+      "priority": 5
+    },
+    {
+      "skill": "NoSQL",
+      "priority": 5
+    },
+    {
+      "skill": "NUnit",
+      "priority": 5
+    },
+    {
+      "skill": "Nuxt.js",
+      "priority": 5
+    },
+    {
+      "skill": "Nx",
+      "priority": 5
+    },
+    {
+      "skill": "OAuth",
+      "priority": 5
+    },
+    {
+      "skill": "OAuth 2.0",
+      "priority": 5
+    },
+    {
+      "skill": "OAuth2",
+      "priority": 5
+    },
+    {
+      "skill": "Observability",
+      "priority": 5
+    },
+    {
+      "skill": "Observer Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "OCaml",
+      "priority": 5
+    },
+    {
+      "skill": "Offline Sync",
+      "priority": 5
+    },
+    {
+      "skill": "OLAP Systems",
+      "priority": 5
+    },
+    {
+      "skill": "OLTP Systems",
+      "priority": 5
+    },
+    {
+      "skill": "ONNX",
+      "priority": 5
+    },
+    {
+      "skill": "ONNX Runtime",
+      "priority": 5
+    },
+    {
+      "skill": "OOP",
+      "priority": 5
+    },
+    {
+      "skill": "OPA",
+      "priority": 5
+    },
+    {
+      "skill": "OpenAPI",
+      "priority": 5
+    },
+    {
+      "skill": "OpenAPI Specification",
+      "priority": 5
+    },
+    {
+      "skill": "OpenCL C",
+      "priority": 5
+    },
+    {
+      "skill": "OpenCV",
+      "priority": 5
+    },
+    {
+      "skill": "OpenID Connect",
+      "priority": 5
+    },
+    {
+      "skill": "OpenLayers",
+      "priority": 5
+    },
+    {
+      "skill": "OpenSearch",
+      "priority": 5
+    },
+    {
+      "skill": "OpenTelemetry",
+      "priority": 5
+    },
+    {
+      "skill": "OpenTelemetry SDK",
+      "priority": 5
+    },
+    {
+      "skill": "OpenVPN",
+      "priority": 5
+    },
+    {
+      "skill": "Opsgenie",
+      "priority": 5
+    },
+    {
+      "skill": "Output Encoding",
+      "priority": 5
+    },
+    {
+      "skill": "OWASP",
+      "priority": 5
+    },
+    {
+      "skill": "OWASP Top 10",
+      "priority": 5
+    },
+    {
+      "skill": "Package Management",
+      "priority": 5
+    },
+    {
+      "skill": "Packer",
+      "priority": 5
+    },
+    {
+      "skill": "Packet Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "PagerDuty",
+      "priority": 5
+    },
+    {
+      "skill": "Pagination",
+      "priority": 5
+    },
+    {
+      "skill": "Paging",
+      "priority": 5
+    },
+    {
+      "skill": "Pair Programming",
+      "priority": 5
+    },
+    {
+      "skill": "Parallelism",
+      "priority": 5
+    },
+    {
+      "skill": "Parcel",
+      "priority": 5
+    },
+    {
+      "skill": "Parquet",
+      "priority": 5
+    },
+    {
+      "skill": "Partitioning",
+      "priority": 5
+    },
+    {
+      "skill": "Passport.js",
+      "priority": 5
+    },
+    {
+      "skill": "Password Hashing",
+      "priority": 5
+    },
+    {
+      "skill": "Password Storage",
+      "priority": 5
+    },
+    {
+      "skill": "Patroni",
+      "priority": 5
+    },
+    {
+      "skill": "PCI DSS Awareness",
+      "priority": 5
+    },
+    {
+      "skill": "PCI-DSS",
+      "priority": 5
+    },
+    {
+      "skill": "PDF Generation",
+      "priority": 5
+    },
+    {
+      "skill": "PEFT",
+      "priority": 5
+    },
+    {
+      "skill": "Penetration Testing",
+      "priority": 5
+    },
+    {
+      "skill": "PgBouncer",
+      "priority": 5
+    },
+    {
+      "skill": "pgvector",
+      "priority": 5
+    },
+    {
+      "skill": "Phoenix",
+      "priority": 5
+    },
+    {
+      "skill": "PHPUnit",
+      "priority": 5
+    },
+    {
+      "skill": "PII Handling",
+      "priority": 5
+    },
+    {
+      "skill": "Pinecone",
+      "priority": 5
+    },
+    {
+      "skill": "Pinia",
+      "priority": 5
+    },
+    {
+      "skill": "PKCE",
+      "priority": 5
+    },
+    {
+      "skill": "PKI",
+      "priority": 5
+    },
+    {
+      "skill": "PL/SQL",
+      "priority": 5
+    },
+    {
+      "skill": "Play Framework",
+      "priority": 5
+    },
+    {
+      "skill": "Plotly",
+      "priority": 5
+    },
+    {
+      "skill": "Podman",
+      "priority": 5
+    },
+    {
+      "skill": "Polars",
+      "priority": 5
+    },
+    {
+      "skill": "Polyrepo Management",
+      "priority": 5
+    },
+    {
+      "skill": "Pony",
+      "priority": 5
+    },
+    {
+      "skill": "POP3",
+      "priority": 5
+    },
+    {
+      "skill": "PostCSS",
+      "priority": 5
+    },
+    {
+      "skill": "PostGIS",
+      "priority": 5
+    },
+    {
+      "skill": "Postman",
+      "priority": 5
+    },
+    {
+      "skill": "Postmortem Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "Power BI",
+      "priority": 5
+    },
+    {
+      "skill": "Prefect",
+      "priority": 5
+    },
+    {
+      "skill": "Presto",
+      "priority": 5
+    },
+    {
+      "skill": "Privileged Access Controls",
+      "priority": 5
+    },
+    {
+      "skill": "Process Improvement",
+      "priority": 5
+    },
+    {
+      "skill": "Process Management",
+      "priority": 5
+    },
+    {
+      "skill": "Product Quality",
+      "priority": 5
+    },
+    {
+      "skill": "Progressive Web Apps",
+      "priority": 5
+    },
+    {
+      "skill": "Prolog",
+      "priority": 5
+    },
+    {
+      "skill": "Promises",
+      "priority": 5
+    },
+    {
+      "skill": "Prompt Engineering",
+      "priority": 5
+    },
+    {
+      "skill": "Prompt Evaluation",
+      "priority": 5
+    },
+    {
+      "skill": "Promtail",
+      "priority": 5
+    },
+    {
+      "skill": "Property Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Property-Based Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Protobuf",
+      "priority": 5
+    },
+    {
+      "skill": "Protocol Buffers",
+      "priority": 5
+    },
+    {
+      "skill": "Proxy Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "Pub/Sub",
+      "priority": 5
+    },
+    {
+      "skill": "Pub/Sub Patterns",
+      "priority": 5
+    },
+    {
+      "skill": "Pull Requests",
+      "priority": 5
+    },
+    {
+      "skill": "Pulumi",
+      "priority": 5
+    },
+    {
+      "skill": "Pure Functions",
+      "priority": 5
+    },
+    {
+      "skill": "Push Notifications",
+      "priority": 5
+    },
+    {
+      "skill": "PWA",
+      "priority": 5
+    },
+    {
+      "skill": "Pyramid",
+      "priority": 5
+    },
+    {
+      "skill": "PySpark",
+      "priority": 5
+    },
+    {
+      "skill": "Q#",
+      "priority": 5
+    },
+    {
+      "skill": "Qdrant",
+      "priority": 5
+    },
+    {
+      "skill": "QoS Basics",
+      "priority": 5
+    },
+    {
+      "skill": "Quality Assurance Process",
+      "priority": 5
+    },
+    {
+      "skill": "Quantization",
+      "priority": 5
+    },
+    {
+      "skill": "Quarkus",
+      "priority": 5
+    },
+    {
+      "skill": "Queuing",
+      "priority": 5
+    },
+    {
+      "skill": "QUIC",
+      "priority": 5
+    },
+    {
+      "skill": "QUnit",
+      "priority": 5
+    },
+    {
+      "skill": "R",
+      "priority": 5
+    },
+    {
+      "skill": "RabbitMQ",
+      "priority": 5
+    },
+    {
+      "skill": "Racket",
+      "priority": 5
+    },
+    {
+      "skill": "Radix UI",
+      "priority": 5
+    },
+    {
+      "skill": "Raft/Paxos",
+      "priority": 5
+    },
+    {
+      "skill": "RAG",
+      "priority": 5
+    },
+    {
+      "skill": "RAID",
+      "priority": 5
+    },
+    {
+      "skill": "Rancher",
+      "priority": 5
+    },
+    {
+      "skill": "Rate Limiting",
+      "priority": 5
+    },
+    {
+      "skill": "RBAC",
+      "priority": 5
+    },
+    {
+      "skill": "RDBMS",
+      "priority": 5
+    },
+    {
+      "skill": "Read Replicas",
+      "priority": 5
+    },
+    {
+      "skill": "README Authoring",
+      "priority": 5
+    },
+    {
+      "skill": "Realm",
+      "priority": 5
+    },
+    {
+      "skill": "ReasonML",
+      "priority": 5
+    },
+    {
+      "skill": "Recharts",
+      "priority": 5
+    },
+    {
+      "skill": "Recommendation Systems",
+      "priority": 5
+    },
+    {
+      "skill": "Red Hat Enterprise Linux",
+      "priority": 5
+    },
+    {
+      "skill": "Redshift",
+      "priority": 5
+    },
+    {
+      "skill": "Refactoring",
+      "priority": 5
+    },
+    {
+      "skill": "Reflection",
+      "priority": 5
+    },
+    {
+      "skill": "Refresh Token Flows",
+      "priority": 5
+    },
+    {
+      "skill": "Regex",
+      "priority": 5
+    },
+    {
+      "skill": "Regression Models",
+      "priority": 5
+    },
+    {
+      "skill": "Regression Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Relay",
+      "priority": 5
+    },
+    {
+      "skill": "Release Management",
+      "priority": 5
+    },
+    {
+      "skill": "Release Planning",
+      "priority": 5
+    },
+    {
+      "skill": "Remix",
+      "priority": 5
+    },
+    {
+      "skill": "Render",
+      "priority": 5
+    },
+    {
+      "skill": "Report Generation",
+      "priority": 5
+    },
+    {
+      "skill": "Repository Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "Reproducible Builds",
+      "priority": 5
+    },
+    {
+      "skill": "Request Validation",
+      "priority": 5
+    },
+    {
+      "skill": "Requirements Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "Resilience Engineering",
+      "priority": 5
+    },
+    {
+      "skill": "Resize Observer API",
+      "priority": 5
+    },
+    {
+      "skill": "Responsive Design",
+      "priority": 5
+    },
+    {
+      "skill": "Resque",
+      "priority": 5
+    },
+    {
+      "skill": "REST",
+      "priority": 5
+    },
+    {
+      "skill": "REST API Development",
+      "priority": 5
+    },
+    {
+      "skill": "REST API monitoring",
+      "priority": 5
+    },
+    {
+      "skill": "REST API testing",
+      "priority": 5
+    },
+    {
+      "skill": "RESTful API",
+      "priority": 5
+    },
+    {
+      "skill": "RESTful services",
+      "priority": 5
+    },
+    {
+      "skill": "Retrieval-Augmented Generation",
+      "priority": 5
+    },
+    {
+      "skill": "Retry Logic",
+      "priority": 5
+    },
+    {
+      "skill": "Reverse Proxy",
+      "priority": 5
+    },
+    {
+      "skill": "Reverse Proxy Configuration",
+      "priority": 5
+    },
+    {
+      "skill": "RFC Writing",
+      "priority": 5
+    },
+    {
+      "skill": "Ribbon",
+      "priority": 5
+    },
+    {
+      "skill": "Risk Management",
+      "priority": 5
+    },
+    {
+      "skill": "Risk-based testing",
+      "priority": 5
+    },
+    {
+      "skill": "RLHF Awareness",
+      "priority": 5
+    },
+    {
+      "skill": "Roadmap Planning",
+      "priority": 5
+    },
+    {
+      "skill": "Robot Framework",
+      "priority": 5
+    },
+    {
+      "skill": "Rocket",
+      "priority": 5
+    },
+    {
+      "skill": "RocksDB",
+      "priority": 5
+    },
+    {
+      "skill": "Role-Based Access Control",
+      "priority": 5
+    },
+    {
+      "skill": "Rollbar",
+      "priority": 5
+    },
+    {
+      "skill": "Rollup",
+      "priority": 5
+    },
+    {
+      "skill": "Root Cause Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "Route53",
+      "priority": 5
+    },
+    {
+      "skill": "RQ",
+      "priority": 5
+    },
+    {
+      "skill": "RSpec",
+      "priority": 5
+    },
+    {
+      "skill": "Runbook Automation",
+      "priority": 5
+    },
+    {
+      "skill": "Runbooks",
+      "priority": 5
+    },
+    {
+      "skill": "RxJS",
+      "priority": 5
+    },
+    {
+      "skill": "SaaS",
+      "priority": 5
+    },
+    {
+      "skill": "SAFe Awareness",
+      "priority": 5
+    },
+    {
+      "skill": "Saga Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "SaltStack",
+      "priority": 5
+    },
+    {
+      "skill": "SameSite Cookies",
+      "priority": 5
+    },
+    {
+      "skill": "SAML",
+      "priority": 5
+    },
+    {
+      "skill": "Sanic",
+      "priority": 5
+    },
+    {
+      "skill": "Sanity Testing",
+      "priority": 5
+    },
+    {
+      "skill": "SAS",
+      "priority": 5
+    },
+    {
+      "skill": "SAST",
+      "priority": 5
+    },
+    {
+      "skill": "SAST/DAST",
+      "priority": 5
+    },
+    {
+      "skill": "SBOM",
+      "priority": 5
+    },
+    {
+      "skill": "SBOM Management",
+      "priority": 5
+    },
+    {
+      "skill": "Scalability Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "Scalability Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Scalable Systems Design",
+      "priority": 5
+    },
+    {
+      "skill": "Scheme",
+      "priority": 5
+    },
+    {
+      "skill": "SCIM",
+      "priority": 5
+    },
+    {
+      "skill": "SciPy",
+      "priority": 5
+    },
+    {
+      "skill": "Scrum",
+      "priority": 5
+    },
+    {
+      "skill": "ScyllaDB",
+      "priority": 5
+    },
+    {
+      "skill": "Seaborn",
+      "priority": 5
+    },
+    {
+      "skill": "Search APIs",
+      "priority": 5
+    },
+    {
+      "skill": "Seccomp",
+      "priority": 5
+    },
+    {
+      "skill": "Secret Manager",
+      "priority": 5
+    },
+    {
+      "skill": "Secret Rotation",
+      "priority": 5
+    },
+    {
+      "skill": "Secret Scoping",
+      "priority": 5
+    },
+    {
+      "skill": "Secrets Detection",
+      "priority": 5
+    },
+    {
+      "skill": "Secrets Management",
+      "priority": 5
+    },
+    {
+      "skill": "Secrets Manager",
+      "priority": 5
+    },
+    {
+      "skill": "Secure API",
+      "priority": 5
+    },
+    {
+      "skill": "Secure API verification",
+      "priority": 5
+    },
+    {
+      "skill": "Secure APIs",
+      "priority": 5
+    },
+    {
+      "skill": "Secure Coding",
+      "priority": 5
+    },
+    {
+      "skill": "Secure Configuration Review",
+      "priority": 5
+    },
+    {
+      "skill": "Secure Cookie Management",
+      "priority": 5
+    },
+    {
+      "skill": "Secure SDLC",
+      "priority": 5
+    },
+    {
+      "skill": "Security Champions Programs",
+      "priority": 5
+    },
+    {
+      "skill": "Security Incident Triage",
+      "priority": 5
+    },
+    {
+      "skill": "Security Monitoring",
+      "priority": 5
+    },
+    {
+      "skill": "Security Regression Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Security Research",
+      "priority": 5
+    },
+    {
+      "skill": "Security testing",
+      "priority": 5
+    },
+    {
+      "skill": "Sed",
+      "priority": 5
+    },
+    {
+      "skill": "SELinux",
+      "priority": 5
+    },
+    {
+      "skill": "Semantic Versioning",
+      "priority": 5
+    },
+    {
+      "skill": "Semaphore",
+      "priority": 5
+    },
+    {
+      "skill": "Sentry",
+      "priority": 5
+    },
+    {
+      "skill": "Sequence Diagrams",
+      "priority": 5
+    },
+    {
+      "skill": "Serialization",
+      "priority": 5
+    },
+    {
+      "skill": "Serilog",
+      "priority": 5
+    },
+    {
+      "skill": "Server-Sent Events",
+      "priority": 5
+    },
+    {
+      "skill": "Server-Side Rendering",
+      "priority": 5
+    },
+    {
+      "skill": "Serverless",
+      "priority": 5
+    },
+    {
+      "skill": "Serverless Architecture",
+      "priority": 5
+    },
+    {
+      "skill": "Service Bus",
+      "priority": 5
+    },
+    {
+      "skill": "Service Level Indicators",
+      "priority": 5
+    },
+    {
+      "skill": "Service Level Objectives",
+      "priority": 5
+    },
+    {
+      "skill": "Service Mesh",
+      "priority": 5
+    },
+    {
+      "skill": "Service Mesh Integration",
+      "priority": 5
+    },
+    {
+      "skill": "Service Workers",
+      "priority": 5
+    },
+    {
+      "skill": "Session Management",
+      "priority": 5
+    },
+    {
+      "skill": "SessionStorage",
+      "priority": 5
+    },
+    {
+      "skill": "SFTP",
+      "priority": 5
+    },
+    {
+      "skill": "shadcn/ui",
+      "priority": 5
+    },
+    {
+      "skill": "Shadow DOM",
+      "priority": 5
+    },
+    {
+      "skill": "Sidecar Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "Sidekiq",
+      "priority": 5
+    },
+    {
+      "skill": "Signal Handling",
+      "priority": 5
+    },
+    {
+      "skill": "Sinatra",
+      "priority": 5
+    },
+    {
+      "skill": "Single Page Applications",
+      "priority": 5
+    },
+    {
+      "skill": "Single Sign-On",
+      "priority": 5
+    },
+    {
+      "skill": "Singleton Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "Site Reliability Engineering",
+      "priority": 5
+    },
+    {
+      "skill": "SLF4J",
+      "priority": 5
+    },
+    {
+      "skill": "SLO/SLI",
+      "priority": 5
+    },
+    {
+      "skill": "SLSA Awareness",
+      "priority": 5
+    },
+    {
+      "skill": "Smalltalk",
+      "priority": 5
+    },
+    {
+      "skill": "Smoke Testing",
+      "priority": 5
+    },
+    {
+      "skill": "SMTP",
+      "priority": 5
+    },
+    {
+      "skill": "SMTP Integration",
+      "priority": 5
+    },
+    {
+      "skill": "Snapshot Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Snowflake",
+      "priority": 5
+    },
+    {
+      "skill": "SNS",
+      "priority": 5
+    },
+    {
+      "skill": "Soak Testing",
+      "priority": 5
+    },
+    {
+      "skill": "SOAP Web Services",
+      "priority": 5
+    },
+    {
+      "skill": "SOC 2 Awareness",
+      "priority": 5
+    },
+    {
+      "skill": "SOC2",
+      "priority": 5
+    },
+    {
+      "skill": "Socket Programming",
+      "priority": 5
+    },
+    {
+      "skill": "Software architecture",
+      "priority": 5
+    },
+    {
+      "skill": "Software Composition Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "Software testing",
+      "priority": 5
+    },
+    {
+      "skill": "SOLID Principles",
+      "priority": 5
+    },
+    {
+      "skill": "Solid.js",
+      "priority": 5
+    },
+    {
+      "skill": "Solidity",
+      "priority": 5
+    },
+    {
+      "skill": "SolidJS",
+      "priority": 5
+    },
+    {
+      "skill": "Sourcegraph",
+      "priority": 5
+    },
+    {
+      "skill": "spaCy",
+      "priority": 5
+    },
+    {
+      "skill": "Spanner",
+      "priority": 5
+    },
+    {
+      "skill": "Spark Java",
+      "priority": 5
+    },
+    {
+      "skill": "Spike Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Spinnaker",
+      "priority": 5
+    },
+    {
+      "skill": "Splunk",
+      "priority": 5
+    },
+    {
+      "skill": "Sprint Planning",
+      "priority": 5
+    },
+    {
+      "skill": "Spying",
+      "priority": 5
+    },
+    {
+      "skill": "SQLite",
+      "priority": 5
+    },
+    {
+      "skill": "SQS",
+      "priority": 5
+    },
+    {
+      "skill": "SSE",
+      "priority": 5
+    },
+    {
+      "skill": "SSG",
+      "priority": 5
+    },
+    {
+      "skill": "SSH",
+      "priority": 5
+    },
+    {
+      "skill": "SSL/TLS",
+      "priority": 5
+    },
+    {
+      "skill": "SSR",
+      "priority": 5
+    },
+    {
+      "skill": "SSRF Prevention",
+      "priority": 5
+    },
+    {
+      "skill": "Stakeholder Alignment",
+      "priority": 5
+    },
+    {
+      "skill": "Static Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "Static Application Security Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Static Site Generation",
+      "priority": 5
+    },
+    {
+      "skill": "Statistics",
+      "priority": 5
+    },
+    {
+      "skill": "STOMP",
+      "priority": 5
+    },
+    {
+      "skill": "Stored Procedures",
+      "priority": 5
+    },
+    {
+      "skill": "Story Estimation",
+      "priority": 5
+    },
+    {
+      "skill": "Storybook",
+      "priority": 5
+    },
+    {
+      "skill": "strace",
+      "priority": 5
+    },
+    {
+      "skill": "Strangler Fig",
+      "priority": 5
+    },
+    {
+      "skill": "Strategy Pattern",
+      "priority": 5
+    },
+    {
+      "skill": "Streams",
+      "priority": 5
+    },
+    {
+      "skill": "Stress Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Stubbing",
+      "priority": 5
+    },
+    {
+      "skill": "Styled Components",
+      "priority": 5
+    },
+    {
+      "skill": "Subnets",
+      "priority": 5
+    },
+    {
+      "skill": "Subnetting",
+      "priority": 5
+    },
+    {
+      "skill": "Superset",
+      "priority": 5
+    },
+    {
+      "skill": "Svelte",
+      "priority": 5
+    },
+    {
+      "skill": "SvelteKit",
+      "priority": 5
+    },
+    {
+      "skill": "SVG",
+      "priority": 5
+    },
+    {
+      "skill": "SVN",
+      "priority": 5
+    },
+    {
+      "skill": "Swagger",
+      "priority": 5
+    },
+    {
+      "skill": "SwiftUI",
+      "priority": 5
+    },
+    {
+      "skill": "Synthetic Data Generation",
+      "priority": 5
+    },
+    {
+      "skill": "Synthetic Monitoring",
+      "priority": 5
+    },
+    {
+      "skill": "Sysdig",
+      "priority": 5
+    },
+    {
+      "skill": "System architecture",
+      "priority": 5
+    },
+    {
+      "skill": "Systemd",
+      "priority": 5
+    },
+    {
+      "skill": "T-SQL",
+      "priority": 5
+    },
+    {
+      "skill": "Tableau",
+      "priority": 5
+    },
+    {
+      "skill": "Tamper Detection",
+      "priority": 5
+    },
+    {
+      "skill": "TanStack Table",
+      "priority": 5
+    },
+    {
+      "skill": "Tcl",
+      "priority": 5
+    },
+    {
+      "skill": "TCP/IP",
+      "priority": 5
+    },
+    {
+      "skill": "TDD",
+      "priority": 5
+    },
+    {
+      "skill": "TeamCity",
+      "priority": 5
+    },
+    {
+      "skill": "Tech Debt Management",
+      "priority": 5
+    },
+    {
+      "skill": "Technical Design",
+      "priority": 5
+    },
+    {
+      "skill": "Technical Discovery",
+      "priority": 5
+    },
+    {
+      "skill": "Technical Documentation",
+      "priority": 5
+    },
+    {
+      "skill": "Technical Planning",
+      "priority": 5
+    },
+    {
+      "skill": "Template Method",
+      "priority": 5
+    },
+    {
+      "skill": "Template Rendering",
+      "priority": 5
+    },
+    {
+      "skill": "TensorRT",
+      "priority": 5
+    },
+    {
+      "skill": "Terragrunt",
+      "priority": 5
+    },
+    {
+      "skill": "Test Automation",
+      "priority": 5
+    },
+    {
+      "skill": "Test Containers",
+      "priority": 5
+    },
+    {
+      "skill": "Test Data Management",
+      "priority": 5
+    },
+    {
+      "skill": "Test Fixtures",
+      "priority": 5
+    },
+    {
+      "skill": "Test Pyramid",
+      "priority": 5
+    },
+    {
+      "skill": "Test-Driven Development",
+      "priority": 5
+    },
+    {
+      "skill": "TestFlight",
+      "priority": 5
+    },
+    {
+      "skill": "Testing",
+      "priority": 5
+    },
+    {
+      "skill": "Thanos",
+      "priority": 5
+    },
+    {
+      "skill": "Threading",
+      "priority": 5
+    },
+    {
+      "skill": "Threat Hunting Basics",
+      "priority": 5
+    },
+    {
+      "skill": "Threat Modeling",
+      "priority": 5
+    },
+    {
+      "skill": "Three.js",
+      "priority": 5
+    },
+    {
+      "skill": "Thrift",
+      "priority": 5
+    },
+    {
+      "skill": "Throttling",
+      "priority": 5
+    },
+    {
+      "skill": "TiDB",
+      "priority": 5
+    },
+    {
+      "skill": "Time Series Forecasting",
+      "priority": 5
+    },
+    {
+      "skill": "Timescale Continuous Aggregates",
+      "priority": 5
+    },
+    {
+      "skill": "TLS/SSL",
+      "priority": 5
+    },
+    {
+      "skill": "tmux",
+      "priority": 5
+    },
+    {
+      "skill": "Token Introspection",
+      "priority": 5
+    },
+    {
+      "skill": "Tornado",
+      "priority": 5
+    },
+    {
+      "skill": "TOTP",
+      "priority": 5
+    },
+    {
+      "skill": "Traceability",
+      "priority": 5
+    },
+    {
+      "skill": "Traefik",
+      "priority": 5
+    },
+    {
+      "skill": "Transaction Management",
+      "priority": 5
+    },
+    {
+      "skill": "Transactions",
+      "priority": 5
+    },
+    {
+      "skill": "Travis CI",
+      "priority": 5
+    },
+    {
+      "skill": "Triggers",
+      "priority": 5
+    },
+    {
+      "skill": "Trino",
+      "priority": 5
+    },
+    {
+      "skill": "Triton Inference Server",
+      "priority": 5
+    },
+    {
+      "skill": "Trivy",
+      "priority": 5
+    },
+    {
+      "skill": "Trunk-Based Development",
+      "priority": 5
+    },
+    {
+      "skill": "Turborepo",
+      "priority": 5
+    },
+    {
+      "skill": "Tyk",
+      "priority": 5
+    },
+    {
+      "skill": "Typesense",
+      "priority": 5
+    },
+    {
+      "skill": "Ubuntu",
+      "priority": 5
+    },
+    {
+      "skill": "UDP",
+      "priority": 5
+    },
+    {
+      "skill": "UI/UX",
+      "priority": 5
+    },
+    {
+      "skill": "UIKit",
+      "priority": 5
+    },
+    {
+      "skill": "Unit Testing",
+      "priority": 5
+    },
+    {
+      "skill": "unittest",
+      "priority": 5
+    },
+    {
+      "skill": "Unix",
+      "priority": 5
+    },
+    {
+      "skill": "Unix/Linux",
+      "priority": 5
+    },
+    {
+      "skill": "User Acceptance Testing",
+      "priority": 5
+    },
+    {
+      "skill": "User experience testing",
+      "priority": 5
+    },
+    {
+      "skill": "UTXO",
+      "priority": 5
+    },
+    {
+      "skill": "uWSGI",
+      "priority": 5
+    },
+    {
+      "skill": "Vagrant",
+      "priority": 5
+    },
+    {
+      "skill": "Value Stream Mapping",
+      "priority": 5
+    },
+    {
+      "skill": "Vapor",
+      "priority": 5
+    },
+    {
+      "skill": "Vault",
+      "priority": 5
+    },
+    {
+      "skill": "VB.NET",
+      "priority": 5
+    },
+    {
+      "skill": "Vector",
+      "priority": 5
+    },
+    {
+      "skill": "Vector Embeddings",
+      "priority": 5
+    },
+    {
+      "skill": "Vector Search",
+      "priority": 5
+    },
+    {
+      "skill": "Vercel",
+      "priority": 5
+    },
+    {
+      "skill": "Vercel Edge Functions",
+      "priority": 5
+    },
+    {
+      "skill": "Verilog",
+      "priority": 5
+    },
+    {
+      "skill": "Vert.x",
+      "priority": 5
+    },
+    {
+      "skill": "VHDL",
+      "priority": 5
+    },
+    {
+      "skill": "Vim/Neovim",
+      "priority": 5
+    },
+    {
+      "skill": "Virtual Memory",
+      "priority": 5
+    },
+    {
+      "skill": "Visual Regression",
+      "priority": 5
+    },
+    {
+      "skill": "Visual Regression Testing",
+      "priority": 5
+    },
+    {
+      "skill": "VLAN Basics",
+      "priority": 5
+    },
+    {
+      "skill": "vLLM",
+      "priority": 5
+    },
+    {
+      "skill": "VPN",
+      "priority": 5
+    },
+    {
+      "skill": "VS Code",
+      "priority": 5
+    },
+    {
+      "skill": "Vulnerability Analysis",
+      "priority": 5
+    },
+    {
+      "skill": "Vulnerability Scanning",
+      "priority": 5
+    },
+    {
+      "skill": "WAF",
+      "priority": 5
+    },
+    {
+      "skill": "Warp",
+      "priority": 5
+    },
+    {
+      "skill": "Waterfall",
+      "priority": 5
+    },
+    {
+      "skill": "WCAG Compliance",
+      "priority": 5
+    },
+    {
+      "skill": "Weaviate",
+      "priority": 5
+    },
+    {
+      "skill": "Web Animations API",
+      "priority": 5
+    },
+    {
+      "skill": "Web Application Firewalls",
+      "priority": 5
+    },
+    {
+      "skill": "Web application testing",
+      "priority": 5
+    },
+    {
+      "skill": "Web Components",
+      "priority": 5
+    },
+    {
+      "skill": "Web testing",
+      "priority": 5
+    },
+    {
+      "skill": "Web3",
+      "priority": 5
+    },
+    {
+      "skill": "WebAssembly",
+      "priority": 5
+    },
+    {
+      "skill": "WebAuthn Awareness",
+      "priority": 5
+    },
+    {
+      "skill": "WebGL",
+      "priority": 5
+    },
+    {
+      "skill": "Webhook Security",
+      "priority": 5
+    },
+    {
+      "skill": "Webhooks",
+      "priority": 5
+    },
+    {
+      "skill": "WebRTC",
+      "priority": 5
+    },
+    {
+      "skill": "WebSocket Protocol",
+      "priority": 5
+    },
+    {
+      "skill": "WebSocket Servers",
+      "priority": 5
+    },
+    {
+      "skill": "WebSockets",
+      "priority": 5
+    },
+    {
+      "skill": "Weights & Biases",
+      "priority": 5
+    },
+    {
+      "skill": "Well-Architected Framework",
+      "priority": 5
+    },
+    {
+      "skill": "WireGuard",
+      "priority": 5
+    },
+    {
+      "skill": "WireMock",
+      "priority": 5
+    },
+    {
+      "skill": "Wireshark",
+      "priority": 5
+    },
+    {
+      "skill": "Wolfram Language",
+      "priority": 5
+    },
+    {
+      "skill": "Workbox",
+      "priority": 5
+    },
+    {
+      "skill": "WSDL/SOAP",
+      "priority": 5
+    },
+    {
+      "skill": "WSO2",
+      "priority": 5
+    },
+    {
+      "skill": "Xamarin",
+      "priority": 5
+    },
+    {
+      "skill": "XGBoost",
+      "priority": 5
+    },
+    {
+      "skill": "XSS Prevention",
+      "priority": 5
+    },
+    {
+      "skill": "XState",
+      "priority": 5
+    },
+    {
+      "skill": "xUnit",
+      "priority": 5
+    },
+    {
+      "skill": "YAGNI",
+      "priority": 5
+    },
+    {
+      "skill": "Yup",
+      "priority": 5
+    },
+    {
+      "skill": "Zabbix",
+      "priority": 5
+    },
+    {
+      "skill": "Zero-Trust",
+      "priority": 5
+    },
+    {
+      "skill": "ZeroMQ",
+      "priority": 5
+    },
+    {
+      "skill": "Zig",
+      "priority": 5
+    },
+    {
+      "skill": "Zipkin",
+      "priority": 5
+    },
+    {
+      "skill": "Zod",
+      "priority": 5
+    },
+    {
+      "skill": "Zustand",
+      "priority": 5
+    },
+    {
+      "skill": "Zuul",
+      "priority": 5
+    }
+  ],
+  "soft": [
+    "Abstraction",
+    "Accountability",
+    "Accountability to the team",
+    "Accountable change management",
+    "Accountable coaching",
+    "Accountable conflict mediation",
+    "Accountable decision ownership",
+    "Accountable direction setting",
+    "Accountable incident leadership",
+    "Accountable leadership",
+    "Accountable mentoring",
+    "Accountable priority setting",
+    "Accountable team support",
+    "Accuracy",
+    "Active Listening",
+    "Adaptability",
+    "Adaptable",
+    "Adaptation to new processes",
+    "Adaptation to new teams",
+    "Adaptation to new tools",
+    "Adaptation to team norms",
+    "Advisory mindset",
+    "Agenda Setting",
+    "Agility",
+    "Ambition",
+    "Analytical",
+    "Analytical ambiguity management",
+    "Analytical constraint handling",
+    "Analytical decision making",
+    "Analytical issue triage",
+    "Analytical option assessment",
+    "Analytical problem solving",
+    "Analytical root-cause analysis",
+    "Analytical scenario analysis",
+    "Analytical thinking",
+    "Analytical tradeoff evaluation",
+    "Analytical troubleshooting",
+    "Approachability",
+    "Assertiveness",
+    "Asynchronous collaboration",
+    "Attention to detail",
+    "Audience-aware communication",
+    "Balancing",
+    "Belonging",
+    "Bias for action",
+    "Big Picture Thinking",
+    "Big-picture thinking",
+    "Brainstorming",
+    "Business Acumen",
+    "Business empathy",
+    "Business thinking",
+    "Business Writing",
+    "Business-aware communication",
+    "Business-aware decision making",
+    "Business-aware delivery",
+    "Business-aware expectation setting",
+    "Business-aware planning",
+    "Business-aware prioritization",
+    "Business-aware problem solving",
+    "Business-aware relationship management",
+    "Business-aware support",
+    "Business-aware thinking",
+    "Calm change management",
+    "Calm coaching",
+    "Calm conflict mediation",
+    "Calm decision ownership",
+    "Calm direction setting",
+    "Calm incident leadership",
+    "Calm leadership",
+    "Calm mentoring",
+    "Calm priority setting",
+    "Calm team support",
+    "Careful deadline awareness",
+    "Careful delivery management",
+    "Careful follow-through",
+    "Careful planning",
+    "Careful prioritization",
+    "Careful quality control",
+    "Careful risk tracking",
+    "Careful task ownership",
+    "Careful time use",
+    "Careful work organization",
+    "Change leadership",
+    "Change Management",
+    "Charisma",
+    "Chat communication",
+    "Civic Engagement",
+    "Clarifying ambiguity",
+    "Clear decision summaries",
+    "Clear follow-up messages",
+    "Clear handoff notes",
+    "Clear meeting contributions",
+    "Clear non-technical explanations",
+    "Clear risk explanations",
+    "Clear status updates",
+    "Clear technical explanations",
+    "Clear verbal communication",
+    "Clear verbal updates",
+    "Clear written communication",
+    "Clear written updates",
+    "Client alignment",
+    "Client briefing",
+    "Client collaboration",
+    "Client communication",
+    "Client coordination",
+    "Client expectation setting",
+    "Client follow-up",
+    "Client issue handling",
+    "Client Relations",
+    "Client relationship management",
+    "Client trust building",
+    "Co-creation",
+    "Coachability",
+    "Coaching",
+    "Collaboration",
+    "Collaboration under pressure",
+    "Collaborative ambiguity management",
+    "Collaborative constraint handling",
+    "Collaborative decision making",
+    "Collaborative issue triage",
+    "Collaborative mindset",
+    "Collaborative option assessment",
+    "Collaborative problem solving",
+    "Collaborative root-cause analysis",
+    "Collaborative scenario analysis",
+    "Collaborative tradeoff evaluation",
+    "Collaborative troubleshooting",
+    "Comfort with Ambiguity",
+    "Comfortable with ambiguity",
+    "Commercial Awareness",
+    "Commitment",
+    "Commitment management",
+    "Common sense",
+    "Communication",
+    "Communication skills",
+    "Community Building",
+    "Compassion",
+    "Complex Problem Solving",
+    "Compliance awareness",
+    "Composure",
+    "Compromise",
+    "Concentration",
+    "Concise communication",
+    "Concise decision summaries",
+    "Concise follow-up messages",
+    "Concise handoff notes",
+    "Concise meeting contributions",
+    "Concise non-technical explanations",
+    "Concise risk explanations",
+    "Concise status updates",
+    "Concise technical explanations",
+    "Concise verbal updates",
+    "Concise written updates",
+    "Confidence",
+    "Confidence without arrogance",
+    "Confident decision summaries",
+    "Confident follow-up messages",
+    "Confident handoff notes",
+    "Confident meeting contributions",
+    "Confident non-technical explanations",
+    "Confident risk explanations",
+    "Confident status updates",
+    "Confident technical explanations",
+    "Confident verbal updates",
+    "Confident written updates",
+    "Confidentiality",
+    "Conflict de-escalation",
+    "Conflict Management",
+    "Conflict mediation",
+    "Conflict resolution",
+    "Consensus building",
+    "Consistency",
+    "Consistency of values",
+    "Consistent deadline awareness",
+    "Consistent delivery management",
+    "Consistent follow-through",
+    "Consistent planning",
+    "Consistent prioritization",
+    "Consistent quality control",
+    "Consistent risk tracking",
+    "Consistent task ownership",
+    "Consistent time use",
+    "Consistent work organization",
+    "Constructive Criticism",
+    "Constructive feedback",
+    "Consultative communication",
+    "Consultative decision making",
+    "Consultative delivery",
+    "Consultative expectation setting",
+    "Consultative planning",
+    "Consultative prioritization",
+    "Consultative problem solving",
+    "Consultative relationship management",
+    "Consultative support",
+    "Consultative thinking",
+    "Context sharing",
+    "Contingency planning",
+    "Continuous adaptation",
+    "Continuous change response",
+    "Continuous context switching",
+    "Continuous improvement",
+    "Continuous knowledge transfer",
+    "Continuous learning",
+    "Continuous process improvement",
+    "Continuous retrospective learning",
+    "Continuous skill growth",
+    "Continuous tool adoption",
+    "Copywriting",
+    "cost-effective",
+    "Creative ambiguity management",
+    "Creative constraint handling",
+    "Creative decision making",
+    "Creative issue triage",
+    "Creative option assessment",
+    "Creative problem solving",
+    "Creative root-cause analysis",
+    "Creative scenario analysis",
+    "Creative thinking",
+    "Creative tradeoff evaluation",
+    "Creative troubleshooting",
+    "Creativity",
+    "Credibility",
+    "Credit sharing",
+    "Crisis communication",
+    "Crisis Management",
+    "Critical thinking",
+    "Cross-cultural communication",
+    "Cross-functional Collaboration",
+    "Cross-functional communication",
+    "Cross-functional leadership",
+    "Cross-team alignment",
+    "Cross-team briefing",
+    "Cross-team collaboration",
+    "Cross-team communication",
+    "Cross-team coordination",
+    "Cross-team expectation setting",
+    "Cross-team follow-up",
+    "Cross-team issue handling",
+    "Cross-team relationship management",
+    "Cross-team trust building",
+    "Cultural Awareness",
+    "Curating knowledge",
+    "Curiosity",
+    "Curiosity-driven adaptation",
+    "Curiosity-driven change response",
+    "Curiosity-driven context switching",
+    "Curiosity-driven exploration",
+    "Curiosity-driven improvement",
+    "Curiosity-driven knowledge transfer",
+    "Curiosity-driven learning",
+    "Curiosity-driven process improvement",
+    "Curiosity-driven retrospective learning",
+    "Curiosity-driven skill growth",
+    "Curiosity-driven tool adoption",
+    "Customer alignment",
+    "Customer briefing",
+    "Customer collaboration",
+    "Customer communication",
+    "Customer coordination",
+    "Customer education",
+    "Customer empathy",
+    "Customer expectation setting",
+    "Customer Focus",
+    "Customer follow-up",
+    "Customer issue handling",
+    "Customer Needs",
+    "Customer relationship management",
+    "Customer Success",
+    "Customer trust building",
+    "Customer-first mindset",
+    "Customer-focused communication",
+    "Customer-focused decision making",
+    "Customer-focused delivery",
+    "Customer-focused expectation setting",
+    "Customer-focused planning",
+    "Customer-focused prioritization",
+    "Customer-focused problem solving",
+    "Customer-focused relationship management",
+    "Customer-focused support",
+    "Customer-focused thinking",
+    "Customer-informed adaptation",
+    "Customer-informed change response",
+    "Customer-informed context switching",
+    "Customer-informed improvement",
+    "Customer-informed knowledge transfer",
+    "Customer-informed learning",
+    "Customer-informed process improvement",
+    "Customer-informed retrospective learning",
+    "Customer-informed skill growth",
+    "Customer-informed tool adoption",
+    "Data Interpretation",
+    "Data-driven adaptation",
+    "Data-driven change response",
+    "Data-driven context switching",
+    "Data-driven improvement",
+    "Data-driven knowledge transfer",
+    "Data-driven learning",
+    "Data-driven process improvement",
+    "Data-driven retrospective learning",
+    "Data-driven skill growth",
+    "Data-driven tool adoption",
+    "Data-informed ambiguity management",
+    "Data-informed constraint handling",
+    "Data-informed decision making",
+    "Data-informed issue triage",
+    "Data-informed option assessment",
+    "Data-informed problem solving",
+    "Data-informed root-cause analysis",
+    "Data-informed scenario analysis",
+    "Data-informed thinking",
+    "Data-informed tradeoff evaluation",
+    "Data-informed troubleshooting",
+    "De-escalation",
+    "Deadline management",
+    "Dealing with difficult customers",
+    "Decision analysis",
+    "Decision communication",
+    "Decision follow-through",
+    "Decision framing",
+    "Decision Making",
+    "Decision quality",
+    "Decision transparency",
+    "Decisive change management",
+    "Decisive coaching",
+    "Decisive conflict mediation",
+    "Decisive decision ownership",
+    "Decisive direction setting",
+    "Decisive incident leadership",
+    "Decisive leadership",
+    "Decisive mentoring",
+    "Decisive priority setting",
+    "Decisive team support",
+    "Decisiveness",
+    "Delegation",
+    "Delivering under ambiguity",
+    "Delivering under constraints",
+    "Dependability",
+    "Design thinking",
+    "Detail Orientation",
+    "Determination",
+    "Diligence",
+    "Diplomacy",
+    "Direction setting",
+    "Disciplined deadline awareness",
+    "Disciplined delivery management",
+    "Disciplined follow-through",
+    "Disciplined planning",
+    "Disciplined prioritization",
+    "Disciplined quality control",
+    "Disciplined risk tracking",
+    "Disciplined task ownership",
+    "Disciplined time use",
+    "Disciplined work organization",
+    "Discretion",
+    "Diversity & Inclusion",
+    "Documentation",
+    "Documentation discipline",
+    "Documentation habits",
+    "Doing the right thing under pressure",
+    "Driven mindset",
+    "Eager to learn",
+    "Editing",
+    "Effective communication",
+    "Efficiency",
+    "Efficiency mindset",
+    "Email etiquette",
+    "Emotional Intelligence",
+    "Empathetic communication",
+    "Empathetic decision summaries",
+    "Empathetic follow-up messages",
+    "Empathetic handoff notes",
+    "Empathetic meeting contributions",
+    "Empathetic non-technical explanations",
+    "Empathetic risk explanations",
+    "Empathetic status updates",
+    "Empathetic technical explanations",
+    "Empathetic verbal updates",
+    "Empathetic written updates",
+    "Empathy",
+    "Empowerment",
+    "Energy",
+    "Enthusiasm",
+    "Entrepreneurial",
+    "Entrepreneurial Thinking",
+    "Equity Mindset",
+    "ES6",
+    "Escalation calmness",
+    "Escalation judgment",
+    "Escalation management",
+    "Ethical communication",
+    "Ethical judgment",
+    "Ethical Leadership",
+    "Evidence-based ambiguity management",
+    "Evidence-based constraint handling",
+    "Evidence-based decision making",
+    "Evidence-based issue triage",
+    "Evidence-based option assessment",
+    "Evidence-based problem solving",
+    "Evidence-based root-cause analysis",
+    "Evidence-based scenario analysis",
+    "Evidence-based tradeoff evaluation",
+    "Evidence-based troubleshooting",
+    "Excellent adaptability",
+    "Excellent boundary setting",
+    "Excellent energy management",
+    "Excellent focus management",
+    "Excellent judgment",
+    "Excellent ownership mindset",
+    "Excellent professional presence",
+    "Excellent self-management",
+    "Excellent stress management",
+    "Excellent work ethic",
+    "Execution",
+    "Execution discipline",
+    "Executive alignment",
+    "Executive briefing",
+    "Executive collaboration",
+    "Executive communication",
+    "Executive coordination",
+    "Executive expectation setting",
+    "Executive follow-up",
+    "Executive issue handling",
+    "Executive Presence",
+    "Executive relationship management",
+    "Executive trust building",
+    "Expectation management",
+    "Expectation management with customers",
+    "Expectation setting",
+    "Experimentation",
+    "Experimentation mindset",
+    "Extreme ownership",
+    "Facilitation",
+    "Facilitation of group discussion",
+    "Fairness",
+    "Fast adaptation",
+    "Fast change response",
+    "Fast context switching",
+    "Fast improvement",
+    "Fast knowledge transfer",
+    "Fast learning",
+    "Fast process improvement",
+    "Fast retrospective learning",
+    "Fast skill growth",
+    "Fast tool adoption",
+    "Feedback Delivery",
+    "Feedback Reception",
+    "Feedback-driven adaptation",
+    "Feedback-driven change response",
+    "Feedback-driven context switching",
+    "Feedback-driven improvement",
+    "Feedback-driven knowledge transfer",
+    "Feedback-driven learning",
+    "Feedback-driven process improvement",
+    "Feedback-driven retrospective learning",
+    "Feedback-driven skill growth",
+    "Feedback-driven tool adoption",
+    "Flexibility",
+    "Focus",
+    "Focused deadline awareness",
+    "Focused delivery management",
+    "Focused follow-through",
+    "Focused planning",
+    "Focused prioritization",
+    "Focused quality control",
+    "Focused risk tracking",
+    "Focused task ownership",
+    "Focused time use",
+    "Focused work organization",
+    "Follow-through",
+    "Follow-up discipline",
+    "Forecasting",
+    "Frugality",
+    "Global Mindset",
+    "Goal Setting",
+    "Goal-oriented",
+    "Good adaptability",
+    "Good boundary setting",
+    "Good energy management",
+    "Good focus management",
+    "Good judgment",
+    "Good ownership mindset",
+    "Good professional presence",
+    "Good self-management",
+    "Good stress management",
+    "Good work ethic",
+    "Gravitas",
+    "Grit",
+    "Growth mindset",
+    "Handling customer objections",
+    "Hands-on adaptation",
+    "Hands-on change management",
+    "Hands-on change response",
+    "Hands-on coaching",
+    "Hands-on conflict mediation",
+    "Hands-on context switching",
+    "Hands-on decision ownership",
+    "Hands-on direction setting",
+    "Hands-on improvement",
+    "Hands-on incident leadership",
+    "Hands-on knowledge transfer",
+    "Hands-on leadership",
+    "Hands-on learning",
+    "Hands-on mentoring",
+    "Hands-on priority setting",
+    "Hands-on process improvement",
+    "Hands-on retrospective learning",
+    "Hands-on skill growth",
+    "Hands-on team support",
+    "Hands-on tool adoption",
+    "Healthy disagreement",
+    "Helping unblock others",
+    "High adaptability",
+    "High boundary setting",
+    "High energy management",
+    "High focus management",
+    "High judgment",
+    "High ownership mentality",
+    "High ownership mindset",
+    "High professional presence",
+    "High self-management",
+    "High stress management",
+    "High work ethic",
+    "Honesty",
+    "Humility",
+    "Humor",
+    "Hypothesis-driven ambiguity management",
+    "Hypothesis-driven constraint handling",
+    "Hypothesis-driven decision making",
+    "Hypothesis-driven issue triage",
+    "Hypothesis-driven option assessment",
+    "Hypothesis-driven problem solving",
+    "Hypothesis-driven root-cause analysis",
+    "Hypothesis-driven scenario analysis",
+    "Hypothesis-driven thinking",
+    "Hypothesis-driven tradeoff evaluation",
+    "Hypothesis-driven troubleshooting",
+    "Ideation",
+    "Improvement mindset",
+    "Impulse Control",
+    "Incident communication",
+    "Incident leadership",
+    "Inclusive change management",
+    "Inclusive coaching",
+    "Inclusive conflict mediation",
+    "Inclusive decision ownership",
+    "Inclusive direction setting",
+    "Inclusive incident leadership",
+    "Inclusive leadership",
+    "Inclusive mentoring",
+    "Inclusive priority setting",
+    "Inclusive team support",
+    "Inclusiveness",
+    "Inclusivity",
+    "Independent adaptation",
+    "Independent ambiguity management",
+    "Independent change response",
+    "Independent constraint handling",
+    "Independent context switching",
+    "Independent decision making",
+    "Independent improvement",
+    "Independent issue triage",
+    "Independent knowledge transfer",
+    "Independent learning",
+    "Independent mindset",
+    "Independent option assessment",
+    "Independent problem solving",
+    "Independent process improvement",
+    "Independent retrospective learning",
+    "Independent root-cause analysis",
+    "Independent scenario analysis",
+    "Independent skill growth",
+    "Independent tool adoption",
+    "Independent tradeoff evaluation",
+    "Independent troubleshooting",
+    "Independent work",
+    "Influence",
+    "Influence without authority",
+    "Influencing direction",
+    "Information Processing",
+    "Information sharing",
+    "Initiative",
+    "Innovation",
+    "Innovation mindset",
+    "Innovative Thinking",
+    "Insight Generation",
+    "Inspiration",
+    "Institutional memory",
+    "Integrity",
+    "Intellectual honesty",
+    "Intellectual Humility",
+    "Interpersonal Skills",
+    "Interview communication",
+    "Intrapreneurship",
+    "Investigative thinking",
+    "Issue triage",
+    "Iterative adaptation",
+    "Iterative change response",
+    "Iterative context switching",
+    "Iterative improvement",
+    "Iterative knowledge transfer",
+    "Iterative learning",
+    "Iterative process improvement",
+    "Iterative retrospective learning",
+    "Iterative skill growth",
+    "Iterative tool adoption",
+    "Judgment",
+    "Knowledge Retention",
+    "Knowledge sharing",
+    "Knowledge Transfer",
+    "KPI Tracking",
+    "Lateral Thinking",
+    "Lead-by-example mindset",
+    "Leadership",
+    "Leadership alignment",
+    "Leadership briefing",
+    "Leadership collaboration",
+    "Leadership communication",
+    "Leadership coordination",
+    "Leadership expectation setting",
+    "Leadership follow-up",
+    "Leadership issue handling",
+    "Leadership relationship management",
+    "Leadership trust building",
+    "Lean Thinking",
+    "Learning agility",
+    "Learning from customers",
+    "Learning from data",
+    "Learning from feedback",
+    "Learning from incidents",
+    "Learning from mistakes",
+    "Learning from peers",
+    "Listening",
+    "Listening for intent",
+    "Listening to customer pain points",
+    "Logical reasoning",
+    "Long-term thinking",
+    "Manager alignment",
+    "Manager briefing",
+    "Manager collaboration",
+    "Manager communication",
+    "Manager coordination",
+    "Manager expectation setting",
+    "Manager follow-up",
+    "Manager issue handling",
+    "Manager relationship management",
+    "Manager trust building",
+    "Managing competing priorities",
+    "Market Awareness",
+    "Mature adaptability",
+    "Mature boundary setting",
+    "Mature energy management",
+    "Mature focus management",
+    "Mature judgment",
+    "Mature ownership mindset",
+    "Mature professional presence",
+    "Mature self-management",
+    "Mature stress management",
+    "Mature work ethic",
+    "Maturity",
+    "Mediation",
+    "Meeting facilitation",
+    "Meeting Management",
+    "Meeting note taking",
+    "Mentor mindset",
+    "Mentoring",
+    "Mentorship",
+    "Metric orientation",
+    "Metrics-driven Thinking",
+    "Milestone tracking",
+    "Mindfulness",
+    "Moderation",
+    "Moral Reasoning",
+    "Morale building",
+    "Motivated problem solver",
+    "Motivation",
+    "Motivation to grow",
+    "Multitasking",
+    "Needs discovery",
+    "Needs-aware communication",
+    "Needs-aware decision making",
+    "Needs-aware delivery",
+    "Needs-aware expectation setting",
+    "Needs-aware planning",
+    "Needs-aware prioritization",
+    "Needs-aware problem solving",
+    "Needs-aware relationship management",
+    "Needs-aware support",
+    "Needs-aware thinking",
+    "Negotiation",
+    "Network building",
+    "Networking",
+    "Non-technical communication",
+    "Note-taking discipline",
+    "Objectivity",
+    "OKR Management",
+    "Onboarding",
+    "Onboarding support",
+    "Open-mindedness",
+    "Openness",
+    "Openness to change",
+    "Operational leadership",
+    "Operational rigor",
+    "Operational Thinking",
+    "Optimism",
+    "Organization",
+    "Organizational awareness",
+    "Organized deadline awareness",
+    "Organized delivery management",
+    "Organized follow-through",
+    "Organized planning",
+    "Organized prioritization",
+    "Organized quality control",
+    "Organized risk tracking",
+    "Organized task ownership",
+    "Organized time use",
+    "Organized work organization",
+    "Outcome orientation",
+    "Outcome-focused communication",
+    "Outcome-focused decision making",
+    "Outcome-focused delivery",
+    "Outcome-focused expectation setting",
+    "Outcome-focused planning",
+    "Outcome-focused prioritization",
+    "Outcome-focused problem solving",
+    "Outcome-focused relationship management",
+    "Outcome-focused support",
+    "Outcome-focused thinking",
+    "Outreach",
+    "Ownership",
+    "Ownership of outcomes",
+    "Ownership-driven approach",
+    "Owning mistakes",
+    "Pairing effectively",
+    "Partner alignment",
+    "Partner briefing",
+    "Partner collaboration",
+    "Partner communication",
+    "Partner coordination",
+    "Partner expectation setting",
+    "Partner follow-up",
+    "Partner issue handling",
+    "Partner relationship management",
+    "Partner trust building",
+    "Partnership building",
+    "Partnership with clients",
+    "Passion",
+    "Patience",
+    "Patience under Pressure",
+    "Pattern recognition",
+    "Peer alignment",
+    "Peer briefing",
+    "Peer collaboration",
+    "Peer communication",
+    "Peer coordination",
+    "Peer expectation setting",
+    "Peer follow-up",
+    "Peer issue handling",
+    "Peer mentoring",
+    "Peer relationship management",
+    "Peer support",
+    "Peer trust building",
+    "People leadership",
+    "People Management",
+    "Performance coaching",
+    "Performance Management",
+    "Performance-focused",
+    "Persistence",
+    "Persuasion",
+    "Persuasive decision summaries",
+    "Persuasive follow-up messages",
+    "Persuasive handoff notes",
+    "Persuasive meeting contributions",
+    "Persuasive non-technical explanations",
+    "Persuasive risk explanations",
+    "Persuasive status updates",
+    "Persuasive technical explanations",
+    "Persuasive verbal updates",
+    "Persuasive written updates",
+    "Planning",
+    "Politeness",
+    "Positive Reinforcement",
+    "Positivity",
+    "Postmortem participation",
+    "Practical ambiguity management",
+    "Practical constraint handling",
+    "Practical deadline awareness",
+    "Practical decision making",
+    "Practical delivery management",
+    "Practical follow-through",
+    "Practical issue triage",
+    "Practical option assessment",
+    "Practical planning",
+    "Practical prioritization",
+    "Practical problem solving",
+    "Practical quality control",
+    "Practical risk tracking",
+    "Practical root-cause analysis",
+    "Practical scenario analysis",
+    "Practical task ownership",
+    "Practical time use",
+    "Practical tradeoff evaluation",
+    "Practical troubleshooting",
+    "Practical work organization",
+    "Pragmatic change management",
+    "Pragmatic coaching",
+    "Pragmatic conflict mediation",
+    "Pragmatic decision ownership",
+    "Pragmatic direction setting",
+    "Pragmatic incident leadership",
+    "Pragmatic leadership",
+    "Pragmatic mentoring",
+    "Pragmatic priority setting",
+    "Pragmatic team support",
+    "Pragmatism",
+    "Precision",
+    "Presentation skills",
+    "Pressure Handling",
+    "Prioritization",
+    "Prioritization under pressure",
+    "Proactive ambiguity management",
+    "Proactive constraint handling",
+    "Proactive deadline awareness",
+    "Proactive decision making",
+    "Proactive delivery management",
+    "Proactive follow-through",
+    "Proactive issue triage",
+    "Proactive option assessment",
+    "Proactive planning",
+    "Proactive prioritization",
+    "Proactive problem solving",
+    "Proactive quality control",
+    "Proactive risk tracking",
+    "Proactive root-cause analysis",
+    "Proactive scenario analysis",
+    "Proactive task ownership",
+    "Proactive time use",
+    "Proactive tradeoff evaluation",
+    "Proactive troubleshooting",
+    "Proactive work organization",
+    "Proactiveness",
+    "Problem decomposition",
+    "Problem ownership with customers",
+    "Problem Solving",
+    "Problem-solving",
+    "Process discipline",
+    "Process Improvement",
+    "Process improvement mindset",
+    "Process Orientation",
+    "Product thinking",
+    "Productivity",
+    "Professional boundaries",
+    "Professional boundary setting",
+    "Professional courtesy",
+    "Professional energy management",
+    "Professional focus management",
+    "Professional judgment",
+    "Professional ownership mindset",
+    "Professional presence",
+    "Professional professional presence",
+    "Professional self-management",
+    "Professional stress management",
+    "Professional work ethic",
+    "Professionalism",
+    "Program leadership",
+    "Progress visibility",
+    "Project leadership",
+    "Proofreading",
+    "Prototyping Mindset",
+    "Psychological Safety",
+    "Psychological safety awareness",
+    "Public speaking",
+    "Purpose-driven",
+    "Quality Focus",
+    "Quality mindset",
+    "Quality-focused communication",
+    "Quality-focused decision making",
+    "Quality-focused delivery",
+    "Quality-focused expectation setting",
+    "Quality-focused planning",
+    "Quality-focused prioritization",
+    "Quality-focused problem solving",
+    "Quality-focused relationship management",
+    "Quality-focused support",
+    "Quality-focused thinking",
+    "Question framing",
+    "Rapport Building",
+    "Receiving feedback well",
+    "Receptiveness to feedback",
+    "Recognition",
+    "Recognition of others",
+    "Reflection after delivery",
+    "Relationship building",
+    "Relationship Management",
+    "Reliability",
+    "Reliability to teammates",
+    "Reliable deadline awareness",
+    "Reliable delivery management",
+    "Reliable follow-through",
+    "Reliable planning",
+    "Reliable prioritization",
+    "Reliable quality control",
+    "Reliable risk tracking",
+    "Reliable task ownership",
+    "Reliable time use",
+    "Reliable work organization",
+    "Remote Collaboration",
+    "Remote communication",
+    "Remote-first culture",
+    "Report Writing",
+    "Requirements clarification",
+    "Research Skills",
+    "Resilience",
+    "Resilience under uncertainty",
+    "Reskilling",
+    "Resource planning",
+    "Resourcefulness",
+    "Respect",
+    "Respect for commitments",
+    "Respect for privacy",
+    "respectful",
+    "Respectful decision summaries",
+    "Respectful follow-up messages",
+    "Respectful handoff notes",
+    "Respectful meeting contributions",
+    "Respectful non-technical explanations",
+    "Respectful risk explanations",
+    "Respectful status updates",
+    "Respectful technical explanations",
+    "Respectful verbal updates",
+    "Respectful written updates",
+    "Respectfulness",
+    "Responsibility",
+    "Responsibility with sensitive information",
+    "Responsiveness",
+    "Responsiveness to customer needs",
+    "Results-driven",
+    "Retrospective participation",
+    "Risk analysis",
+    "Risk awareness",
+    "Risk mitigation",
+    "Roadmap communication",
+    "Root Cause Analysis",
+    "Root-cause thinking",
+    "Scenario planning",
+    "Scheduling",
+    "Scope control",
+    "Scrappiness",
+    "Self-awareness",
+    "Self-directed",
+    "Self-directed adaptation",
+    "Self-directed change response",
+    "Self-directed context switching",
+    "Self-directed improvement",
+    "Self-directed knowledge transfer",
+    "Self-directed learning",
+    "Self-directed process improvement",
+    "Self-directed retrospective learning",
+    "Self-directed skill growth",
+    "Self-directed tool adoption",
+    "Self-direction",
+    "Self-improvement",
+    "Self-motivated",
+    "Self-motivation",
+    "Self-reflection",
+    "Self-regulation",
+    "Sense-making",
+    "Sensitivity to user frustration",
+    "Servant change management",
+    "Servant coaching",
+    "Servant conflict mediation",
+    "Servant decision ownership",
+    "Servant direction setting",
+    "Servant incident leadership",
+    "Servant leadership",
+    "Servant mentoring",
+    "Servant priority setting",
+    "Servant team support",
+    "Service orientation",
+    "Service-minded communication",
+    "Service-minded decision making",
+    "Service-minded delivery",
+    "Service-minded expectation setting",
+    "Service-minded planning",
+    "Service-minded prioritization",
+    "Service-minded problem solving",
+    "Service-minded relationship management",
+    "Service-minded support",
+    "Service-minded thinking",
+    "Shared ownership",
+    "Short-term prioritization",
+    "Simplification",
+    "Situational leadership",
+    "Social Awareness",
+    "Social Responsibility",
+    "Solution framing",
+    "Solutions-oriented communication",
+    "Solutions-oriented decision making",
+    "Solutions-oriented delivery",
+    "Solutions-oriented expectation setting",
+    "Solutions-oriented planning",
+    "Solutions-oriented prioritization",
+    "Solutions-oriented problem solving",
+    "Solutions-oriented relationship management",
+    "Solutions-oriented support",
+    "Solutions-oriented thinking",
+    "Sound adaptability",
+    "Sound boundary setting",
+    "Sound energy management",
+    "Sound focus management",
+    "Sound judgment",
+    "Sound ownership mindset",
+    "Sound professional presence",
+    "Sound self-management",
+    "Sound stress management",
+    "Sound work ethic",
+    "Speaking up respectfully",
+    "Sponsorship",
+    "Stakeholder alignment",
+    "Stakeholder briefing",
+    "Stakeholder collaboration",
+    "Stakeholder communication",
+    "Stakeholder coordination",
+    "Stakeholder expectation setting",
+    "Stakeholder follow-up",
+    "Stakeholder issue handling",
+    "Stakeholder Management",
+    "Stakeholder relationship management",
+    "Stakeholder trust building",
+    "Status reporting",
+    "Steady deadline awareness",
+    "Steady delivery management",
+    "Steady follow-through",
+    "Steady planning",
+    "Steady prioritization",
+    "Steady quality control",
+    "Steady risk tracking",
+    "Steady task ownership",
+    "Steady time use",
+    "Steady work organization",
+    "Storytelling",
+    "Strategic Alignment",
+    "Strategic analysis",
+    "Strategic change management",
+    "Strategic coaching",
+    "Strategic conflict mediation",
+    "Strategic decision ownership",
+    "Strategic direction setting",
+    "Strategic incident leadership",
+    "Strategic leadership",
+    "Strategic mentoring",
+    "Strategic priority setting",
+    "Strategic team support",
+    "Strategic thinking",
+    "Stress Management",
+    "Strong adaptability",
+    "Strong analytical skills",
+    "Strong boundary setting",
+    "Strong communication skills",
+    "Strong deadline awareness",
+    "Strong delivery management",
+    "Strong energy management",
+    "Strong focus management",
+    "Strong follow-through",
+    "Strong judgment",
+    "Strong ownership mindset",
+    "Strong planning",
+    "Strong prioritization",
+    "Strong problem-solving skills",
+    "Strong professional presence",
+    "Strong quality control",
+    "Strong risk tracking",
+    "Strong self-management",
+    "Strong stress management",
+    "Strong task ownership",
+    "Strong time use",
+    "Strong work ethic",
+    "Strong work organization",
+    "Structured ambiguity management",
+    "Structured constraint handling",
+    "Structured decision making",
+    "Structured decision summaries",
+    "Structured execution",
+    "Structured follow-up messages",
+    "Structured handoff notes",
+    "Structured issue triage",
+    "Structured meeting contributions",
+    "Structured non-technical explanations",
+    "Structured option assessment",
+    "Structured problem solving",
+    "Structured risk explanations",
+    "Structured root-cause analysis",
+    "Structured scenario analysis",
+    "Structured status updates",
+    "Structured technical explanations",
+    "Structured thinking",
+    "Structured tradeoff evaluation",
+    "Structured troubleshooting",
+    "Structured verbal updates",
+    "Structured written updates",
+    "Succession mindset",
+    "Summarization",
+    "Support-mindedness",
+    "Supportive change management",
+    "Supportive coaching",
+    "Supportive conflict mediation",
+    "Supportive decision ownership",
+    "Supportive direction setting",
+    "Supportive incident leadership",
+    "Supportive leadership",
+    "Supportive mentoring",
+    "Supportive priority setting",
+    "Supportive team support",
+    "Sustainability Mindset",
+    "Synthesis",
+    "Systems analysis",
+    "Systems thinking",
+    "Tact",
+    "Talent development",
+    "Task management",
+    "Teaching others",
+    "Team Building",
+    "Team Leadership",
+    "Team motivation",
+    "Teamwork",
+    "Technical communication",
+    "Technical leadership",
+    "Technical Writing",
+    "Tenacity",
+    "Thoroughness",
+    "Thoughtful decision summaries",
+    "Thoughtful follow-up messages",
+    "Thoughtful handoff notes",
+    "Thoughtful meeting contributions",
+    "Thoughtful non-technical explanations",
+    "Thoughtful risk explanations",
+    "Thoughtful status updates",
+    "Thoughtful technical explanations",
+    "Thoughtful verbal updates",
+    "Thoughtful written updates",
+    "Time management",
+    "Timely decision summaries",
+    "Timely follow-up messages",
+    "Timely handoff notes",
+    "Timely meeting contributions",
+    "Timely non-technical explanations",
+    "Timely risk explanations",
+    "Timely status updates",
+    "Timely technical explanations",
+    "Timely verbal updates",
+    "Timely written updates",
+    "Tolerance for Uncertainty",
+    "Tradeoff analysis",
+    "Training",
+    "Translating technical topics for customers",
+    "Transparency",
+    "Transparency about risks",
+    "Transparent change management",
+    "Transparent coaching",
+    "Transparent conflict mediation",
+    "Transparent decision ownership",
+    "Transparent decision summaries",
+    "Transparent direction setting",
+    "Transparent follow-up messages",
+    "Transparent handoff notes",
+    "Transparent incident leadership",
+    "Transparent leadership",
+    "Transparent meeting contributions",
+    "Transparent mentoring",
+    "Transparent non-technical explanations",
+    "Transparent priority setting",
+    "Transparent risk explanations",
+    "Transparent status updates",
+    "Transparent team support",
+    "Transparent technical explanations",
+    "Transparent verbal updates",
+    "Transparent written updates",
+    "Troubleshooting",
+    "Troubleshooting mindset",
+    "Trust building",
+    "Trustworthiness",
+    "Upskilling",
+    "Urgency with judgment",
+    "User empathy",
+    "User-centered thinking",
+    "User-focused communication",
+    "User-focused decision making",
+    "User-focused delivery",
+    "User-focused expectation setting",
+    "User-focused planning",
+    "User-focused prioritization",
+    "User-focused problem solving",
+    "User-focused relationship management",
+    "User-focused support",
+    "User-focused thinking",
+    "Value orientation",
+    "Value-oriented communication",
+    "Value-oriented decision making",
+    "Value-oriented delivery",
+    "Value-oriented expectation setting",
+    "Value-oriented planning",
+    "Value-oriented prioritization",
+    "Value-oriented problem solving",
+    "Value-oriented relationship management",
+    "Value-oriented support",
+    "Value-oriented thinking",
+    "Values-driven",
+    "Vendor alignment",
+    "Vendor briefing",
+    "Vendor collaboration",
+    "Vendor communication",
+    "Vendor coordination",
+    "Vendor expectation setting",
+    "Vendor follow-up",
+    "Vendor issue handling",
+    "Vendor relationship management",
+    "Vendor trust building",
+    "Verbal Communication",
+    "Vision setting",
+    "Visionary Leadership",
+    "Volunteer Mindset",
+    "Warmth",
+    "Willingness to Learn",
+    "Work Ethic",
+    "Work planning",
+    "Working across time zones",
+    "Working with design partners",
+    "Working with distributed teams",
+    "Working with operations partners",
+    "Working with product partners",
+    "Working with QA partners",
+    "Working with security partners",
+    "Working with support teams",
+    "Workshop Facilitation",
+    "Written Communication",
+    "Zoom In / Zoom Out"
+  ]
+}
