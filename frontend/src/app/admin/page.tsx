@@ -7,7 +7,7 @@ export default function AdminPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/admin/profiles');
+    router.replace('/admin/settings');
   }, [router]);
 
   return (

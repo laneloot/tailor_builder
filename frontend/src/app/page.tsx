@@ -5,7 +5,6 @@ import {
   profilesApi,
   groupsApi,
   resumeApi,
-  AIProvider,
   PublicAppSettings,
   Profile,
   Group,
@@ -67,19 +66,21 @@ export default function Home() {
   const [companyName, setCompanyName] = useState('');
   const [role, setRole] = useState('');
   const [jobDescription, setJobDescription] = useState('');
-  const [selectedModel, setSelectedModel] = useState<AIProvider>('openrouter');
   const [modelSettings, setModelSettings] = useState<PublicAppSettings>({
     openaiEnabled: true,
     claudeEnabled: true,
     openrouterEnabled: true,
+    deepseekEnabled: true,
     defaultMode: 'preview',
     defaultTheme: 'light',
     defaultResumeSelection: 'single',
     defaultGroupId: '',
     defaultProfileId: '',
+    defaultModelId: '',
     defaultResumeDocxEnabled: true,
     defaultCoverLetterDocxEnabled: true,
     outputPathUsesJobTitle: true,
+    aiModels: [],
     googleSheetsSources: [],
   });
   const [jobAnalysis, setJobAnalysis] = useState<JobAnalysis | null>(null);
@@ -130,7 +131,7 @@ export default function Home() {
 
   useEffect(() => {
     resetGenerationOutputs();
-  }, [builderMode, companyName, role, jobDescription, selectedProfileId, selectedModel, generateMode, resetGenerationOutputs]);
+  }, [builderMode, companyName, role, jobDescription, selectedProfileId, generateMode, resetGenerationOutputs]);
 
   const loadInitialData = async () => {
     try {
@@ -141,14 +142,17 @@ export default function Home() {
           openaiEnabled: true,
           claudeEnabled: true,
           openrouterEnabled: true,
+          deepseekEnabled: true,
           defaultMode: 'preview' as const,
           defaultTheme: 'light' as const,
           defaultResumeSelection: 'single' as const,
           defaultGroupId: '',
           defaultProfileId: '',
+          defaultModelId: '',
           defaultResumeDocxEnabled: true,
           defaultCoverLetterDocxEnabled: true,
           outputPathUsesJobTitle: true,
+          aiModels: [],
           googleSheetsSources: [],
         })),
       ]);
@@ -161,14 +165,6 @@ export default function Home() {
 
       if (!getStoredTheme()) {
         applyTheme(modelData.defaultTheme);
-      }
-
-      if (modelData.openrouterEnabled) {
-        setSelectedModel('openrouter');
-      } else if (modelData.claudeEnabled) {
-        setSelectedModel('claude');
-      } else if (modelData.openaiEnabled) {
-        setSelectedModel('openai');
       }
 
       if (enabledProfiles.length > 0) {
@@ -368,7 +364,6 @@ export default function Home() {
         jobAnalysis: analysis,
         companyName: targetCompanyName,
         role: resolvedRole,
-        model: selectedModel,
         ...getDefaultGenerationOptions(),
       });
       updateGenerationProgress(
@@ -402,7 +397,6 @@ export default function Home() {
           tailoredContent: tailoredContentByProfileId?.get(profile.id),
           companyName: targetCompanyName,
           role: resolvedRole,
-          model: selectedModel,
           ...getDefaultGenerationOptions(),
         });
         collectUnconfirmedFromGenerateResult(unconfirmedHardMap, unconfirmedSoftMap, result);
@@ -476,7 +470,6 @@ export default function Home() {
           jobDescription: job.jobDescription.trim(),
           sourceRowNumber: job.sourceRowNumber,
         })),
-        model: selectedModel,
       });
 
       const analysisByRow = new Map<number, JobAnalysis>();
@@ -524,7 +517,6 @@ export default function Home() {
         const result = await resumeApi.generateMultiJob({
           profileIds: selectedProfiles.map((profile) => profile.id),
           jobs: jobsToGenerate,
-          model: selectedModel,
           ...getDefaultGenerationOptions(),
         });
 
@@ -609,7 +601,7 @@ export default function Home() {
     try {
       setGenerationStep('Analyzing job description...');
       clearGenerationProgress();
-      const analysis = await resumeApi.analyze(jobDescription, selectedModel);
+      const analysis = await resumeApi.analyze(jobDescription, '');
       setJobAnalysis(analysis);
 
       if (generateMode === 'single' && !autoGenerate) {
@@ -621,7 +613,6 @@ export default function Home() {
           templateId,
           jobDescription,
           jobAnalysis: analysis,
-          model: selectedModel,
         });
         setPreviewHtml(preview.html);
         setPreviewTailored(preview.tailored);
@@ -651,7 +642,6 @@ export default function Home() {
         const res = await resumeApi.previewAll({
           jobDescription,
           jobAnalysis: analysis,
-          model: selectedModel,
           profileIds,
         });
         const previewsWithDrafts = res.previews.map((preview) => ({
@@ -684,7 +674,6 @@ export default function Home() {
           jobAnalysis: analysis,
           companyName: companyName.trim(),
           role: shouldShowRoleInput ? role.trim() : (getAnalysisJobTitle(analysis) || ''),
-          model: selectedModel,
           ...getDefaultGenerationOptions(),
         });
         updateGenerationProgress(1, 1, 'Building resume', profile?.name, companyName.trim());
@@ -892,7 +881,6 @@ export default function Home() {
             jobDescription,
             jobAnalysis: jobAnalysis || undefined,
             tailoredContent: nextTailored,
-            model: selectedModel,
           });
           setPreviewHtml(refreshed.html);
           setPreviewTailored(refreshed.tailored);
@@ -970,7 +958,6 @@ export default function Home() {
                 jobDescription,
                 jobAnalysis: jobAnalysis || undefined,
                 tailoredContent: nextTailored,
-                model: selectedModel,
               });
               return {
                 profileId,
@@ -1038,7 +1025,6 @@ export default function Home() {
         jobDescription,
         jobAnalysis: jobAnalysis || undefined,
         tailoredContent,
-        model: selectedModel,
       });
       setPreviewHtml(preview.html);
       setPreviewTailored(preview.tailored);
@@ -1069,7 +1055,7 @@ export default function Home() {
     setSuccessMessage('');
 
     try {
-      const analysis = jobAnalysis || (await resumeApi.analyze(jobDescription, selectedModel));
+      const analysis = jobAnalysis || (await resumeApi.analyze(jobDescription));
       if (!jobAnalysis) {
         setJobAnalysis(analysis);
       }
@@ -1085,7 +1071,6 @@ export default function Home() {
         tailoredContent: tailoredContent || undefined,
         companyName: companyName.trim(),
         role: shouldShowRoleInput ? role.trim() : (getAnalysisJobTitle(analysis) || ''),
-        model: selectedModel,
         ...getDefaultGenerationOptions(),
       });
       updateGenerationProgress(1, 1, 'Building resume', profile?.name, companyName.trim());
@@ -1153,7 +1138,6 @@ export default function Home() {
         jobDescription,
         jobAnalysis: jobAnalysis || undefined,
         tailoredContent: preview.tailoredContent,
-        model: selectedModel,
       });
       const nextPreviews = multiplePreviews.map((item) => {
         if (item.profileId !== profileId) return item;
@@ -1202,7 +1186,7 @@ export default function Home() {
     setSuccessMessage('');
 
     try {
-      const analysis = jobAnalysis || (await resumeApi.analyze(jobDescription, selectedModel));
+      const analysis = jobAnalysis || (await resumeApi.analyze(jobDescription));
       if (!jobAnalysis) {
         setJobAnalysis(analysis);
       }
@@ -1236,7 +1220,6 @@ export default function Home() {
             tailoredContent: preview.tailoredContent,
             companyName: companyName.trim(),
             role: shouldShowRoleInput ? role.trim() : (getAnalysisJobTitle(analysis) || ''),
-            model: selectedModel,
             ...getDefaultGenerationOptions(),
           });
           completed += 1;
@@ -1613,20 +1596,6 @@ export default function Home() {
               <p className="text-sm text-gray-500 mt-1">{jobDescription.length} characters</p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">AI Model</label>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value as AIProvider)}
-                disabled={isGenerating}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {modelSettings.openaiEnabled && <option value="openai">OpenAI</option>}
-                {modelSettings.claudeEnabled && <option value="claude">Claude</option>}
-                {modelSettings.openrouterEnabled && <option value="openrouter">OpenRouter</option>}
-              </select>
-            </div>
-
             <div
               className={`flex items-center justify-between border rounded-lg p-4 transition-colors ${
                 autoGenerate ? 'border-blue-200 bg-blue-50' : 'border-red-200 bg-red-50'
@@ -1773,20 +1742,6 @@ export default function Home() {
                 </p>
               </div>
             )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">AI Model</label>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value as AIProvider)}
-                disabled={isGenerating}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {modelSettings.openaiEnabled && <option value="openai">OpenAI</option>}
-                {modelSettings.claudeEnabled && <option value="claude">Claude</option>}
-                {modelSettings.openrouterEnabled && <option value="openrouter">OpenRouter</option>}
-              </select>
-            </div>
 
             {!hasGoogleSheetSources && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -1987,7 +1942,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="mt-auto py-6 text-center text-sm text-gray-500">
-        <p>Tailored Resume Builder - Powered by OpenAI, Anthropic, and OpenRouter</p>
+        <p>Tailored Resume Builder - Powered by OpenAI, Anthropic, OpenRouter, and DeepSeek</p>
       </footer>
     </div>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -14,11 +15,15 @@ const NAV_ITEMS = [
   { href: '/test', label: 'Test' },
   { href: '/admin/profiles', label: 'Profiles' },
   { href: '/admin/templates', label: 'Templates' },
-  { href: '/admin/prompts', label: 'Prompts' },
   { href: '/admin/groups', label: 'Groups' },
-  { href: '/admin/skills', label: 'Skill Library' },
-  { href: '/admin/settings', label: 'Settings' },
+];
+
+const SETTINGS_ITEMS = [
+  { href: '/admin/settings', label: 'General' },
   { href: '/admin/google-sheets', label: 'Google Sheets' },
+  { href: '/admin/prompts', label: 'Prompts' },
+  { href: '/admin/models', label: 'Models' },
+  { href: '/admin/skills', label: 'Skill Library' },
 ];
 
 function isActivePath(pathname: string, href: string): boolean {
@@ -30,6 +35,21 @@ function isActivePath(pathname: string, href: string): boolean {
 
 export default function AppTopNav({ onLogout }: Props) {
   const pathname = usePathname();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!settingsRef.current?.contains(event.target as Node)) {
+        setIsSettingsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, []);
+
+  const isSettingsActive = SETTINGS_ITEMS.some((item) => isActivePath(pathname, item.href));
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
@@ -55,6 +75,42 @@ export default function AppTopNav({ onLogout }: Props) {
                 </Link>
               );
             })}
+
+            <div className="relative" ref={settingsRef}>
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen((current) => !current)}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                  isSettingsActive || isSettingsOpen
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
+                }`}
+              >
+                Settings
+              </button>
+
+              {isSettingsOpen && (
+                <div className="absolute left-0 top-full mt-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
+                  {SETTINGS_ITEMS.map((item) => {
+                    const isActive = isActivePath(pathname, item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setIsSettingsOpen(false)}
+                        className={`block px-4 py-3 text-sm transition ${
+                          isActive
+                            ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200'
+                            : 'text-gray-700 hover:bg-gray-50 dark:text-slate-200 dark:hover:bg-slate-900'
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </nav>
         </div>
 

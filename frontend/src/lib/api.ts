@@ -120,7 +120,15 @@ async function apiFetch<T>(
   throw lastConnectionError ?? new Error('Unable to connect to backend');
 }
 
-export type AIProvider = 'openai' | 'claude' | 'openrouter';
+export type AIProvider = 'openai' | 'claude' | 'openrouter' | 'deepseek';
+export const AI_PROVIDERS: AIProvider[] = ['openai', 'claude', 'openrouter', 'deepseek'];
+
+export function getAIProviderLabel(provider: AIProvider): string {
+  if (provider === 'openai') return 'OpenAI';
+  if (provider === 'claude') return 'Claude';
+  if (provider === 'openrouter') return 'OpenRouter';
+  return 'DeepSeek';
+}
 export type DefaultMode = 'preview' | 'generate';
 export type ThemeMode = 'light' | 'dark';
 export type DefaultResumeSelection = 'single' | 'all' | 'group';
@@ -129,6 +137,17 @@ export interface GoogleSheetSource {
   id: string;
   name: string;
   sheetId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AIModelRecord {
+  id: string;
+  name: string;
+  provider: AIProvider;
+  modelName: string;
+  description: string;
+  enabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -290,14 +309,17 @@ export interface PublicAppSettings {
   openaiEnabled: boolean;
   claudeEnabled: boolean;
   openrouterEnabled: boolean;
+  deepseekEnabled: boolean;
   defaultMode: DefaultMode;
   defaultTheme: ThemeMode;
   defaultResumeSelection: DefaultResumeSelection;
   defaultGroupId: string;
   defaultProfileId: string;
+  defaultModelId: string;
   defaultResumeDocxEnabled: boolean;
   defaultCoverLetterDocxEnabled: boolean;
   outputPathUsesJobTitle: boolean;
+  aiModels: AIModelRecord[];
   googleSheetsSources: GoogleSheetSource[];
 }
 
@@ -349,6 +371,7 @@ function normalizePublicAppSettings(value: unknown): PublicAppSettings {
     openaiEnabled: typeof source.openaiEnabled === 'boolean' ? source.openaiEnabled : true,
     claudeEnabled: typeof source.claudeEnabled === 'boolean' ? source.claudeEnabled : true,
     openrouterEnabled: typeof source.openrouterEnabled === 'boolean' ? source.openrouterEnabled : true,
+    deepseekEnabled: typeof source.deepseekEnabled === 'boolean' ? source.deepseekEnabled : true,
     defaultMode: source.defaultMode === 'generate' ? 'generate' : 'preview',
     defaultTheme: source.defaultTheme === 'dark' ? 'dark' : 'light',
     defaultResumeSelection:
@@ -357,12 +380,31 @@ function normalizePublicAppSettings(value: unknown): PublicAppSettings {
         : 'single',
     defaultGroupId: typeof source.defaultGroupId === 'string' ? source.defaultGroupId : '',
     defaultProfileId: typeof source.defaultProfileId === 'string' ? source.defaultProfileId : '',
+    defaultModelId: typeof source.defaultModelId === 'string' ? source.defaultModelId : '',
     defaultResumeDocxEnabled:
       typeof source.defaultResumeDocxEnabled === 'boolean' ? source.defaultResumeDocxEnabled : true,
     defaultCoverLetterDocxEnabled:
       typeof source.defaultCoverLetterDocxEnabled === 'boolean' ? source.defaultCoverLetterDocxEnabled : true,
     outputPathUsesJobTitle:
       typeof source.outputPathUsesJobTitle === 'boolean' ? source.outputPathUsesJobTitle : true,
+    aiModels: Array.isArray(source.aiModels)
+      ? source.aiModels
+          .filter((entry): entry is AIModelRecord => typeof entry === 'object' && entry !== null)
+          .map((entry) => ({
+            id: typeof entry.id === 'string' ? entry.id : '',
+            name: typeof entry.name === 'string' ? entry.name : '',
+            provider:
+              entry.provider === 'claude' || entry.provider === 'openrouter' || entry.provider === 'openai' || entry.provider === 'deepseek'
+                ? entry.provider
+                : 'openai',
+            modelName: typeof entry.modelName === 'string' ? entry.modelName : '',
+            description: typeof entry.description === 'string' ? entry.description : '',
+            enabled: typeof entry.enabled === 'boolean' ? entry.enabled : true,
+            createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : '',
+            updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : '',
+          }) satisfies AIModelRecord)
+          .filter((entry) => entry.id && entry.modelName)
+      : [],
     googleSheetsSources: normalizeGoogleSheetSources(source.googleSheetsSources),
   };
 }
@@ -396,6 +438,14 @@ function normalizeAdminAppSettings(value: unknown): AdminAppSettings {
               entries: [],
             },
             openrouter: {
+              configured: false,
+              activeSource: 'none',
+              activeKeyId: null,
+              activePreview: null,
+              environmentPreview: null,
+              entries: [],
+            },
+            deepseek: {
               configured: false,
               activeSource: 'none',
               activeKeyId: null,
@@ -575,6 +625,41 @@ export const adminApi = {
     normalizeAdminAppSettings(await apiFetch<AdminAppSettings>('/admin/ai-models', {
       method: 'PUT',
       body: JSON.stringify(data),
+    })),
+
+  listModels: async () =>
+    (await apiFetch<{ models: AIModelRecord[] }>('/admin/models')).models,
+
+  createModel: async (data: {
+    name: string;
+    provider: AIProvider;
+    modelName: string;
+    description?: string;
+    enabled?: boolean;
+  }) =>
+    normalizeAdminAppSettings(await apiFetch<AdminAppSettings>('/admin/models', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })),
+
+  updateModel: async (
+    id: string,
+    data: {
+      name?: string;
+      provider?: AIProvider;
+      modelName?: string;
+      description?: string;
+      enabled?: boolean;
+    }
+  ) =>
+    normalizeAdminAppSettings(await apiFetch<AdminAppSettings>(`/admin/models/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })),
+
+  deleteModel: async (id: string) =>
+    normalizeAdminAppSettings(await apiFetch<AdminAppSettings>(`/admin/models/${id}`, {
+      method: 'DELETE',
     })),
 };
 
@@ -769,6 +854,13 @@ export interface Template {
 }
 
 export type PromptResponseFormat = 'json' | 'text';
+export type PromptFeatureKey =
+  | 'analyze-job-description'
+  | 'tailor-resume'
+  | 'generate-cover-letter'
+  | 'extract-template-from-pdf'
+  | 'extract-profile-from-resume'
+  | 'filter-google-sheet-job';
 
 export interface AIModelOption {
   id: string;
@@ -793,12 +885,15 @@ export interface PromptSummary {
   id: string;
   name: string;
   description: string;
+  featureKey?: PromptFeatureKey;
+  featureLabel?: string;
   responseFormat: PromptResponseFormat;
   modelProvider?: AIProvider;
   modelName?: string;
   allowedVariables: PromptVariableDefinition[];
   validation: PromptValidation;
   isBuiltIn: boolean;
+  isActiveForFeature?: boolean;
   usage?: string;
   createdAt: string;
   updatedAt: string;
@@ -1025,6 +1120,7 @@ export const promptsApi = {
   create: (data: {
     name: string;
     description?: string;
+    featureKey?: PromptFeatureKey;
     content: string;
     responseFormat?: PromptResponseFormat;
     modelProvider?: AIProvider;
@@ -1041,6 +1137,7 @@ export const promptsApi = {
     data: {
       name?: string;
       description?: string;
+      featureKey?: PromptFeatureKey;
       content: string;
       responseFormat?: PromptResponseFormat;
       modelProvider?: AIProvider;
@@ -1056,6 +1153,11 @@ export const promptsApi = {
   delete: (id: string) =>
     apiFetch<{ message: string }>(`/prompts/${id}`, {
       method: 'DELETE',
+    }),
+
+  activate: (id: string) =>
+    apiFetch<{ featureKey: PromptFeatureKey; promptId: string }>(`/prompts/${id}/activate`, {
+      method: 'POST',
     }),
 
   getModelOptions: () => apiFetch<AIModelOption[]>('/prompts/models'),
@@ -1087,7 +1189,7 @@ export const promptsApi = {
 export const resumeApi = {
   getModels: async () => normalizePublicAppSettings(await apiFetch<PublicAppSettings>('/resume/models')),
 
-  analyze: (jobDescription: string, model: AIProvider) =>
+  analyze: (jobDescription: string, model?: string) =>
     apiFetch<JobAnalysis>('/resume/analyze', {
       method: 'POST',
       body: JSON.stringify({ jobDescription, model }),
@@ -1099,7 +1201,7 @@ export const resumeApi = {
       jobDescription: string;
       sourceRowNumber?: number;
     }>;
-    model: AIProvider;
+    model?: string;
   }) =>
     apiFetch<{
       provider: AIProvider;
@@ -1129,7 +1231,7 @@ export const resumeApi = {
     tailoredContent?: TailoredContent;
     companyName: string;
     role: string;
-    model: AIProvider;
+    model?: string;
     format?: 'pdf' | 'docx' | 'both';
     includeCoverLetterDocx?: boolean;
   }) =>
@@ -1167,7 +1269,7 @@ export const resumeApi = {
     jobAnalysis?: JobAnalysis;
     companyName: string;
     role: string;
-    model: AIProvider;
+    model?: string;
     profileIds?: string[];
     format?: 'pdf' | 'docx' | 'both';
     includeCoverLetterDocx?: boolean;
@@ -1207,7 +1309,7 @@ export const resumeApi = {
       jobAnalysis?: JobAnalysis;
       sourceRowNumber?: number;
     }>;
-    model: AIProvider;
+    model?: string;
     profileIds?: string[];
     format?: 'pdf' | 'docx' | 'both';
     includeCoverLetterDocx?: boolean;
@@ -1273,7 +1375,7 @@ export const resumeApi = {
     jobDescription?: string;
     jobAnalysis?: JobAnalysis;
     tailoredContent?: TailoredContent;
-    model: AIProvider;
+    model?: string;
   }) =>
     apiFetch<{ html: string; tailored: boolean; tailoredContent?: TailoredContent }>('/resume/preview', {
       method: 'POST',
@@ -1284,7 +1386,7 @@ export const resumeApi = {
     templateId?: string;
     jobDescription?: string;
     jobAnalysis?: JobAnalysis;
-    model: AIProvider;
+    model?: string;
     profileIds?: string[];
   }) =>
     apiFetch<{

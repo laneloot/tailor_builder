@@ -1,7 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
 import {
+  PromptActivationResult,
   PromptCreateInput,
+  PromptFeatureKey,
   PromptPreviewInput,
   PromptPreviewResult,
   PromptRecord,
@@ -17,12 +19,16 @@ import type { AIProvider } from '../types/template';
 const DATA_DIR = process.env.TAILOR_DATA_DIR
   ? path.resolve(process.env.TAILOR_DATA_DIR)
   : path.join(__dirname, '../../data');
+const CONFIG_DIR = path.join(DATA_DIR, 'config');
 const PROMPTS_DIR = path.join(DATA_DIR, 'prompts');
+const PROMPT_LIBRARY_CONFIG_FILE = path.join(CONFIG_DIR, 'prompt-library.json');
 const CUSTOM_PROMPT_PREFIX = 'custom-';
 const PROMPT_SUFFIX = '.json';
 const VARIABLE_PATTERN = /\[\[\s*([a-zA-Z0-9_.-]+)\s*\]\]/g;
 
-type BuiltInPromptDefinition = {
+type PromptFeatureDefinition = {
+  key: PromptFeatureKey;
+  label: string;
   id: string;
   name: string;
   description: string;
@@ -33,10 +39,11 @@ type BuiltInPromptDefinition = {
   allowedVariables: PromptVariableDefinition[];
 };
 
-type StoredCustomPromptMeta = {
+type StoredPromptMeta = {
   id: string;
   name: string;
   description: string;
+  featureKey?: PromptFeatureKey;
   responseFormat: PromptResponseFormat;
   modelProvider?: AIProvider;
   modelName?: string;
@@ -45,12 +52,18 @@ type StoredCustomPromptMeta = {
   updatedAt: string;
 };
 
-type StoredPromptJson = Partial<StoredCustomPromptMeta> & {
+type StoredPromptJson = Partial<StoredPromptMeta> & {
   content?: unknown;
 };
 
-const BUILT_IN_PROMPTS: BuiltInPromptDefinition[] = [
+type PromptLibraryConfig = {
+  activePrompts: Partial<Record<PromptFeatureKey, string>>;
+};
+
+const PROMPT_FEATURES: PromptFeatureDefinition[] = [
   {
+    key: 'analyze-job-description',
+    label: 'Analyze Job Description',
     id: 'analyze-job-description',
     name: 'Analyze Job Description',
     description: 'Extracts structured ATS keywords, role metadata, and soft-skill signals from a raw job description.',
@@ -71,6 +84,8 @@ Preferred: GraphQL, Kubernetes, Terraform, CI/CD, and experience in fast-paced s
     ],
   },
   {
+    key: 'tailor-resume',
+    label: 'Tailor Resume',
     id: 'tailor-resume',
     name: 'Tailor Resume',
     description: 'Rewrites a profile against structured job analysis data and returns tailored resume content.',
@@ -167,29 +182,22 @@ Preferred: GraphQL, Kubernetes, Terraform, CI/CD, and experience in fast-paced s
     ],
   },
   {
+    key: 'generate-cover-letter',
+    label: 'Generate Cover Letter',
     id: 'generate-cover-letter',
     name: 'Generate Cover Letter',
     description: 'Generates a concise cover letter body using the profile and application details.',
     usage: 'Live prompt used when there is no job description but a cover letter is requested.',
     responseFormat: 'text',
     allowedVariables: [
-      {
-        name: 'profileJson',
-        description: 'Serialized candidate profile JSON.',
-      },
-      {
-        name: 'companyName',
-        description: 'Target company name.',
-        sampleValue: 'Acme',
-      },
-      {
-        name: 'role',
-        description: 'Target role title.',
-        sampleValue: 'Senior Software Engineer',
-      },
+      { name: 'profileJson', description: 'Serialized candidate profile JSON.' },
+      { name: 'companyName', description: 'Target company name.', sampleValue: 'Acme' },
+      { name: 'role', description: 'Target role title.', sampleValue: 'Senior Software Engineer' },
     ],
   },
   {
+    key: 'extract-template-from-pdf',
+    label: 'Extract Template From PDF',
     id: 'extract-template-from-pdf',
     name: 'Extract Template From PDF',
     description: 'Converts resume PDF text into an ATS-friendly Handlebars HTML template.',
@@ -217,6 +225,8 @@ BS Computer Science | State University | 2018`,
     ],
   },
   {
+    key: 'extract-profile-from-resume',
+    label: 'Extract Profile From Resume',
     id: 'extract-profile-from-resume',
     name: 'Extract Profile From Resume',
     description: 'Parses raw resume text into the structured profile schema used by the app.',
@@ -244,6 +254,8 @@ Node.js, TypeScript, PostgreSQL, AWS`,
     ],
   },
   {
+    key: 'filter-google-sheet-job',
+    label: 'Filter Google Sheet Job',
     id: 'filter-google-sheet-job',
     name: 'Filter Google Sheet Job',
     description: 'Analyzes scraped job-page content and returns structured job attributes for Google Sheets.',
@@ -291,20 +303,31 @@ Requirements:
   },
 ];
 
-function isBuiltInPrompt(id: string): boolean {
-  return BUILT_IN_PROMPTS.some((prompt) => prompt.id === id);
+const FEATURE_KEYS = new Set<PromptFeatureKey>(PROMPT_FEATURES.map((feature) => feature.key));
+
+function isPromptFeatureKey(value: unknown): value is PromptFeatureKey {
+  return typeof value === 'string' && FEATURE_KEYS.has(value as PromptFeatureKey);
 }
 
-function getBuiltInPrompt(id: string): BuiltInPromptDefinition | undefined {
-  return BUILT_IN_PROMPTS.find((prompt) => prompt.id === id);
+function getPromptFeatureDefinition(featureKey: PromptFeatureKey): PromptFeatureDefinition {
+  const feature = PROMPT_FEATURES.find((entry) => entry.key === featureKey);
+  if (!feature) {
+    throw new Error(`Unknown prompt feature "${featureKey}"`);
+  }
+  return feature;
+}
+
+function getPromptFeatureDefinitionById(id: string): PromptFeatureDefinition | undefined {
+  return PROMPT_FEATURES.find((feature) => feature.id === id);
 }
 
 function getPromptPath(id: string): string {
   return path.join(PROMPTS_DIR, `${id}${PROMPT_SUFFIX}`);
 }
 
-async function ensurePromptDirectory(): Promise<void> {
+async function ensurePromptStorage(): Promise<void> {
   await fs.mkdir(PROMPTS_DIR, { recursive: true });
+  await fs.mkdir(CONFIG_DIR, { recursive: true });
 }
 
 function normalizePromptName(name: string): string {
@@ -349,6 +372,14 @@ function normalizeAllowedVariables(
   }
 
   return normalized;
+}
+
+function cloneAllowedVariables(allowedVariables: PromptVariableDefinition[]): PromptVariableDefinition[] {
+  return allowedVariables.map((variable) => ({ ...variable }));
+}
+
+function normalizeFeatureKey(value: unknown): PromptFeatureKey | undefined {
+  return isPromptFeatureKey(value) ? value : undefined;
 }
 
 export function extractPromptVariables(content: string): string[] {
@@ -435,7 +466,8 @@ function buildSampleValues(
   const provided = providedValues ?? {};
 
   for (const variable of allowedVariables) {
-    sampleValues[variable.name] = provided[variable.name] ?? variable.sampleValue ?? buildSampleValue(variable.name);
+    sampleValues[variable.name] =
+      provided[variable.name] ?? variable.sampleValue ?? buildSampleValue(variable.name);
   }
 
   return sampleValues;
@@ -443,16 +475,16 @@ function buildSampleValues(
 
 function renderPromptText(
   content: string,
-  sampleValues: Record<string, string>
+  values: Record<string, string>
 ): { renderedContent: string; missingVariables: string[] } {
   const missing = new Set<string>();
   const renderedContent = content.replace(VARIABLE_PATTERN, (_match, variableName: string) => {
     const name = normalizeVariableName(variableName);
-    if (!(name in sampleValues)) {
+    if (!(name in values)) {
       missing.add(name);
       return `[[${name}]]`;
     }
-    return sampleValues[name] ?? '';
+    return values[name] ?? '';
   });
 
   return {
@@ -524,8 +556,9 @@ function slugify(value: string): string {
     .slice(0, 40) || 'prompt';
 }
 
-async function generateCustomPromptId(name: string): Promise<string> {
-  const base = `${CUSTOM_PROMPT_PREFIX}${slugify(name)}`;
+async function generateCustomPromptId(name: string, featureKey?: PromptFeatureKey): Promise<string> {
+  const featurePrefix = featureKey ? `${featureKey}-` : '';
+  const base = `${CUSTOM_PROMPT_PREFIX}${featurePrefix}${slugify(name)}`;
   let candidate = base;
   let counter = 1;
 
@@ -534,7 +567,6 @@ async function generateCustomPromptId(name: string): Promise<string> {
       await fs.access(getPromptPath(candidate));
       candidate = `${base}-${counter}`;
       counter += 1;
-      continue;
     } catch {
       return candidate;
     }
@@ -578,14 +610,72 @@ async function readPromptJson(id: string): Promise<{
   }
 }
 
-async function readBuiltInPromptRecord(definition: BuiltInPromptDefinition): Promise<PromptRecord | null> {
+function normalizePromptLibraryConfig(input: unknown): PromptLibraryConfig {
+  const source = typeof input === 'object' && input !== null
+    ? input as { activePrompts?: unknown }
+    : {};
+  const rawActivePrompts = typeof source.activePrompts === 'object' && source.activePrompts !== null
+    ? source.activePrompts as Record<string, unknown>
+    : {};
+  const activePrompts: Partial<Record<PromptFeatureKey, string>> = {};
+
+  for (const feature of PROMPT_FEATURES) {
+    const value = rawActivePrompts[feature.key];
+    if (typeof value === 'string' && value.trim()) {
+      activePrompts[feature.key] = value.trim();
+    }
+  }
+
+  return { activePrompts };
+}
+
+async function readPromptLibraryConfig(): Promise<PromptLibraryConfig> {
+  try {
+    const raw = await fs.readFile(PROMPT_LIBRARY_CONFIG_FILE, 'utf-8');
+    return normalizePromptLibraryConfig(JSON.parse(raw) as unknown);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { activePrompts: {} };
+    }
+    throw error;
+  }
+}
+
+async function writePromptLibraryConfig(config: PromptLibraryConfig): Promise<void> {
+  await fs.writeFile(
+    PROMPT_LIBRARY_CONFIG_FILE,
+    `${JSON.stringify(normalizePromptLibraryConfig(config), null, 2)}\n`,
+    'utf-8'
+  );
+}
+
+function toPromptSummary(record: PromptRecord): PromptSummary {
+  return {
+    id: record.id,
+    name: record.name,
+    description: record.description,
+    featureKey: record.featureKey,
+    featureLabel: record.featureLabel,
+    responseFormat: record.responseFormat,
+    modelProvider: record.modelProvider,
+    modelName: record.modelName,
+    allowedVariables: record.allowedVariables,
+    validation: record.validation,
+    isBuiltIn: record.isBuiltIn,
+    isActiveForFeature: record.isActiveForFeature,
+    usage: record.usage,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  };
+}
+
+async function readBuiltInPromptRecord(definition: PromptFeatureDefinition): Promise<PromptRecord | null> {
   const stored = await readPromptJson(definition.id);
   if (!stored) {
     console.warn(`Built-in prompt file missing: ${definition.id}`);
     return null;
   }
 
-  const validation = validatePromptContent(stored.content, definition.allowedVariables);
   const modelSelection = normalizePromptModelSelection(
     stored.parsed.modelProvider ?? definition.modelProvider,
     stored.parsed.modelName ?? definition.modelName
@@ -595,12 +685,15 @@ async function readBuiltInPromptRecord(definition: BuiltInPromptDefinition): Pro
     id: definition.id,
     name: definition.name,
     description: definition.description,
+    featureKey: definition.key,
+    featureLabel: definition.label,
     responseFormat: definition.responseFormat,
     modelProvider: modelSelection?.provider,
     modelName: modelSelection?.modelName,
-    allowedVariables: definition.allowedVariables,
-    validation,
+    allowedVariables: cloneAllowedVariables(definition.allowedVariables),
+    validation: validatePromptContent(stored.content, definition.allowedVariables),
     isBuiltIn: true,
+    isActiveForFeature: false,
     usage: definition.usage,
     createdAt: typeof stored.parsed.createdAt === 'string'
       ? stored.parsed.createdAt
@@ -612,23 +705,27 @@ async function readBuiltInPromptRecord(definition: BuiltInPromptDefinition): Pro
   };
 }
 
-async function readCustomPromptFile(id: string): Promise<(StoredCustomPromptMeta & { content: string }) | null> {
+async function readCustomPromptFile(id: string): Promise<(StoredPromptMeta & { content: string }) | null> {
   const stored = await readPromptJson(id);
   if (!stored) return null;
 
   const parsed = stored.parsed;
+  const featureKey = normalizeFeatureKey(parsed.featureKey);
+  const feature = featureKey ? getPromptFeatureDefinition(featureKey) : null;
   const modelSelection = normalizePromptModelSelection(parsed.modelProvider, parsed.modelName);
+  const allowedVariables = feature
+    ? cloneAllowedVariables(feature.allowedVariables)
+    : normalizeAllowedVariables(Array.isArray(parsed.allowedVariables) ? parsed.allowedVariables : []);
 
   return {
     id: typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id.trim() : id,
     name: normalizePromptName(typeof parsed.name === 'string' ? parsed.name : id),
     description: normalizePromptDescription(typeof parsed.description === 'string' ? parsed.description : ''),
-    responseFormat: normalizeResponseFormat(parsed.responseFormat),
+    featureKey,
+    responseFormat: feature ? feature.responseFormat : normalizeResponseFormat(parsed.responseFormat),
     modelProvider: modelSelection?.provider,
     modelName: modelSelection?.modelName,
-    allowedVariables: normalizeAllowedVariables(
-      Array.isArray(parsed.allowedVariables) ? parsed.allowedVariables : []
-    ),
+    allowedVariables,
     createdAt: typeof parsed.createdAt === 'string' && parsed.createdAt.trim()
       ? parsed.createdAt.trim()
       : stored.timestamps?.createdAt ?? new Date().toISOString(),
@@ -639,10 +736,6 @@ async function readCustomPromptFile(id: string): Promise<(StoredCustomPromptMeta
   };
 }
 
-async function writePromptJson(id: string, prompt: StoredPromptJson & { content: string }): Promise<void> {
-  await fs.writeFile(getPromptPath(id), `${JSON.stringify(prompt, null, 2)}\n`, 'utf-8');
-}
-
 async function readCustomPromptRecord(id: string): Promise<PromptRecord | null> {
   const prompt = await readCustomPromptFile(id);
   if (!prompt) return null;
@@ -651,75 +744,142 @@ async function readCustomPromptRecord(id: string): Promise<PromptRecord | null> 
     id: prompt.id,
     name: prompt.name,
     description: prompt.description,
+    featureKey: prompt.featureKey,
+    featureLabel: prompt.featureKey ? getPromptFeatureDefinition(prompt.featureKey).label : undefined,
     responseFormat: prompt.responseFormat,
     modelProvider: prompt.modelProvider,
     modelName: prompt.modelName,
     allowedVariables: prompt.allowedVariables,
     validation: validatePromptContent(prompt.content, prompt.allowedVariables),
     isBuiltIn: false,
+    isActiveForFeature: false,
+    usage: prompt.featureKey ? getPromptFeatureDefinition(prompt.featureKey).usage : undefined,
     createdAt: prompt.createdAt,
     updatedAt: prompt.updatedAt,
     content: prompt.content,
   };
 }
 
-function toPromptSummary(record: PromptRecord): PromptSummary {
-  return {
-    id: record.id,
-    name: record.name,
-    description: record.description,
-    responseFormat: record.responseFormat,
-    modelProvider: record.modelProvider,
-    modelName: record.modelName,
-    allowedVariables: record.allowedVariables,
-    validation: record.validation,
-    isBuiltIn: record.isBuiltIn,
-    usage: record.usage,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
-  };
+async function writePromptJson(id: string, prompt: StoredPromptJson & { content: string }): Promise<void> {
+  await fs.writeFile(getPromptPath(id), `${JSON.stringify(prompt, null, 2)}\n`, 'utf-8');
 }
 
-export async function listPrompts(): Promise<PromptSummary[]> {
-  await ensurePromptDirectory();
+async function listAllPromptRecords(): Promise<PromptRecord[]> {
+  await ensurePromptStorage();
 
-  const builtInRecords = (await Promise.all(BUILT_IN_PROMPTS.map(readBuiltInPromptRecord)))
+  const builtInRecords = (await Promise.all(PROMPT_FEATURES.map(readBuiltInPromptRecord)))
     .filter((record): record is PromptRecord => record !== null);
 
   const entries = await fs.readdir(PROMPTS_DIR);
   const customIds = entries
     .filter((entry) => entry.endsWith(PROMPT_SUFFIX))
     .map((entry) => entry.slice(0, -PROMPT_SUFFIX.length))
-    .filter((id) => !isBuiltInPrompt(id));
+    .filter((id) => !getPromptFeatureDefinitionById(id));
 
   const customRecords = (await Promise.all(customIds.map(readCustomPromptRecord)))
-    .filter((record): record is PromptRecord => record !== null)
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .filter((record): record is PromptRecord => record !== null);
 
-  return [...builtInRecords.map(toPromptSummary), ...customRecords.map(toPromptSummary)];
-}
+  const config = await readPromptLibraryConfig();
+  const activeByFeature = new Map<PromptFeatureKey, string>();
 
-export async function getPromptById(id: string): Promise<PromptRecord | null> {
-  await ensurePromptDirectory();
-
-  if (isBuiltInPrompt(id)) {
-    const definition = getBuiltInPrompt(id);
-    if (!definition) return null;
-    return readBuiltInPromptRecord(definition);
+  for (const feature of PROMPT_FEATURES) {
+    const variants = [...builtInRecords, ...customRecords].filter((record) => record.featureKey === feature.key);
+    const configuredId = config.activePrompts[feature.key];
+    const activeId = configuredId && variants.some((record) => record.id === configuredId)
+      ? configuredId
+      : variants.some((record) => record.id === feature.id)
+        ? feature.id
+        : variants[0]?.id;
+    if (activeId) {
+      activeByFeature.set(feature.key, activeId);
+    }
   }
 
+  const featureOrder = new Map(PROMPT_FEATURES.map((feature, index) => [feature.key, index] as const));
+
+  return [...builtInRecords, ...customRecords]
+    .map((record) => ({
+      ...record,
+      isActiveForFeature: record.featureKey ? activeByFeature.get(record.featureKey) === record.id : false,
+    }))
+    .sort((left, right) => {
+      const leftOrder = left.featureKey ? (featureOrder.get(left.featureKey) ?? 999) : 999;
+      const rightOrder = right.featureKey ? (featureOrder.get(right.featureKey) ?? 999) : 999;
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+      if ((left.isActiveForFeature ? 0 : 1) !== (right.isActiveForFeature ? 0 : 1)) {
+        return (left.isActiveForFeature ? 0 : 1) - (right.isActiveForFeature ? 0 : 1);
+      }
+      if ((left.isBuiltIn ? 0 : 1) !== (right.isBuiltIn ? 0 : 1)) {
+        return (left.isBuiltIn ? 0 : 1) - (right.isBuiltIn ? 0 : 1);
+      }
+      return left.name.localeCompare(right.name);
+    });
+}
+
+async function getPromptRecordByIdExact(id: string): Promise<PromptRecord | null> {
+  if (getPromptFeatureDefinitionById(id)) {
+    return readBuiltInPromptRecord(getPromptFeatureDefinitionById(id)!);
+  }
   return readCustomPromptRecord(id);
 }
 
+export async function listPrompts(): Promise<PromptSummary[]> {
+  const records = await listAllPromptRecords();
+  return records.map(toPromptSummary);
+}
+
+export async function getPromptById(id: string): Promise<PromptRecord | null> {
+  const records = await listAllPromptRecords();
+  return records.find((record) => record.id === id) ?? null;
+}
+
+export async function getRuntimePromptByFeature(featureKey: PromptFeatureKey): Promise<PromptRecord | null> {
+  const records = await listAllPromptRecords();
+  const exactActive = records.find((record) => record.featureKey === featureKey && record.isActiveForFeature);
+  if (exactActive) {
+    return exactActive;
+  }
+
+  const builtIn = records.find((record) => record.id === featureKey);
+  if (builtIn) {
+    return builtIn;
+  }
+
+  return records.find((record) => record.featureKey === featureKey) ?? null;
+}
+
+function resolveCreateDraftContext(input: PromptCreateInput): {
+  featureKey?: PromptFeatureKey;
+  responseFormat: PromptResponseFormat;
+  allowedVariables: PromptVariableDefinition[];
+} {
+  const featureKey = normalizeFeatureKey(input.featureKey);
+  if (!featureKey) {
+    return {
+      featureKey: undefined,
+      responseFormat: normalizeResponseFormat(input.responseFormat),
+      allowedVariables: normalizeAllowedVariables(input.allowedVariables),
+    };
+  }
+
+  const feature = getPromptFeatureDefinition(featureKey);
+  return {
+    featureKey,
+    responseFormat: feature.responseFormat,
+    allowedVariables: cloneAllowedVariables(feature.allowedVariables),
+  };
+}
+
 export async function createPrompt(input: PromptCreateInput): Promise<PromptRecord> {
-  await ensurePromptDirectory();
+  await ensurePromptStorage();
 
   const name = normalizePromptName(input.name);
   const description = normalizePromptDescription(input.description);
   const content = normalizePromptContent(input.content);
-  const responseFormat = normalizeResponseFormat(input.responseFormat);
   const modelSelection = normalizePromptModelSelection(input.modelProvider, input.modelName);
-  const allowedVariables = normalizeAllowedVariables(input.allowedVariables);
+  const draftContext = resolveCreateDraftContext(input);
 
   if (!name) {
     throw new Error('Prompt name is required');
@@ -728,18 +888,19 @@ export async function createPrompt(input: PromptCreateInput): Promise<PromptReco
     throw new Error('Prompt content is required');
   }
 
-  assertValidPromptDraft(content, allowedVariables);
+  assertValidPromptDraft(content, draftContext.allowedVariables);
 
-  const id = await generateCustomPromptId(name);
+  const id = await generateCustomPromptId(name, draftContext.featureKey);
   const now = new Date().toISOString();
-  const prompt: StoredCustomPromptMeta & { content: string } = {
+  const prompt: StoredPromptMeta & { content: string } = {
     id,
     name,
     description,
-    responseFormat,
+    featureKey: draftContext.featureKey,
+    responseFormat: draftContext.responseFormat,
     modelProvider: modelSelection?.provider,
     modelName: modelSelection?.modelName,
-    allowedVariables,
+    allowedVariables: draftContext.allowedVariables,
     createdAt: now,
     updatedAt: now,
     content,
@@ -754,23 +915,49 @@ export async function createPrompt(input: PromptCreateInput): Promise<PromptReco
   return saved;
 }
 
+function resolveUpdateDraftContext(
+  input: PromptUpdateInput,
+  current: StoredPromptMeta & { content: string }
+): {
+  featureKey?: PromptFeatureKey;
+  responseFormat: PromptResponseFormat;
+  allowedVariables: PromptVariableDefinition[];
+} {
+  const nextFeatureKey = normalizeFeatureKey(input.featureKey ?? current.featureKey);
+  if (!nextFeatureKey) {
+    return {
+      featureKey: undefined,
+      responseFormat: normalizeResponseFormat(input.responseFormat ?? current.responseFormat),
+      allowedVariables: normalizeAllowedVariables(input.allowedVariables ?? current.allowedVariables),
+    };
+  }
+
+  const feature = getPromptFeatureDefinition(nextFeatureKey);
+  return {
+    featureKey: nextFeatureKey,
+    responseFormat: feature.responseFormat,
+    allowedVariables: cloneAllowedVariables(feature.allowedVariables),
+  };
+}
+
 export async function updatePrompt(id: string, input: PromptUpdateInput): Promise<PromptRecord | null> {
-  await ensurePromptDirectory();
+  await ensurePromptStorage();
 
   const content = normalizePromptContent(input.content);
   if (!content) {
     throw new Error('Prompt content is required');
   }
 
-  if (isBuiltInPrompt(id)) {
-    const definition = getBuiltInPrompt(id);
-    if (!definition) return null;
+  if (getPromptFeatureDefinitionById(id)) {
+    const feature = getPromptFeatureDefinitionById(id);
+    if (!feature) return null;
     const modelSelection = normalizePromptModelSelection(input.modelProvider, input.modelName);
 
-    assertValidPromptDraft(content, definition.allowedVariables);
+    assertValidPromptDraft(content, feature.allowedVariables);
     const existing = await readPromptJson(id);
     await writePromptJson(id, {
       id,
+      featureKey: feature.key,
       content,
       modelProvider: modelSelection?.provider,
       modelName: modelSelection?.modelName,
@@ -787,27 +974,27 @@ export async function updatePrompt(id: string, input: PromptUpdateInput): Promis
 
   const name = normalizePromptName(input.name ?? current.name);
   const description = normalizePromptDescription(input.description ?? current.description);
-  const responseFormat = normalizeResponseFormat(input.responseFormat ?? current.responseFormat);
+  const draftContext = resolveUpdateDraftContext(input, current);
   const modelSelection = normalizePromptModelSelection(
     input.modelProvider ?? current.modelProvider,
     input.modelName ?? current.modelName
   );
-  const allowedVariables = normalizeAllowedVariables(input.allowedVariables ?? current.allowedVariables);
 
   if (!name) {
     throw new Error('Prompt name is required');
   }
 
-  assertValidPromptDraft(content, allowedVariables);
+  assertValidPromptDraft(content, draftContext.allowedVariables);
 
-  const nextPrompt: StoredCustomPromptMeta & { content: string } = {
+  const nextPrompt: StoredPromptMeta & { content: string } = {
     ...current,
     name,
     description,
-    responseFormat,
+    featureKey: draftContext.featureKey,
+    responseFormat: draftContext.responseFormat,
     modelProvider: modelSelection?.provider,
     modelName: modelSelection?.modelName,
-    allowedVariables,
+    allowedVariables: draftContext.allowedVariables,
     updatedAt: new Date().toISOString(),
     content,
   };
@@ -817,10 +1004,31 @@ export async function updatePrompt(id: string, input: PromptUpdateInput): Promis
   return getPromptById(id);
 }
 
-export async function deletePrompt(id: string): Promise<boolean> {
-  await ensurePromptDirectory();
+export async function activatePrompt(id: string): Promise<PromptActivationResult> {
+  await ensurePromptStorage();
 
-  if (isBuiltInPrompt(id)) {
+  const prompt = await getPromptRecordByIdExact(id);
+  if (!prompt) {
+    throw new Error('Prompt not found');
+  }
+  if (!prompt.featureKey) {
+    throw new Error('Only feature-linked prompts can be activated');
+  }
+
+  const config = await readPromptLibraryConfig();
+  config.activePrompts[prompt.featureKey] = prompt.id;
+  await writePromptLibraryConfig(config);
+
+  return {
+    featureKey: prompt.featureKey,
+    promptId: prompt.id,
+  };
+}
+
+export async function deletePrompt(id: string): Promise<boolean> {
+  await ensurePromptStorage();
+
+  if (getPromptFeatureDefinitionById(id)) {
     throw new Error('Cannot delete built-in prompts');
   }
 
@@ -828,6 +1036,14 @@ export async function deletePrompt(id: string): Promise<boolean> {
   if (!prompt) return false;
 
   await fs.unlink(getPromptPath(id)).catch(() => undefined);
+
+  if (prompt.featureKey) {
+    const config = await readPromptLibraryConfig();
+    if (config.activePrompts[prompt.featureKey] === id) {
+      delete config.activePrompts[prompt.featureKey];
+      await writePromptLibraryConfig(config);
+    }
+  }
 
   return true;
 }
@@ -839,9 +1055,11 @@ function resolveDraftSource(
   if (record) {
     return {
       content: input.content ? normalizePromptContent(input.content) : record.content,
-      allowedVariables: record.isBuiltIn
-        ? record.allowedVariables
-        : normalizeAllowedVariables(input.allowedVariables ?? record.allowedVariables),
+      allowedVariables: record.featureKey
+        ? cloneAllowedVariables(getPromptFeatureDefinition(record.featureKey).allowedVariables)
+        : record.isBuiltIn
+          ? record.allowedVariables
+          : normalizeAllowedVariables(input.allowedVariables ?? record.allowedVariables),
     };
   }
 
@@ -859,7 +1077,7 @@ function resolveDraftSource(
 }
 
 export async function previewPrompt(input: PromptPreviewInput): Promise<PromptPreviewResult> {
-  await ensurePromptDirectory();
+  await ensurePromptStorage();
 
   const stored = input.id ? await getPromptById(input.id) : null;
   if (input.id && !stored) {
@@ -879,7 +1097,7 @@ export async function previewPrompt(input: PromptPreviewInput): Promise<PromptPr
 }
 
 export async function validatePromptDraft(input: PromptPreviewInput): Promise<PromptValidation> {
-  await ensurePromptDirectory();
+  await ensurePromptStorage();
 
   const stored = input.id ? await getPromptById(input.id) : null;
   if (input.id && !stored) {
@@ -890,25 +1108,36 @@ export async function validatePromptDraft(input: PromptPreviewInput): Promise<Pr
   return validatePromptContent(content, allowedVariables);
 }
 
+async function resolvePromptForRuntime(id: string): Promise<PromptRecord | null> {
+  if (isPromptFeatureKey(id)) {
+    return getRuntimePromptByFeature(id);
+  }
+  return getPromptById(id);
+}
+
+export async function resolvePromptByRuntimeId(id: string): Promise<PromptRecord | null> {
+  return resolvePromptForRuntime(id);
+}
+
 export async function renderPrompt(
   id: string,
   values: Record<string, string>
 ): Promise<string> {
-  const prompt = await getPromptById(id);
+  const prompt = await resolvePromptForRuntime(id);
   if (!prompt) {
     throw new Error(`Prompt "${id}" not found`);
   }
 
   if (prompt.validation.unknownVariables.length > 0) {
     throw new Error(
-      `Prompt "${id}" contains unknown variables: ${prompt.validation.unknownVariables.join(', ')}`
+      `Prompt "${prompt.id}" contains unknown variables: ${prompt.validation.unknownVariables.join(', ')}`
     );
   }
 
   const { renderedContent, missingVariables } = renderPromptText(prompt.content, values);
   if (missingVariables.length > 0) {
     throw new Error(
-      `Prompt "${id}" is missing runtime values for: ${missingVariables.join(', ')}`
+      `Prompt "${prompt.id}" is missing runtime values for: ${missingVariables.join(', ')}`
     );
   }
 
@@ -919,21 +1148,21 @@ export async function renderPromptSegments(
   id: string,
   values: Record<string, string>
 ): Promise<RenderedPromptSegment[]> {
-  const prompt = await getPromptById(id);
+  const prompt = await resolvePromptForRuntime(id);
   if (!prompt) {
     throw new Error(`Prompt "${id}" not found`);
   }
 
   if (prompt.validation.unknownVariables.length > 0) {
     throw new Error(
-      `Prompt "${id}" contains unknown variables: ${prompt.validation.unknownVariables.join(', ')}`
+      `Prompt "${prompt.id}" contains unknown variables: ${prompt.validation.unknownVariables.join(', ')}`
     );
   }
 
   const { segments, missingVariables } = renderPromptSegmentsFromText(prompt.content, values);
   if (missingVariables.length > 0) {
     throw new Error(
-      `Prompt "${id}" is missing runtime values for: ${missingVariables.join(', ')}`
+      `Prompt "${prompt.id}" is missing runtime values for: ${missingVariables.join(', ')}`
     );
   }
 

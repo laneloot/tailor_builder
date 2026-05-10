@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import {
+  AI_PROVIDERS,
   adminApi,
   AdminAppSettings,
   AdminAppSettingsUpdate,
   AIProvider,
   DefaultMode,
   DefaultResumeSelection,
+  getAIProviderLabel,
   Group,
   groupsApi,
   Profile,
@@ -34,11 +36,13 @@ type SettingsFormState = {
   openaiEnabled: boolean;
   claudeEnabled: boolean;
   openrouterEnabled: boolean;
+  deepseekEnabled: boolean;
   defaultMode: DefaultMode;
   defaultTheme: ThemeMode;
   defaultResumeSelection: DefaultResumeSelection;
   defaultGroupId: string;
   defaultProfileId: string;
+  defaultModelId: string;
   defaultResumeDocxEnabled: boolean;
   defaultCoverLetterDocxEnabled: boolean;
   outputBaseDir: string;
@@ -76,7 +80,7 @@ function buildPathPreview(template: string): string {
 function toApiKeyFormState(settings: AdminAppSettings['apiKeys']): Record<AIProvider, ApiKeyProviderFormState> {
   const next = {} as Record<AIProvider, ApiKeyProviderFormState>;
 
-  for (const provider of ['openai', 'claude', 'openrouter'] as const) {
+  for (const provider of AI_PROVIDERS) {
     next[provider] = {
       activeKeyId: settings[provider].activeSource === 'stored' ? (settings[provider].activeKeyId ?? '') : '',
       pendingName: '',
@@ -94,11 +98,13 @@ function toFormState(settings: AdminAppSettings): SettingsFormState {
     openaiEnabled: settings.openaiEnabled,
     claudeEnabled: settings.claudeEnabled,
     openrouterEnabled: settings.openrouterEnabled,
+    deepseekEnabled: settings.deepseekEnabled,
     defaultMode: settings.defaultMode,
     defaultTheme: settings.defaultTheme,
     defaultResumeSelection: settings.defaultResumeSelection,
     defaultGroupId: settings.defaultGroupId,
     defaultProfileId: settings.defaultProfileId,
+    defaultModelId: settings.defaultModelId,
     defaultResumeDocxEnabled: settings.defaultResumeDocxEnabled,
     defaultCoverLetterDocxEnabled: settings.defaultCoverLetterDocxEnabled,
     outputBaseDir: settings.outputBaseDir,
@@ -126,6 +132,7 @@ function mergeSavedSection(
       openaiEnabled: updated.openaiEnabled,
       claudeEnabled: updated.claudeEnabled,
       openrouterEnabled: updated.openrouterEnabled,
+      deepseekEnabled: updated.deepseekEnabled,
     };
   }
 
@@ -137,6 +144,7 @@ function mergeSavedSection(
       defaultResumeSelection: updated.defaultResumeSelection,
       defaultGroupId: updated.defaultGroupId,
       defaultProfileId: updated.defaultProfileId,
+      defaultModelId: updated.defaultModelId,
       defaultResumeDocxEnabled: updated.defaultResumeDocxEnabled,
       defaultCoverLetterDocxEnabled: updated.defaultCoverLetterDocxEnabled,
     };
@@ -269,7 +277,7 @@ export default function AdminSettingsPage() {
 
   const handleSaveProviders = async () => {
     if (!form) return;
-    if (!form.openaiEnabled && !form.claudeEnabled && !form.openrouterEnabled) {
+    if (!form.openaiEnabled && !form.claudeEnabled && !form.openrouterEnabled && !form.deepseekEnabled) {
       setError('At least one AI model must remain enabled.');
       return;
     }
@@ -280,6 +288,7 @@ export default function AdminSettingsPage() {
         openaiEnabled: form.openaiEnabled,
         claudeEnabled: form.claudeEnabled,
         openrouterEnabled: form.openrouterEnabled,
+        deepseekEnabled: form.deepseekEnabled,
       },
       'AI providers saved.'
     );
@@ -300,6 +309,7 @@ export default function AdminSettingsPage() {
         defaultResumeSelection: form.defaultResumeSelection,
         defaultGroupId: form.defaultResumeSelection === 'group' ? form.defaultGroupId : '',
         defaultProfileId: form.defaultResumeSelection === 'single' ? form.defaultProfileId : '',
+        defaultModelId: form.defaultModelId,
         defaultResumeDocxEnabled: form.defaultResumeDocxEnabled,
         defaultCoverLetterDocxEnabled: form.defaultCoverLetterDocxEnabled,
       },
@@ -372,7 +382,7 @@ export default function AdminSettingsPage() {
 
     const providerPayload: NonNullable<AdminAppSettingsUpdate['apiKeys']> = {};
 
-    for (const provider of ['openai', 'claude', 'openrouter'] as const) {
+    for (const provider of AI_PROVIDERS) {
       const providerState = form.apiKeys[provider];
       const draftValue = providerState.pendingValue.trim();
       const pendingAdds = draftValue
@@ -417,7 +427,11 @@ export default function AdminSettingsPage() {
     openai: form.openaiEnabled,
     claude: form.claudeEnabled,
     openrouter: form.openrouterEnabled,
+    deepseek: form.deepseekEnabled,
   } satisfies Record<AIProvider, boolean>;
+  const availableDefaultModels = settings.aiModels.filter(
+    (model) => model.enabled && providerEnabled[model.provider]
+  );
   const outputPathPreview = buildPathPreview(form.outputPathTemplate);
 
   return (
@@ -516,14 +530,10 @@ export default function AdminSettingsPage() {
             </p>
           </div>
 
-          {([
-            ['openai', 'OpenAI'],
-            ['claude', 'Claude'],
-            ['openrouter', 'OpenRouter'],
-          ] as Array<[AIProvider, string]>).map(([provider, label]) => (
+          {AI_PROVIDERS.map((provider) => (
             <label key={provider} className="flex items-center justify-between border rounded-md p-4">
               <div>
-                <div className="font-medium text-gray-900">{label}</div>
+                <div className="font-medium text-gray-900">{getAIProviderLabel(provider)}</div>
                 <div className="text-sm text-gray-500">
                   {settings.apiKeys[provider].configured
                     ? `Active key: ${settings.apiKeys[provider].activePreview}`
@@ -538,6 +548,7 @@ export default function AdminSettingsPage() {
                   if (provider === 'openai') setField('openaiEnabled', e.target.checked);
                   if (provider === 'claude') setField('claudeEnabled', e.target.checked);
                   if (provider === 'openrouter') setField('openrouterEnabled', e.target.checked);
+                  if (provider === 'deepseek') setField('deepseekEnabled', e.target.checked);
                 }}
               />
             </label>
@@ -692,6 +703,30 @@ export default function AdminSettingsPage() {
             )}
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Default AI model</label>
+            <select
+              value={form.defaultModelId}
+              onChange={(e) => setField('defaultModelId', e.target.value)}
+              disabled={savingSection === 'defaults' || availableDefaultModels.length === 0}
+              className="w-full max-w-xl px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {availableDefaultModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {`${getAIProviderLabel(model.provider)} · ${model.name} (${model.modelName})`}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-sm text-gray-600">
+              This is the default model used by Resume Builder when no prompt-level override is set.
+            </p>
+            {availableDefaultModels.length === 0 && (
+              <p className="mt-2 text-sm text-amber-700">
+                No enabled models are currently available. Add one in Settings &gt; Models or re-enable a provider.
+              </p>
+            )}
+          </div>
+
           <div className="space-y-3">
             <div className="text-sm font-medium text-gray-900">Default generated files</div>
             <p className="text-sm text-gray-600">
@@ -739,11 +774,7 @@ export default function AdminSettingsPage() {
             </p>
           </div>
 
-          {([
-            ['openai', 'OpenAI'],
-            ['claude', 'Claude'],
-            ['openrouter', 'OpenRouter'],
-          ] as Array<[AIProvider, string]>).map(([provider, label]) => {
+          {AI_PROVIDERS.map((provider) => {
             const providerSettings = settings.apiKeys[provider];
             const providerForm = form.apiKeys[provider];
             const visibleStoredKeys = providerSettings.entries.filter((entry) => !providerForm.removeIds.includes(entry.id));
@@ -751,7 +782,7 @@ export default function AdminSettingsPage() {
             return (
               <div key={provider} className="border rounded-md p-4 space-y-4">
                 <div>
-                  <div className="font-medium text-gray-900">{label}</div>
+                  <div className="font-medium text-gray-900">{getAIProviderLabel(provider)}</div>
                   <div className="text-sm text-gray-500">
                     {providerSettings.activeSource === 'stored' && providerSettings.activePreview
                       ? `Stored active key: ${providerSettings.activePreview}`
@@ -847,7 +878,7 @@ export default function AdminSettingsPage() {
                     value={providerForm.pendingValue}
                     onChange={(e) => setApiKeysForProvider(provider, (current) => ({ ...current, pendingValue: e.target.value }))}
                     disabled={savingSection === 'keys'}
-                    placeholder={`Paste ${label} API key`}
+                    placeholder={`Paste ${getAIProviderLabel(provider)} API key`}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button

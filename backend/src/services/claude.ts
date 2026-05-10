@@ -3,14 +3,14 @@ import dotenv from 'dotenv';
 import { Profile } from '../types/profile';
 import type { AIProvider, JobAnalysis, RawNestedJobAnalysis, TailoredContent } from '../types/template';
 import path from "path";
-import { getPromptById, renderPrompt, renderPromptSegments } from './promptService';
+import { renderPrompt, renderPromptSegments, resolvePromptByRuntimeId } from './promptService';
 import { getAIModelSettings, getProviderApiKey, isProviderEnabled } from '../config/aiModelConfig';
 import { readHardSkillPriorityMap, readSkills } from '../database/skillsDatabase';
 import { moveCaseInsensitiveMatches, uniqueCaseInsensitive } from '../utils/array';
 import { extractJSON } from '../utils/json';
 import { removeDuplicateSubstrings, ensureMinTechSkills } from './utils/resumeBuilder';
 import { supplimentSoftSkills, supplimentTechSkills } from './utils/config';
-import { DEFAULT_CLAUDE_MODEL, DEFAULT_OPENAI_MODEL, DEFAULT_OPENROUTER_MODEL } from './aiModelCatalog';
+import { DEFAULT_CLAUDE_MODEL, DEFAULT_DEEPSEEK_MODEL, DEFAULT_OPENAI_MODEL, DEFAULT_OPENROUTER_MODEL } from './aiModelCatalog';
 
 // Ensure the repo .env file is loaded for this module even when it is imported
 // before index.ts finishes bootstrapping, and prefer .env over inherited shell vars.
@@ -37,6 +37,8 @@ export function refreshSkillCaches(): void {
 // Lazy initialization to ensure env vars are loaded first
 let openaiClient: OpenAI | null = null;
 let openaiClientKey = '';
+let deepseekClient: OpenAI | null = null;
+let deepseekClientKey = '';
 let anthropicCacheUsageWarningShown = false;
 
 function extractTechSkills(text: string): string[] {
@@ -653,6 +655,14 @@ export function resolveAIProvider(model?: string): AIProvider {
   if (model === 'openrouter' || model?.startsWith('openrouter/')) {
     return 'openrouter';
   }
+  if (
+    model === 'deepseek' ||
+    model?.startsWith('deepseek-') ||
+    model === 'deepseek-chat' ||
+    model === 'deepseek-reasoner'
+  ) {
+    return 'deepseek';
+  }
   return DEFAULT_PROVIDER;
 }
 
@@ -669,6 +679,22 @@ async function getOpenAIClient(): Promise<OpenAI> {
     openaiClientKey = apiKey;
   }
   return openaiClient;
+}
+
+async function getDeepSeekClient(): Promise<OpenAI> {
+  const apiKey = await getProviderApiKey('deepseek');
+  if (!apiKey) {
+    throw new Error('DeepSeek API key is not set');
+  }
+
+  if (!deepseekClient || deepseekClientKey !== apiKey) {
+    deepseekClient = new OpenAI({
+      apiKey,
+      baseURL: 'https://api.deepseek.com',
+    });
+    deepseekClientKey = apiKey;
+  }
+  return deepseekClient;
 }
 
 type OpenRouterChatCompletionResponse = {
@@ -759,6 +785,30 @@ async function createOpenAIChatCompletion(input: {
   const content = response.choices[0]?.message?.content;
   if (!content) {
     throw new Error('Unexpected response from OpenAI');
+  }
+
+  return content;
+}
+
+async function createDeepSeekChatCompletion(input: {
+  model: string;
+  maxTokens: number;
+  temperature: number;
+  responseFormat: CompletionResponseFormat;
+  messages: ProviderChatMessage[];
+}): Promise<string> {
+  const response = await (await getDeepSeekClient()).chat.completions.create({
+    model: input.model,
+    max_tokens: input.maxTokens,
+    temperature: input.temperature,
+    top_p: 1,
+    ...(input.responseFormat === 'json' ? { response_format: { type: 'json_object' as const } } : {}),
+    messages: input.messages,
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Unexpected response from DeepSeek');
   }
 
   return content;
@@ -884,7 +934,7 @@ function toAnthropicCacheControl(ttl?: AnthropicCacheTtl): AnthropicCacheControl
 }
 
 async function getPromptContentOrThrow(promptId: string): Promise<string> {
-  const prompt = await getPromptById(promptId);
+  const prompt = await resolvePromptByRuntimeId(promptId);
   const content = prompt?.content?.trim();
   if (!content) {
     throw new Error(`Prompt "${promptId}" was not found or has no content.`);
@@ -1248,16 +1298,43 @@ export async function createTextCompletion(
     });
   }
 
+  if (provider === 'deepseek') {
+    const messages: ProviderChatMessage[] = [];
+    if (responseFormat === 'json') {
+      messages.push({
+        role: 'system',
+        content: JSON_ONLY_SYSTEM_PROMPT,
+      });
+    }
+
+    messages.push({
+      role: 'user',
+      content: prompt,
+    });
+
+    return createDeepSeekChatCompletion({
+      model: modelName || DEFAULT_DEEPSEEK_MODEL,
+      maxTokens,
+      temperature,
+      responseFormat,
+      messages,
+    });
+  }
+
   return createAnthropicMessage(prompt, maxTokens, temperature, modelName || DEFAULT_CLAUDE_MODEL);
 }
 
 export async function resolvePromptExecutionConfig(
   promptId: string,
-  fallbackProvider: AIProvider
+  fallbackProvider: AIProvider,
+  fallbackModelName?: string
 ): Promise<{ provider: AIProvider; modelName?: string }> {
-  const prompt = await getPromptById(promptId);
+  const prompt = await resolvePromptByRuntimeId(promptId);
   if (!prompt?.modelProvider || !prompt.modelName) {
-    return { provider: fallbackProvider };
+    return {
+      provider: fallbackProvider,
+      modelName: fallbackModelName,
+    };
   }
 
   return {
@@ -1272,13 +1349,18 @@ function isAnthropicOptimizedModel(modelName?: string): boolean {
 
 export async function shouldUseAnthropicOptimizationsForPrompt(
   promptId: string,
-  requestedProvider: AIProvider
+  requestedProvider: AIProvider,
+  requestedModelName?: string
 ): Promise<boolean> {
   if (requestedProvider !== 'claude') {
     return false;
   }
 
-  const executionConfig = await resolvePromptExecutionConfig(promptId, requestedProvider);
+  const executionConfig = await resolvePromptExecutionConfig(
+    promptId,
+    requestedProvider,
+    requestedModelName
+  );
   if (executionConfig.provider !== 'claude') {
     return false;
   }
@@ -1296,6 +1378,7 @@ export async function createPromptCompletion(input: {
   prompt: string;
   promptValues?: Record<string, string>;
   fallbackProvider?: AIProvider;
+  fallbackModelName?: string;
   maxTokens?: number;
   temperature?: number;
   responseFormat?: CompletionResponseFormat;
@@ -1303,7 +1386,8 @@ export async function createPromptCompletion(input: {
 }): Promise<string> {
   const executionConfig = await resolvePromptExecutionConfig(
     input.promptId,
-    input.fallbackProvider || DEFAULT_PROVIDER
+    input.fallbackProvider || DEFAULT_PROVIDER,
+    input.fallbackModelName
   );
   const settings = await getAIModelSettings();
   if (!isProviderEnabled(executionConfig.provider, settings)) {
@@ -1347,6 +1431,16 @@ export async function createPromptCompletion(input: {
         messages,
       });
     }
+
+    if (executionConfig.provider === 'deepseek') {
+      return createDeepSeekChatCompletion({
+        model: executionConfig.modelName || DEFAULT_DEEPSEEK_MODEL,
+        maxTokens: input.maxTokens ?? 4000,
+        temperature: input.temperature ?? 0,
+        responseFormat: input.responseFormat ?? 'json',
+        messages,
+      });
+    }
   }
 
   if (executionConfig.provider === 'claude' && input.promptValues) {
@@ -1373,9 +1467,10 @@ export async function createPromptCompletion(input: {
 
 export async function canUseAnthropicBatchForPrompt(
   promptId: string,
-  fallbackProvider: AIProvider
+  fallbackProvider: AIProvider,
+  fallbackModelName?: string
 ): Promise<boolean> {
-  return shouldUseAnthropicOptimizationsForPrompt(promptId, fallbackProvider);
+  return shouldUseAnthropicOptimizationsForPrompt(promptId, fallbackProvider, fallbackModelName);
 }
 
 export async function batchCreatePromptCompletions(input: {
@@ -1385,6 +1480,7 @@ export async function batchCreatePromptCompletions(input: {
     values: Record<string, string>;
   }>;
   fallbackProvider?: AIProvider;
+  fallbackModelName?: string;
   maxTokens?: number;
   temperature?: number;
   responseFormat?: CompletionResponseFormat;
@@ -1392,7 +1488,8 @@ export async function batchCreatePromptCompletions(input: {
 }): Promise<Map<string, { content?: string; error?: string }>> {
   const executionConfig = await resolvePromptExecutionConfig(
     input.promptId,
-    input.fallbackProvider || DEFAULT_PROVIDER
+    input.fallbackProvider || DEFAULT_PROVIDER,
+    input.fallbackModelName
   );
   const settings = await getAIModelSettings();
   if (!isProviderEnabled(executionConfig.provider, settings)) {
@@ -2266,7 +2363,11 @@ function normalizeTailoredContent(content: TailoredContent, jobAnalysis?: JobAna
   };
 }
 
-export async function analyzeJobDescription(jobDescription: string, provider: AIProvider = DEFAULT_PROVIDER): Promise<JobAnalysis> {
+export async function analyzeJobDescription(
+  jobDescription: string,
+  provider: AIProvider = DEFAULT_PROVIDER,
+  modelName?: string
+): Promise<JobAnalysis> {
   const promptValues = buildAnalyzeJobDescriptionPromptValues(jobDescription);
   const prompt = await renderPrompt('analyze-job-description', {
     jobDescription,
@@ -2276,6 +2377,7 @@ export async function analyzeJobDescription(jobDescription: string, provider: AI
     prompt,
     promptValues,
     fallbackProvider: provider,
+    fallbackModelName: modelName,
     maxTokens: 7000,
     temperature: 0,
     responseFormat: 'json',
@@ -2308,17 +2410,18 @@ export async function batchAnalyzeJobDescriptions(input: {
     jobDescription: string;
   }>;
   provider?: AIProvider;
+  modelName?: string;
   anthropicCacheTtl?: AnthropicCacheTtl;
 }): Promise<Map<string, { analysis?: JobAnalysis; error?: string }>> {
   const provider = input.provider || DEFAULT_PROVIDER;
   const canUseAnthropicBatch = input.items.length > 1
-    && await canUseAnthropicBatchForPrompt('analyze-job-description', provider);
+    && await canUseAnthropicBatchForPrompt('analyze-job-description', provider, input.modelName);
 
   if (!canUseAnthropicBatch) {
     const resultMap = new Map<string, { analysis?: JobAnalysis; error?: string }>();
     for (const item of input.items) {
       try {
-        const analysis = await analyzeJobDescription(item.jobDescription, provider);
+        const analysis = await analyzeJobDescription(item.jobDescription, provider, input.modelName);
         resultMap.set(item.customId, { analysis });
       } catch (error) {
         resultMap.set(item.customId, {
@@ -2336,6 +2439,7 @@ export async function batchAnalyzeJobDescriptions(input: {
       values: buildAnalyzeJobDescriptionPromptValues(item.jobDescription),
     })),
     fallbackProvider: provider,
+    fallbackModelName: input.modelName,
     maxTokens: 7000,
     temperature: 0,
     responseFormat: 'json',
@@ -2439,19 +2543,22 @@ export function parseTailoredResumeContent(
 export async function tailorResume(
   profile: Profile,
   jobAnalysis: JobAnalysis,
-  provider: AIProvider = DEFAULT_PROVIDER
+  provider: AIProvider = DEFAULT_PROVIDER,
+  modelName?: string
 ): Promise<TailoredContent> {
   const promptValues = buildTailorResumePromptValues(profile, jobAnalysis);
   const prompt = await renderPrompt('tailor-resume', promptValues);
   const shouldUseAnthropicOptimizations = await shouldUseAnthropicOptimizationsForPrompt(
     'tailor-resume',
-    provider
+    provider,
+    modelName
   );
   const content = await createPromptCompletion({
     promptId: 'tailor-resume',
     prompt,
     promptValues,
     fallbackProvider: provider,
+    fallbackModelName: modelName,
     maxTokens: 11000,
     temperature: 0.2,
     responseFormat: 'json',
@@ -2474,7 +2581,8 @@ export async function generateCoverLetter(
   profile: Profile,
   companyName: string,
   role: string,
-  provider: AIProvider = DEFAULT_PROVIDER
+  provider: AIProvider = DEFAULT_PROVIDER,
+  modelName?: string
 ): Promise<string> {
   const promptValues = {
     profileJson: JSON.stringify(profile, null, 2),
@@ -2491,6 +2599,7 @@ export async function generateCoverLetter(
     prompt,
     promptValues,
     fallbackProvider: provider,
+    fallbackModelName: modelName,
     maxTokens: 1500,
     temperature: 0.7,
     responseFormat: 'text',

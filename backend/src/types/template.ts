@@ -59,7 +59,7 @@ export interface JobAnalysis {
   sourceJobDescription?: string;
 }
 
-export type AIProvider = 'openai' | 'claude' | 'openrouter';
+export type AIProvider = 'openai' | 'claude' | 'openrouter' | 'deepseek';
 
 export type RawNestedJobAnalysis = Partial<JobAnalysis> & {
   jobMeta?: {
@@ -124,7 +124,7 @@ export interface GenerateResumeRequest {
   jobDescription?: string;
   jobAnalysis?: JobAnalysis;
   tailoredContent?: TailoredContent;
-  model?: AIProvider;
+  model?: string;
   companyName: string;
   role: string;
   format?: ResumeFormat;

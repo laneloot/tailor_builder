@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   adminApi,
   AIModelOption,
   AIProvider,
+  getAIProviderLabel,
   promptsApi,
+  PromptFeatureKey,
   PromptPreviewResult,
   PromptRecord,
   PromptResponseFormat,
@@ -18,16 +20,35 @@ type PromptDraft = {
   id?: string;
   name: string;
   description: string;
+  featureKey?: PromptFeatureKey;
+  featureLabel?: string;
   content: string;
   responseFormat: PromptResponseFormat;
   modelProvider?: AIProvider;
   modelName?: string;
   allowedVariables: PromptVariableDefinition[];
   isBuiltIn: boolean;
+  isActiveForFeature?: boolean;
   usage?: string;
   createdAt?: string;
   updatedAt?: string;
 };
+
+type FeatureGroup = {
+  key: PromptFeatureKey;
+  label: string;
+  prompts: PromptSummary[];
+  activePrompt: PromptSummary | null;
+};
+
+const FEATURE_ORDER: PromptFeatureKey[] = [
+  'analyze-job-description',
+  'tailor-resume',
+  'generate-cover-letter',
+  'extract-template-from-pdf',
+  'extract-profile-from-resume',
+  'filter-google-sheet-job',
+];
 
 function emptyValidation(): PromptValidation {
   return {
@@ -41,28 +62,37 @@ function makeDraft(record: PromptRecord): PromptDraft {
     id: record.id,
     name: record.name,
     description: record.description,
+    featureKey: record.featureKey,
+    featureLabel: record.featureLabel,
     content: record.content,
     responseFormat: record.responseFormat,
     modelProvider: record.modelProvider,
     modelName: record.modelName,
     allowedVariables: record.allowedVariables.map((variable) => ({ ...variable })),
     isBuiltIn: record.isBuiltIn,
+    isActiveForFeature: record.isActiveForFeature,
     usage: record.usage,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
 }
 
-function makeBlankDraft(): PromptDraft {
+function makeBlankDraftForFeature(group: FeatureGroup | null): PromptDraft {
+  const template = group?.prompts[0];
+
   return {
-    name: '',
+    name: template?.featureLabel ? `${template.featureLabel} Variant` : '',
     description: '',
+    featureKey: group?.key,
+    featureLabel: group?.label,
     content: '',
-    responseFormat: 'json',
+    responseFormat: template?.responseFormat ?? 'json',
     modelProvider: undefined,
     modelName: undefined,
-    allowedVariables: [],
+    allowedVariables: template?.allowedVariables.map((variable) => ({ ...variable })) ?? [],
     isBuiltIn: false,
+    isActiveForFeature: false,
+    usage: template?.usage,
   };
 }
 
@@ -72,6 +102,7 @@ function makeDuplicateDraft(draft: PromptDraft): PromptDraft {
     id: undefined,
     name: draft.name ? `${draft.name} Copy` : 'New Prompt',
     isBuiltIn: false,
+    isActiveForFeature: false,
     createdAt: undefined,
     updatedAt: undefined,
   };
@@ -82,6 +113,11 @@ function formatDate(value?: string): string {
   return new Date(value).toLocaleString();
 }
 
+function getFeatureRank(featureKey: PromptFeatureKey): number {
+  const index = FEATURE_ORDER.indexOf(featureKey);
+  return index === -1 ? FEATURE_ORDER.length : index;
+}
+
 export default function PromptsPage() {
   const [prompts, setPrompts] = useState<PromptSummary[]>([]);
   const [modelOptions, setModelOptions] = useState<AIModelOption[]>([]);
@@ -89,7 +125,10 @@ export default function PromptsPage() {
     openai: true,
     claude: true,
     openrouter: true,
+    deepseek: true,
   });
+  const [selectedFeatureKey, setSelectedFeatureKey] = useState<PromptFeatureKey | null>(null);
+  const [activeCandidateId, setActiveCandidateId] = useState('');
   const [draft, setDraft] = useState<PromptDraft | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [validation, setValidation] = useState<PromptValidation>(emptyValidation());
@@ -103,10 +142,53 @@ export default function PromptsPage() {
   const [isValidating, setIsValidating] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
+  const featureGroups = useMemo<FeatureGroup[]>(() => {
+    const groups = new Map<PromptFeatureKey, FeatureGroup>();
+
+    for (const prompt of prompts) {
+      if (!prompt.featureKey) continue;
+
+      const existing = groups.get(prompt.featureKey);
+      if (existing) {
+        existing.prompts.push(prompt);
+        if (prompt.isActiveForFeature) {
+          existing.activePrompt = prompt;
+        }
+        continue;
+      }
+
+      groups.set(prompt.featureKey, {
+        key: prompt.featureKey,
+        label: prompt.featureLabel || prompt.featureKey,
+        prompts: [prompt],
+        activePrompt: prompt.isActiveForFeature ? prompt : null,
+      });
+    }
+
+    return [...groups.values()]
+      .map((group) => ({
+        ...group,
+        prompts: [...group.prompts].sort((left, right) => {
+          if ((left.isActiveForFeature ? 0 : 1) !== (right.isActiveForFeature ? 0 : 1)) {
+            return (left.isActiveForFeature ? 0 : 1) - (right.isActiveForFeature ? 0 : 1);
+          }
+          if ((left.isBuiltIn ? 0 : 1) !== (right.isBuiltIn ? 0 : 1)) {
+            return (left.isBuiltIn ? 0 : 1) - (right.isBuiltIn ? 0 : 1);
+          }
+          return left.name.localeCompare(right.name);
+        }),
+      }))
+      .sort((left, right) => getFeatureRank(left.key) - getFeatureRank(right.key));
+  }, [prompts]);
+
+  const selectedFeatureGroup = useMemo(
+    () => featureGroups.find((group) => group.key === selectedFeatureKey) ?? null,
+    [featureGroups, selectedFeatureKey]
+  );
+
   const openPrompt = useCallback(async (id: string) => {
     setIsLoadingPrompt(true);
     setError('');
-    setStatus('');
     try {
       const record = await promptsApi.getById(id);
       setDraft(makeDraft(record));
@@ -121,33 +203,62 @@ export default function PromptsPage() {
     }
   }, []);
 
-  const refreshPrompts = useCallback(async (preferredId?: string | null) => {
+  const resetEditor = useCallback((group: FeatureGroup | null) => {
+    setDraft(makeBlankDraftForFeature(group));
+    setSelectedId(null);
+    setValidation(emptyValidation());
+    setPreview(null);
+    setIsDirty(false);
+  }, []);
+
+  const refreshPrompts = useCallback(async (
+    preferredFeatureKey?: PromptFeatureKey | null,
+    preferredPromptId?: string | null
+  ) => {
     setIsLoadingList(true);
     setError('');
     try {
       const data = await promptsApi.getAll();
       setPrompts(data);
 
-      const nextId =
-        preferredId && data.some((prompt) => prompt.id === preferredId)
-          ? preferredId
-          : data[0]?.id ?? null;
+      const nextFeatureKey =
+        preferredFeatureKey && data.some((prompt) => prompt.featureKey === preferredFeatureKey)
+          ? preferredFeatureKey
+          : data.find((prompt) => prompt.featureKey)?.featureKey ?? null;
 
-      if (nextId) {
-        await openPrompt(nextId);
+      setSelectedFeatureKey(nextFeatureKey);
+
+      if (!nextFeatureKey) {
+        resetEditor(null);
+        setActiveCandidateId('');
+        return;
+      }
+
+      const promptsForFeature = data.filter((prompt) => prompt.featureKey === nextFeatureKey);
+      const activePrompt = promptsForFeature.find((prompt) => prompt.isActiveForFeature) ?? promptsForFeature[0] ?? null;
+      const nextPromptId =
+        preferredPromptId && promptsForFeature.some((prompt) => prompt.id === preferredPromptId)
+          ? preferredPromptId
+          : activePrompt?.id ?? null;
+
+      setActiveCandidateId(activePrompt?.id ?? '');
+
+      if (nextPromptId) {
+        await openPrompt(nextPromptId);
       } else {
-        setDraft(makeBlankDraft());
-        setSelectedId(null);
-        setValidation(emptyValidation());
-        setPreview(null);
-        setIsDirty(false);
+        resetEditor({
+          key: nextFeatureKey,
+          label: promptsForFeature[0]?.featureLabel || nextFeatureKey,
+          prompts: promptsForFeature,
+          activePrompt,
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load prompts');
     } finally {
       setIsLoadingList(false);
     }
-  }, [openPrompt]);
+  }, [openPrompt, resetEditor]);
 
   useEffect(() => {
     void refreshPrompts();
@@ -163,21 +274,17 @@ export default function PromptsPage() {
           adminApi.getAIModels(),
         ]);
 
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
         setModelOptions(options);
         setEnabledProviders({
           openai: settings.openaiEnabled,
           claude: settings.claudeEnabled,
           openrouter: settings.openrouterEnabled,
+          deepseek: settings.deepseekEnabled,
         });
       } catch (err) {
-        if (!isMounted) {
-          return;
-        }
-
+        if (!isMounted) return;
         setError(err instanceof Error ? err.message : 'Failed to load prompt model options');
       }
     };
@@ -194,21 +301,39 @@ export default function PromptsPage() {
     return window.confirm('Discard unsaved changes?');
   };
 
-  const handleSelectPrompt = async (id: string) => {
-    if (id === selectedId) return;
+  const handleSelectFeature = async (featureKey: PromptFeatureKey) => {
+    if (featureKey === selectedFeatureKey) return;
     if (!confirmDiscard()) return;
-    await openPrompt(id);
+
+    const group = featureGroups.find((entry) => entry.key === featureKey) ?? null;
+    setSelectedFeatureKey(featureKey);
+    setStatus('');
+    setError('');
+
+    const activePrompt = group?.activePrompt ?? group?.prompts[0] ?? null;
+    setActiveCandidateId(activePrompt?.id ?? '');
+
+    if (activePrompt?.id) {
+      await openPrompt(activePrompt.id);
+    } else {
+      resetEditor(group);
+    }
   };
 
-  const handleNewBlank = () => {
+  const handleSelectPromptVariant = async (prompt: PromptSummary) => {
+    if (prompt.id !== activeCandidateId) {
+      setActiveCandidateId(prompt.id);
+    }
+    if (prompt.id === selectedId) return;
     if (!confirmDiscard()) return;
-    setDraft(makeBlankDraft());
-    setSelectedId(null);
-    setValidation(emptyValidation());
-    setPreview(null);
+    await openPrompt(prompt.id);
+  };
+
+  const handleNewVariant = () => {
+    if (!confirmDiscard()) return;
+    resetEditor(selectedFeatureGroup);
+    setStatus(`Creating a new prompt variant for ${selectedFeatureGroup?.label || 'this feature'}.`);
     setError('');
-    setStatus('Creating a new custom prompt.');
-    setIsDirty(false);
   };
 
   const handleDuplicate = () => {
@@ -218,7 +343,7 @@ export default function PromptsPage() {
     setValidation(emptyValidation());
     setPreview(null);
     setError('');
-    setStatus('Duplicated into a new custom prompt draft.');
+    setStatus('Duplicated into a new prompt variant draft.');
     setIsDirty(true);
   };
 
@@ -241,7 +366,7 @@ export default function PromptsPage() {
       const nextValidation = await promptsApi.validateDraft({
         id: draft.id,
         content: draft.content,
-        allowedVariables: draft.isBuiltIn ? undefined : draft.allowedVariables,
+        allowedVariables: draft.featureKey ? undefined : draft.allowedVariables,
       });
       setValidation(nextValidation);
       setStatus('Validation complete.');
@@ -261,7 +386,7 @@ export default function PromptsPage() {
       const nextPreview = await promptsApi.previewDraft({
         id: draft.id,
         content: draft.content,
-        allowedVariables: draft.isBuiltIn ? undefined : draft.allowedVariables,
+        allowedVariables: draft.featureKey ? undefined : draft.allowedVariables,
       });
       setPreview(nextPreview);
       setValidation(nextPreview.validation);
@@ -273,7 +398,7 @@ export default function PromptsPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSavePrompt = async () => {
     if (!draft) return;
     setIsSaving(true);
     setError('');
@@ -282,6 +407,7 @@ export default function PromptsPage() {
       const payload = {
         name: draft.name,
         description: draft.description,
+        featureKey: draft.featureKey,
         content: draft.content,
         responseFormat: draft.responseFormat,
         modelProvider: draft.modelProvider,
@@ -293,15 +419,29 @@ export default function PromptsPage() {
         ? await promptsApi.update(draft.id, payload)
         : await promptsApi.create(payload);
 
-      await refreshPrompts(saved.id);
+      await refreshPrompts((saved.featureKey ?? selectedFeatureKey) || null, saved.id);
       setPreview(null);
-      setStatus(draft.id ? 'Prompt updated.' : 'Prompt created.');
       setValidation(saved.validation);
+      setStatus(draft.id ? 'Prompt variant updated.' : 'Prompt variant created.');
       setIsDirty(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save prompt');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveSelectedPrompt = async () => {
+    if (!selectedFeatureGroup || !activeCandidateId) return;
+    setError('');
+    setStatus('');
+    try {
+      const targetPrompt = selectedFeatureGroup.prompts.find((prompt) => prompt.id === activeCandidateId);
+      await promptsApi.activate(activeCandidateId);
+      await refreshPrompts(selectedFeatureGroup.key, activeCandidateId);
+      setStatus(`Saved "${targetPrompt?.name || activeCandidateId}" as the active prompt for ${selectedFeatureGroup.label}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save active prompt selection');
     }
   };
 
@@ -313,7 +453,7 @@ export default function PromptsPage() {
     setStatus('');
     try {
       await promptsApi.delete(draft.id);
-      await refreshPrompts();
+      await refreshPrompts(draft.featureKey ?? selectedFeatureKey ?? null);
       setStatus('Prompt deleted.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete prompt');
@@ -352,47 +492,34 @@ export default function PromptsPage() {
 
   const selectedModelOptionId =
     draft?.modelProvider && draft.modelName
-      ? `${draft.modelProvider}:${draft.modelName}`
+      ? (
+          modelOptions.find(
+            (option) =>
+              option.provider === draft.modelProvider && option.modelName === draft.modelName
+          )?.id ?? ''
+        )
       : '';
 
-  if (isLoadingList && !draft) {
+  const selectedFeatureHasPendingChange =
+    !!selectedFeatureGroup &&
+    !!selectedFeatureGroup.activePrompt &&
+    selectedFeatureGroup.activePrompt.id !== activeCandidateId;
+
+  if (isLoadingList && !draft && featureGroups.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Prompt Library</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Built-in prompts are live application prompts. Custom prompts are stored drafts until wired into a runtime flow.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={handleNewBlank}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
-          >
-            New Blank Prompt
-          </button>
-          <button
-            onClick={handleDuplicate}
-            disabled={!draft}
-            className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium disabled:opacity-50"
-          >
-            Duplicate Current
-          </button>
-          <button
-            onClick={() => void refreshPrompts(selectedId)}
-            className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
-          >
-            Reload
-          </button>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Prompt Library</h1>
+        <p className="mt-1 text-sm text-gray-600">
+          Choose a feature, review all prompt variants available for that feature, then save which one should run live.
+        </p>
       </div>
 
       {error && (
@@ -407,52 +534,163 @@ export default function PromptsPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Prompts</h2>
+      <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,420px)_minmax(0,1fr)]">
+        <aside className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+            <h2 className="font-semibold text-gray-900">Features</h2>
             {isLoadingList && <span className="text-xs text-gray-500">Refreshing...</span>}
           </div>
           <div className="max-h-[70vh] overflow-y-auto">
-            {prompts.map((prompt) => (
+            {featureGroups.map((group) => (
               <button
-                key={prompt.id}
-                onClick={() => void handleSelectPrompt(prompt.id)}
-                className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 ${
-                  selectedId === prompt.id ? 'bg-blue-50' : ''
+                key={group.key}
+                onClick={() => void handleSelectFeature(group.key)}
+                className={`w-full border-b border-gray-100 px-4 py-4 text-left hover:bg-gray-50 ${
+                  selectedFeatureKey === group.key ? 'bg-blue-50' : ''
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-medium text-gray-900">{prompt.name}</div>
-                    <div className="text-xs text-gray-500 mt-1">{prompt.id}</div>
+                    <div className="font-medium text-gray-900">{group.label}</div>
+                    <div className="mt-1 text-xs text-gray-500">{group.prompts.length} prompt variant(s)</div>
                   </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                      prompt.isBuiltIn
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {prompt.isBuiltIn ? 'Live' : 'Custom'}
-                  </span>
+                  {group.activePrompt && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                      Active
+                    </span>
+                  )}
                 </div>
-                <p className="text-sm text-gray-600 mt-2 line-clamp-3">{prompt.description}</p>
+                <div className="mt-2 text-sm text-gray-600">
+                  {group.activePrompt ? `Current: ${group.activePrompt.name}` : 'No active prompt selected'}
+                </div>
               </button>
             ))}
           </div>
         </aside>
 
-        <section className="bg-white rounded-xl border border-gray-200">
-          {!draft ? (
-            <div className="p-8 text-sm text-gray-500">Select or create a prompt to start editing.</div>
+        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="border-b border-gray-200 px-4 py-4">
+            <h2 className="font-semibold text-gray-900">
+              {selectedFeatureGroup ? selectedFeatureGroup.label : 'Prompt Variants'}
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              {selectedFeatureGroup
+                ? 'Select which prompt this feature should use, then save the active selection.'
+                : 'Pick a feature to manage its prompt variants.'}
+            </p>
+          </div>
+
+          {!selectedFeatureGroup ? (
+            <div className="p-6 text-sm text-gray-500">No feature selected.</div>
           ) : (
-            <div className="p-6 space-y-6">
+            <div className="space-y-4 p-4">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">Active Prompt</div>
+                    <div className="mt-1 text-sm text-gray-600">
+                      {selectedFeatureGroup.activePrompt
+                        ? selectedFeatureGroup.activePrompt.name
+                        : 'No active prompt selected'}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveSelectedPrompt()}
+                    disabled={!activeCandidateId || !selectedFeatureHasPendingChange}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-300"
+                  >
+                    Save Selected Prompt
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleNewVariant}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                >
+                  New Variant
+                </button>
+                <button
+                  onClick={handleDuplicate}
+                  disabled={!draft}
+                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                >
+                  Duplicate Current
+                </button>
+                <button
+                  onClick={() => void refreshPrompts(selectedFeatureGroup.key, selectedId)}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Reload
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {selectedFeatureGroup.prompts.map((prompt) => (
+                  <label
+                    key={prompt.id}
+                    className={`block cursor-pointer rounded-xl border p-4 transition ${
+                      activeCandidateId === prompt.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="radio"
+                        name={`active-prompt-${selectedFeatureGroup.key}`}
+                        checked={activeCandidateId === prompt.id}
+                        onChange={() => void handleSelectPromptVariant(prompt)}
+                        className="mt-1"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-medium text-gray-900">{prompt.name}</div>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                              prompt.isBuiltIn
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            {prompt.isBuiltIn ? 'Built-in' : 'Custom'}
+                          </span>
+                          {prompt.isActiveForFeature && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              Live Now
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 text-sm text-gray-600">{prompt.description}</div>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
+                          <span>ID: {prompt.id}</span>
+                          {prompt.modelProvider && prompt.modelName && (
+                            <span>
+                              Model: {getAIProviderLabel(prompt.modelProvider)} / {prompt.modelName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-xl border border-gray-200 bg-white">
+          {!draft ? (
+            <div className="p-8 text-sm text-gray-500">Select a prompt variant to edit.</div>
+          ) : (
+            <div className="space-y-6 p-6">
               <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-xl font-semibold text-gray-900">
-                      {draft.id ? draft.name : 'New Custom Prompt'}
+                      {draft.id ? draft.name : 'New Prompt Variant'}
                     </h2>
                     <span
                       className={`rounded-full px-2.5 py-1 text-xs font-medium ${
@@ -463,48 +701,58 @@ export default function PromptsPage() {
                     >
                       {draft.isBuiltIn ? 'Built-in' : 'Custom'}
                     </span>
-                    <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">
+                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
                       {draft.responseFormat.toUpperCase()}
                     </span>
+                    {draft.featureLabel && (
+                      <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700">
+                        {draft.featureLabel}
+                      </span>
+                    )}
+                    {draft.isActiveForFeature && (
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                        Active Variant
+                      </span>
+                    )}
                     {isDirty && (
-                      <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-orange-100 text-orange-700">
+                      <span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700">
                         Unsaved
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-gray-500 mt-2">
+                  <div className="mt-2 text-xs text-gray-500">
                     {draft.id ? `ID: ${draft.id}` : 'ID will be generated on save'}
                   </div>
                   {draft.usage && (
-                    <div className="text-sm text-gray-600 mt-2">{draft.usage}</div>
+                    <div className="mt-2 text-sm text-gray-600">{draft.usage}</div>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={handleValidate}
                     disabled={isValidating || isSaving || isLoadingPrompt}
-                    className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium disabled:opacity-50"
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                   >
                     {isValidating ? 'Validating...' : 'Validate'}
                   </button>
                   <button
                     onClick={handlePreview}
                     disabled={isPreviewing || isSaving || isLoadingPrompt}
-                    className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium disabled:opacity-50"
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                   >
                     {isPreviewing ? 'Previewing...' : 'Preview'}
                   </button>
                   <button
-                    onClick={handleSave}
+                    onClick={handleSavePrompt}
                     disabled={isSaving || isLoadingPrompt}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
+                    className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                   >
                     {isSaving ? 'Saving...' : 'Save Prompt'}
                   </button>
                   <button
                     onClick={handleDelete}
                     disabled={!draft.id || draft.isBuiltIn || isSaving}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50"
+                    className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
                   >
                     Delete
                   </button>
@@ -517,7 +765,7 @@ export default function PromptsPage() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
                   <input
                     type="text"
                     value={draft.name}
@@ -529,26 +777,18 @@ export default function PromptsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Response Format</label>
-                  <select
-                    value={draft.responseFormat}
-                    disabled={draft.isBuiltIn}
-                    onChange={(event) =>
-                      updateDraft((current) => ({
-                        ...current,
-                        responseFormat: event.target.value as PromptResponseFormat,
-                      }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 disabled:bg-gray-100"
-                  >
-                    <option value="json">JSON</option>
-                    <option value="text">Text</option>
-                  </select>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Feature</label>
+                  <input
+                    type="text"
+                    value={draft.featureLabel || draft.featureKey || 'No feature assigned'}
+                    disabled
+                    className="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2"
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Runtime Model</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Runtime Model</label>
                 <select
                   value={selectedModelOptionId}
                   onChange={(event) => {
@@ -574,7 +814,7 @@ export default function PromptsPage() {
                   ))}
                 </select>
                 <p className="mt-2 text-sm text-gray-600">
-                  Choose a specific model for this prompt, or leave it on the runtime default to keep current route behavior.
+                  Set the model this prompt variant should use when it becomes the active prompt for its feature.
                 </p>
                 {draft.modelProvider && draft.modelName && (
                   <p className="mt-1 text-xs text-gray-500">
@@ -584,7 +824,7 @@ export default function PromptsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
                 <input
                   type="text"
                   value={draft.description}
@@ -597,21 +837,22 @@ export default function PromptsPage() {
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                Use <code className="rounded bg-white px-1 py-0.5">[[variableName]]</code> placeholders inside prompt text.
-                Built-in prompts have backend-managed variable sets. Custom prompts can define their own variable list below.
+                Feature-linked prompts use backend-managed variables so every variant remains compatible with that feature.
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-gray-900">Prompt Content</h3>
-                  <div className="text-xs text-gray-500">Created: {formatDate(draft.createdAt)} | Updated: {formatDate(draft.updatedAt)}</div>
+                  <div className="text-xs text-gray-500">
+                    Created: {formatDate(draft.createdAt)} | Updated: {formatDate(draft.updatedAt)}
+                  </div>
                 </div>
                 <textarea
                   value={draft.content}
                   onChange={(event) =>
                     updateDraft((current) => ({ ...current, content: event.target.value }))
                   }
-                  className="w-full min-h-[720px] rounded-xl border border-gray-300 px-4 py-3 font-mono text-sm"
+                  className="min-h-[720px] w-full rounded-xl border border-gray-300 px-4 py-3 font-mono text-sm"
                   spellCheck={false}
                 />
               </div>
@@ -619,10 +860,10 @@ export default function PromptsPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-gray-900">Variables</h3>
-                  {!draft.isBuiltIn && (
+                  {!draft.featureKey && !draft.isBuiltIn && (
                     <button
                       onClick={addVariable}
-                      className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                      className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
                     >
                       Add Variable
                     </button>
@@ -638,14 +879,14 @@ export default function PromptsPage() {
                 <div className="space-y-3">
                   {draft.allowedVariables.map((variable, index) => (
                     <div key={`${variable.name}-${index}`} className="rounded-lg border border-gray-200 p-4">
-                      {draft.isBuiltIn ? (
+                      {draft.featureKey || draft.isBuiltIn ? (
                         <div className="space-y-2">
                           <div className="font-mono text-sm text-gray-900">{variable.name}</div>
                           {variable.description && (
                             <div className="text-sm text-gray-600">{variable.description}</div>
                           )}
                           {variable.sampleValue && (
-                            <div className="rounded-md bg-gray-50 border border-gray-200 p-3 text-xs text-gray-600 whitespace-pre-wrap">
+                            <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 whitespace-pre-wrap">
                               {variable.sampleValue}
                             </div>
                           )}
@@ -675,7 +916,7 @@ export default function PromptsPage() {
                           />
                           <button
                             onClick={() => removeVariable(index)}
-                            className="px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100"
+                            className="rounded-lg bg-red-50 px-3 py-2 text-red-700 hover:bg-red-100"
                           >
                             Remove
                           </button>
@@ -687,10 +928,10 @@ export default function PromptsPage() {
               </div>
 
               <div className="grid gap-4 xl:grid-cols-2">
-                <div className="rounded-xl border border-gray-200 p-4 space-y-3">
+                <div className="space-y-3 rounded-xl border border-gray-200 p-4">
                   <h3 className="text-sm font-semibold text-gray-900">Validation</h3>
                   <div>
-                    <div className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">Used Variables</div>
+                    <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Used Variables</div>
                     <div className="flex flex-wrap gap-2">
                       {validation.usedVariables.length === 0 ? (
                         <span className="text-sm text-gray-500">No placeholders detected.</span>
@@ -704,7 +945,7 @@ export default function PromptsPage() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">Unknown Variables</div>
+                    <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Unknown Variables</div>
                     <div className="flex flex-wrap gap-2">
                       {validation.unknownVariables.length === 0 ? (
                         <span className="text-sm text-emerald-700">None.</span>
@@ -719,7 +960,7 @@ export default function PromptsPage() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 p-4 space-y-3">
+                <div className="space-y-3 rounded-xl border border-gray-200 p-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-gray-900">Rendered Preview</h3>
                     {preview && (
@@ -728,7 +969,7 @@ export default function PromptsPage() {
                       </span>
                     )}
                   </div>
-                  <div className="min-h-[220px] rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 whitespace-pre-wrap overflow-auto">
+                  <div className="min-h-[220px] overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 whitespace-pre-wrap">
                     {preview?.renderedContent ?? 'Run Preview to render this prompt with sample values.'}
                   </div>
                 </div>
