@@ -9,7 +9,6 @@ import {
   GoogleSheetTab,
   importApi,
   jobsApi,
-  PublicAppSettings,
   resumeApi,
 } from '@/lib/api';
 
@@ -71,23 +70,7 @@ function getColumnLabel(columnNumber: number): string {
   return label;
 }
 
-const DEFAULT_SETTINGS: PublicAppSettings = {
-  openaiEnabled: true,
-  claudeEnabled: true,
-  openrouterEnabled: true,
-  defaultMode: 'preview',
-  defaultTheme: 'light',
-  defaultResumeSelection: 'single',
-  defaultGroupId: '',
-  defaultProfileId: '',
-  defaultResumeDocxEnabled: true,
-  defaultCoverLetterDocxEnabled: true,
-  outputPathUsesJobTitle: true,
-  googleSheetsSources: [],
-};
-
 export default function JobFilterPage() {
-  const [settings, setSettings] = useState<PublicAppSettings>(DEFAULT_SETTINGS);
   const [sheetSources, setSheetSources] = useState<GoogleSheetSource[]>([]);
   const [sheetTabs, setSheetTabs] = useState<GoogleSheetTab[]>([]);
   const [sheetTitle, setSheetTitle] = useState('');
@@ -111,7 +94,6 @@ export default function JobFilterPage() {
           return;
         }
 
-        setSettings(nextSettings);
         setSheetSources(nextSettings.googleSheetsSources);
         setForm((current) => ({
           ...current,

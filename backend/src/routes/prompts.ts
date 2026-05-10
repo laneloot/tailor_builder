@@ -1,6 +1,8 @@
 import { Request, Response, Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
+import { listAvailableAIModelOptions } from '../config/aiModelConfig';
 import {
+  activatePrompt,
   createPrompt,
   deletePrompt,
   getPromptById,
@@ -9,7 +11,6 @@ import {
   updatePrompt,
   validatePromptDraft,
 } from '../services/promptService';
-import { listAIModelOptions } from '../services/aiModelCatalog';
 import { PromptCreateInput, PromptPreviewInput, PromptUpdateInput } from '../types/prompt';
 
 const router = Router();
@@ -50,8 +51,13 @@ router.post('/preview', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/models', (_req: Request, res: Response) => {
-  res.json(listAIModelOptions());
+router.get('/models', async (_req: Request, res: Response) => {
+  try {
+    res.json(await listAvailableAIModelOptions());
+  } catch (error) {
+    console.error('Error fetching prompt model options:', error);
+    res.status(500).json({ error: 'Failed to fetch prompt model options' });
+  }
 });
 
 router.get('/:id', async (req: Request<{ id: string }>, res: Response) => {
@@ -92,6 +98,17 @@ router.put('/:id', async (req: Request<{ id: string }>, res: Response) => {
     console.error('Error updating prompt:', error);
     res.status(400).json({
       error: error instanceof Error ? error.message : 'Failed to update prompt',
+    });
+  }
+});
+
+router.post('/:id/activate', async (req: Request<{ id: string }>, res: Response) => {
+  try {
+    res.json(await activatePrompt(req.params.id));
+  } catch (error) {
+    console.error('Error activating prompt:', error);
+    res.status(400).json({
+      error: error instanceof Error ? error.message : 'Failed to activate prompt',
     });
   }
 });

@@ -9,7 +9,6 @@ import {
   canUseAnthropicBatchForPrompt,
   generateCoverLetter,
   parseTailoredResumeContent,
-  resolveAIProvider,
   tailorResume,
 } from '../services/claude';
 import { generateResumePDF, generatePreviewHTML, getGeneratedPDFPath } from '../generators/pdfGenerator';
@@ -17,7 +16,7 @@ import { generateResumeDOCX } from '../generators/docxGenerator';
 import { saveCoverLetter, saveCoverLetterDOCX } from '../generators/coverLetterGenerator';
 import { getGeneratedOutputPath } from '../utils/generatedPath';
 import { getTemplateById, createDefaultTemplate } from '../extractors/templateExtractor';
-import { getAIModelSettings, getDefaultEnabledProvider, getPublicAppSettings, isProviderEnabled } from '../config/aiModelConfig';
+import { getPublicAppSettings, resolveRequestedAIModel } from '../config/aiModelConfig';
 import { confirmSkill, createSkill, deleteSkillHandler, listSkills, updateSkillHandler } from '../controllers/skills';
 import { Profile } from '../types/profile';
 import { AIProvider, GenerateResumeRequest, JobAnalysis, TailoredContent } from '../types/template';
@@ -65,19 +64,19 @@ router.delete('/skills', deleteSkillHandler);
 // Analyze job description
 router.post('/analyze', async (req: Request, res: Response) => {
   try {
-    const { jobDescription, model } = req.body as { jobDescription?: string; model?: AIProvider | string };
+    const { jobDescription, model } = req.body as { jobDescription?: string; model?: string };
 
     if (!jobDescription || jobDescription.trim().length < 50) {
       res.status(400).json({ error: 'Job description must be at least 50 characters' });
       return;
     }
 
-    const settings = await getAIModelSettings();
-    const requestedProvider = resolveAIProvider(model);
-    const provider = isProviderEnabled(requestedProvider, settings)
-      ? requestedProvider
-      : getDefaultEnabledProvider(settings);
-    const analysis = await analyzeJobDescription(jobDescription, provider);
+    const selectedModel = await resolveRequestedAIModel(model);
+    const analysis = await analyzeJobDescription(
+      jobDescription,
+      selectedModel.provider,
+      selectedModel.modelName
+    );
     res.json(analysis);
   } catch (error) {
     console.error('Error analyzing job description:', error);
@@ -98,7 +97,7 @@ router.post('/analyze-multi-job', async (req: Request, res: Response) => {
         jobDescription?: string;
         sourceRowNumber?: number;
       }>;
-      model?: AIProvider | string;
+      model?: string;
     };
 
     if (!Array.isArray(jobs) || jobs.length === 0) {
@@ -106,11 +105,7 @@ router.post('/analyze-multi-job', async (req: Request, res: Response) => {
       return;
     }
 
-    const settings = await getAIModelSettings();
-    const requestedProvider = resolveAIProvider(model);
-    const provider = isProviderEnabled(requestedProvider, settings)
-      ? requestedProvider
-      : getDefaultEnabledProvider(settings);
+    const selectedModel = await resolveRequestedAIModel(model);
 
     const validJobs: Array<{
       customId: string;
@@ -159,7 +154,8 @@ router.post('/analyze-multi-job', async (req: Request, res: Response) => {
         customId: job.customId,
         jobDescription: job.jobDescription,
       })),
-      provider,
+      provider: selectedModel.provider,
+      modelName: selectedModel.modelName,
       anthropicCacheTtl: '1h',
     });
 
@@ -190,7 +186,7 @@ router.post('/analyze-multi-job', async (req: Request, res: Response) => {
     }
 
     res.json({
-      provider,
+      provider: selectedModel.provider,
       analyzed: analyses.length,
       analyses,
       failed: failures.length,
@@ -263,7 +259,8 @@ type TailorBatchItem<TMeta> = {
 
 async function tailorResumesForBatchItems<TMeta>(
   items: TailorBatchItem<TMeta>[],
-  provider: AIProvider
+  provider: AIProvider,
+  modelName?: string
 ): Promise<{
   tailoredByCustomId: Map<string, TailoredContent>;
   failures: Array<{ customId: string; profileId: string; profileName: string; error: string; meta: TMeta }>;
@@ -277,7 +274,7 @@ async function tailorResumesForBatchItems<TMeta>(
   const unconfirmedSoftMap = new Map<string, string>();
 
   const shouldUseAnthropicBatch = items.length > 1
-    && await canUseAnthropicBatchForPrompt('tailor-resume', provider);
+    && await canUseAnthropicBatchForPrompt('tailor-resume', provider, modelName);
 
   if (shouldUseAnthropicBatch) {
     const batchResults = await batchCreatePromptCompletions({
@@ -287,6 +284,7 @@ async function tailorResumesForBatchItems<TMeta>(
         values: buildTailorResumePromptValues(item.profile, item.analysis),
       })),
       fallbackProvider: provider,
+      fallbackModelName: modelName,
       maxTokens: 11000,
       temperature: 0.2,
       responseFormat: 'json',
@@ -339,7 +337,7 @@ async function tailorResumesForBatchItems<TMeta>(
   } else {
     for (const item of items) {
       try {
-        const tailored = await tailorResume(item.profile, item.analysis, provider);
+        const tailored = await tailorResume(item.profile, item.analysis, provider, modelName);
         tailoredByCustomId.set(item.customId, tailored);
         collectUnconfirmedSkillMaps(tailored, unconfirmedHardMap, unconfirmedSoftMap);
       } catch (error) {
@@ -365,7 +363,8 @@ async function tailorResumesForBatchItems<TMeta>(
 async function tailorResumesForProfiles(
   profiles: Profile[],
   analysis: JobAnalysis,
-  provider: AIProvider
+  provider: AIProvider,
+  modelName?: string
 ): Promise<{
   tailoredByProfileId: Map<string, TailoredContent>;
   failures: Array<{ profileId: string; profileName: string; error: string }>;
@@ -378,7 +377,7 @@ async function tailorResumesForProfiles(
     analysis,
     meta: { profileId: profile.id },
   }));
-  const batchResult = await tailorResumesForBatchItems(items, provider);
+  const batchResult = await tailorResumesForBatchItems(items, provider, modelName);
   const tailoredByProfileId = new Map<string, TailoredContent>();
 
   for (const item of items) {
@@ -415,17 +414,8 @@ router.post('/generate-all', async (req: Request, res: Response) => {
       includeCoverLetterDocx,
     } = req.body;
 
-    // Load setting
-    const settings = await getAIModelSettings();
     const appSettings = await getPublicAppSettings();
-    const selectedModel = resolveAIProvider(model);
-
-
-    // Validate
-    if (!isProviderEnabled(selectedModel, settings)) {
-      res.status(400).json({ error: `Selected AI model '${selectedModel}' is disabled by admin` });
-      return;
-    }
+    const selectedModel = await resolveRequestedAIModel(typeof model === 'string' ? model : undefined);
 
     if (!companyName?.trim()) {
       res.status(400).json({ error: 'Company name is required' });
@@ -446,7 +436,11 @@ router.post('/generate-all', async (req: Request, res: Response) => {
     const trimmedJobDescription = jobDescription?.trim();
 
     if (trimmedJobDescription && trimmedJobDescription.length > 50) {
-      analysis = jobAnalysis || await analyzeJobDescription(trimmedJobDescription, selectedModel);
+      analysis = jobAnalysis || await analyzeJobDescription(
+        trimmedJobDescription,
+        selectedModel.provider,
+        selectedModel.modelName
+      );
     }
 
     const resolvedRole = resolveGenerationRole(role, analysis);
@@ -463,10 +457,10 @@ router.post('/generate-all', async (req: Request, res: Response) => {
     const formatNorm = (format as string) === 'both' ? 'both' : format === 'docx' ? 'docx' : 'pdf';
     const generateCoverLetterDocx = shouldGenerateCoverLetterDocx(includeCoverLetterDocx);
     const shouldUseBulkTailoring = analysis
-      ? await canUseAnthropicBatchForPrompt('tailor-resume', selectedModel)
+      ? await canUseAnthropicBatchForPrompt('tailor-resume', selectedModel.provider, selectedModel.modelName)
       : false;
     const bulkTailoring = shouldUseBulkTailoring && analysis
-      ? await tailorResumesForProfiles(profiles, analysis, selectedModel)
+      ? await tailorResumesForProfiles(profiles, analysis, selectedModel.provider, selectedModel.modelName)
       : null;
 
     for (const profile of profiles) {
@@ -488,7 +482,7 @@ router.post('/generate-all', async (req: Request, res: Response) => {
         if (analysis) {
           tailoredContent = bulkTailoring
             ? bulkTailoring.tailoredByProfileId.get(profile.id)
-            : await tailorResume(profile, analysis, selectedModel);
+            : await tailorResume(profile, analysis, selectedModel.provider, selectedModel.modelName);
         }
         collectUnconfirmedSkillMaps(tailoredContent, unconfirmedHardMap, unconfirmedSoftMap);
 
@@ -496,7 +490,13 @@ router.post('/generate-all', async (req: Request, res: Response) => {
         if (tailoredContent?.coverLetter?.trim()) {
           coverLetterBody = tailoredContent.coverLetter.trim();
         } else {
-          coverLetterBody = await generateCoverLetter(profile, normalizedCompanyName, resolvedRole, selectedModel);
+          coverLetterBody = await generateCoverLetter(
+            profile,
+            normalizedCompanyName,
+            resolvedRole,
+            selectedModel.provider,
+            selectedModel.modelName
+          );
         }
         const pathInfo = await getGeneratedOutputPath(profile, normalizedCompanyName, resolvedRole);
         const coverLetterPdfPath = await saveCoverLetter(profile, coverLetterBody, pathInfo);
@@ -572,20 +572,14 @@ router.post('/generate-multi-job', async (req: Request, res: Response) => {
         jobAnalysis?: JobAnalysis;
         sourceRowNumber?: number;
       }>;
-      model?: AIProvider | string;
+      model?: string;
       profileIds?: string[];
       format?: 'pdf' | 'docx' | 'both';
       includeCoverLetterDocx?: boolean;
     };
 
-    const settings = await getAIModelSettings();
     const appSettings = await getPublicAppSettings();
-    const selectedModel = resolveAIProvider(model);
-
-    if (!isProviderEnabled(selectedModel, settings)) {
-      res.status(400).json({ error: `Selected AI model '${selectedModel}' is disabled by admin` });
-      return;
-    }
+    const selectedModel = await resolveRequestedAIModel(model);
 
     if (!Array.isArray(jobs) || jobs.length === 0) {
       res.status(400).json({ error: 'At least one job is required' });
@@ -640,7 +634,7 @@ router.post('/generate-multi-job', async (req: Request, res: Response) => {
     }
 
     const bulkTailoring = batchItems.length > 0
-      ? await tailorResumesForBatchItems(batchItems, selectedModel)
+      ? await tailorResumesForBatchItems(batchItems, selectedModel.provider, selectedModel.modelName)
       : null;
 
     const formatNorm = (format as string) === 'both' ? 'both' : format === 'docx' ? 'docx' : 'pdf';
@@ -683,7 +677,7 @@ router.post('/generate-multi-job', async (req: Request, res: Response) => {
 
             tailoredContent = customId
               ? bulkTailoring?.tailoredByCustomId.get(customId)
-              : await tailorResume(profile, job.analysis, selectedModel);
+              : await tailorResume(profile, job.analysis, selectedModel.provider, selectedModel.modelName);
           }
           collectUnconfirmedSkillMaps(tailoredContent, unconfirmedHardMap, unconfirmedSoftMap);
 
@@ -691,7 +685,13 @@ router.post('/generate-multi-job', async (req: Request, res: Response) => {
           if (tailoredContent?.coverLetter?.trim()) {
             coverLetterBody = tailoredContent.coverLetter.trim();
           } else {
-            coverLetterBody = await generateCoverLetter(profile, job.companyName, job.role, selectedModel);
+            coverLetterBody = await generateCoverLetter(
+              profile,
+              job.companyName,
+              job.role,
+              selectedModel.provider,
+              selectedModel.modelName
+            );
           }
 
           const pathInfo = await getGeneratedOutputPath(profile, job.companyName, job.role);
@@ -772,17 +772,12 @@ router.post('/preview-all', async (req: Request, res: Response) => {
       templateId?: string;
       jobDescription?: string;
       jobAnalysis?: import('../types/template').JobAnalysis;
-      model?: AIProvider | string;
+      model?: string;
       profileIds?: string[];
     };
 
-    const settings = await getAIModelSettings();
     const appSettings = await getPublicAppSettings();
-    const selectedModel = resolveAIProvider(model);
-    if (!isProviderEnabled(selectedModel, settings)) {
-      res.status(400).json({ error: `Selected AI model '${selectedModel}' is disabled by admin` });
-      return;
-    }
+    const selectedModel = await resolveRequestedAIModel(model);
 
     const profiles = await loadAllProfiles(profileIds);
     if (profiles.length === 0) {
@@ -795,7 +790,11 @@ router.post('/preview-all', async (req: Request, res: Response) => {
     let analysis: JobAnalysis | undefined;
     const trimmedJobDescription = jobDescription?.trim();
     if (trimmedJobDescription && trimmedJobDescription.length > 50) {
-      analysis = jobAnalysis || await analyzeJobDescription(trimmedJobDescription, selectedModel);
+      analysis = jobAnalysis || await analyzeJobDescription(
+        trimmedJobDescription,
+        selectedModel.provider,
+        selectedModel.modelName
+      );
     }
 
     const previews: Array<{
@@ -807,10 +806,10 @@ router.post('/preview-all', async (req: Request, res: Response) => {
     const unconfirmedHardMap = new Map<string, string>();
     const unconfirmedSoftMap = new Map<string, string>();
     const shouldUseBulkTailoring = analysis
-      ? await canUseAnthropicBatchForPrompt('tailor-resume', selectedModel)
+      ? await canUseAnthropicBatchForPrompt('tailor-resume', selectedModel.provider, selectedModel.modelName)
       : false;
     const bulkTailoring = shouldUseBulkTailoring && analysis
-      ? await tailorResumesForProfiles(profiles, analysis, selectedModel)
+      ? await tailorResumesForProfiles(profiles, analysis, selectedModel.provider, selectedModel.modelName)
       : null;
 
     if (bulkTailoring && bulkTailoring.failures.length > 0) {
@@ -835,7 +834,7 @@ router.post('/preview-all', async (req: Request, res: Response) => {
       const tailoredContent = analysis
         ? bulkTailoring
           ? bulkTailoring.tailoredByProfileId.get(profile.id)
-          : await tailorResume(profile, analysis, selectedModel)
+          : await tailorResume(profile, analysis, selectedModel.provider, selectedModel.modelName)
         : undefined;
       collectUnconfirmedSkillMaps(tailoredContent, unconfirmedHardMap, unconfirmedSoftMap);
 
@@ -876,13 +875,8 @@ router.post('/generate', async (req: Request, res: Response) => {
       format = 'pdf',
       includeCoverLetterDocx,
     }: GenerateResumeRequest = req.body;
-    const settings = await getAIModelSettings();
     const appSettings = await getPublicAppSettings();
-    const selectedModel = resolveAIProvider(model);
-    if (!isProviderEnabled(selectedModel, settings)) {
-      res.status(400).json({ error: `Selected AI model '${selectedModel}' is disabled by admin` });
-      return;
-    }
+    const selectedModel = await resolveRequestedAIModel(typeof model === 'string' ? model : undefined);
 
     if (!profileId) {
       res.status(400).json({ error: 'Profile ID is required' });
@@ -929,8 +923,12 @@ router.post('/generate', async (req: Request, res: Response) => {
     let analysis = jobAnalysis;
     if (!tailoredContent && jobDescription && jobDescription.trim().length > 50) {
       // Analyze job if not already analyzed
-      analysis = jobAnalysis || await analyzeJobDescription(jobDescription, selectedModel);
-      tailoredContent = await tailorResume(profile, analysis, selectedModel);
+      analysis = jobAnalysis || await analyzeJobDescription(
+        jobDescription,
+        selectedModel.provider,
+        selectedModel.modelName
+      );
+      tailoredContent = await tailorResume(profile, analysis, selectedModel.provider, selectedModel.modelName);
     }
     const resolvedRole = resolveGenerationRole(role, analysis);
     if (appSettings.outputPathUsesJobTitle && !resolvedRole) {
@@ -952,7 +950,8 @@ router.post('/generate', async (req: Request, res: Response) => {
         profile,
         companyName.trim(),
         resolvedRole,
-        selectedModel
+        selectedModel.provider,
+        selectedModel.modelName
       );
     }
 
@@ -1028,12 +1027,7 @@ router.post('/generate', async (req: Request, res: Response) => {
 router.post('/preview', async (req: Request, res: Response) => {
   try {
     const { profileId, templateId, jobDescription, jobAnalysis, tailoredContent: manualTailoredContent, model }: GenerateResumeRequest = req.body;
-    const settings = await getAIModelSettings();
-    const selectedModel = resolveAIProvider(model);
-    if (!isProviderEnabled(selectedModel, settings)) {
-      res.status(400).json({ error: `Selected AI model '${selectedModel}' is disabled by admin` });
-      return;
-    }
+    const selectedModel = await resolveRequestedAIModel(typeof model === 'string' ? model : undefined);
 
     if (!profileId) {
       res.status(400).json({ error: 'Profile ID is required' });
@@ -1073,8 +1067,12 @@ router.post('/preview', async (req: Request, res: Response) => {
     // If job description provided, tailor the resume (unless overridden by manual edits)
     let tailoredContent = manualTailoredContent;
     if (!tailoredContent && jobDescription && jobDescription.trim().length > 50) {
-      const analysis = jobAnalysis || await analyzeJobDescription(jobDescription, selectedModel);
-      tailoredContent = await tailorResume(profile, analysis, selectedModel);
+      const analysis = jobAnalysis || await analyzeJobDescription(
+        jobDescription,
+        selectedModel.provider,
+        selectedModel.modelName
+      );
+      tailoredContent = await tailorResume(profile, analysis, selectedModel.provider, selectedModel.modelName);
     }
 
     // Generate HTML preview

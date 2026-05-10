@@ -96,6 +96,61 @@ test('prompt service creates, previews, updates, and deletes custom JSON prompts
   assert.equal(fs.existsSync(promptPath), false);
 });
 
+test('prompt service supports multiple prompt variants per feature and active selection', async () => {
+  const dataDir = makeTempDataDir('prompts-feature-variants');
+  process.env.TAILOR_DATA_DIR = dataDir;
+  writePrompt(dataDir, 'analyze-job-description', 'Default analyze [[jobDescription]]');
+
+  const promptService = loadFresh('../dist/services/promptService');
+
+  const variantA = await promptService.createPrompt({
+    name: 'Analyze Variant A',
+    featureKey: 'analyze-job-description',
+    content: 'Variant A [[jobDescription]]',
+    modelProvider: 'openrouter',
+    modelName: 'deepseek/deepseek-chat',
+  });
+  const variantB = await promptService.createPrompt({
+    name: 'Analyze Variant B',
+    featureKey: 'analyze-job-description',
+    content: 'Variant B [[jobDescription]]',
+    modelProvider: 'claude',
+    modelName: 'claude-sonnet-4-20250514',
+  });
+
+  const prompts = await promptService.listPrompts();
+  const featurePrompts = prompts.filter((prompt) => prompt.featureKey === 'analyze-job-description');
+  assert.equal(featurePrompts.length, 3);
+  assert.equal(featurePrompts.some((prompt) => prompt.id === 'analyze-job-description' && prompt.isActiveForFeature), true);
+
+  await promptService.activatePrompt(variantB.id);
+
+  const promptsAfterActivation = await promptService.listPrompts();
+  const activePrompt = promptsAfterActivation.find((prompt) => prompt.id === variantB.id);
+  assert.equal(activePrompt?.isActiveForFeature, true);
+
+  assert.equal(
+    await promptService.renderPrompt('analyze-job-description', { jobDescription: 'Backend role' }),
+    'Variant B Backend role'
+  );
+
+  const runtimePrompt = await promptService.getRuntimePromptByFeature('analyze-job-description');
+  assert.equal(runtimePrompt?.id, variantB.id);
+  assert.equal(runtimePrompt?.modelProvider, 'claude');
+  assert.equal(runtimePrompt?.modelName, 'claude-sonnet-4-20250514');
+
+  const storedConfig = readJson(path.join(dataDir, 'config', 'prompt-library.json'));
+  assert.equal(storedConfig.activePrompts['analyze-job-description'], variantB.id);
+
+  await promptService.deletePrompt(variantB.id);
+  assert.equal(
+    await promptService.renderPrompt('analyze-job-description', { jobDescription: 'Backend role' }),
+    'Default analyze Backend role'
+  );
+
+  assert.equal(await promptService.getPromptById(variantA.id) !== null, true);
+});
+
 test('prompt validation rejects unknown variables', async () => {
   const dataDir = makeTempDataDir('prompts-validation');
   process.env.TAILOR_DATA_DIR = dataDir;

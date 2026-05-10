@@ -37,7 +37,7 @@ test('skills JSON database supports CRUD and duplicate protection', () => {
     type: 'soft',
   });
 
-  assert.deepEqual(skillsDb.readSkills('hard'), ['React', 'TypeScript']);
+  assert.deepEqual(skillsDb.readSkills('hard'), ['TypeScript', 'React']);
   assert.deepEqual(skillsDb.readSkills('soft'), ['Communication']);
 
   assert.deepEqual(skillsDb.updateSkill('hard', 'typescript', 'Node.js'), {
@@ -45,7 +45,7 @@ test('skills JSON database supports CRUD and duplicate protection', () => {
     skill: 'Node.js',
     type: 'hard',
   });
-  assert.deepEqual(skillsDb.readSkills('hard'), ['Node.js', 'React']);
+  assert.deepEqual(skillsDb.readSkills('hard'), ['React', 'Node.js']);
   assert.throws(() => skillsDb.updateSkill('hard', 'Node.js', 'react'), /Skill already exists/);
   assert.throws(() => skillsDb.updateSkill('hard', 'Missing', 'Go'), /Skill not found/);
 

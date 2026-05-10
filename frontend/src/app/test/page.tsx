@@ -21,14 +21,17 @@ const DEFAULT_MODEL_SETTINGS: PublicAppSettings = {
   openaiEnabled: true,
   claudeEnabled: true,
   openrouterEnabled: true,
+  deepseekEnabled: true,
   defaultMode: 'preview',
   defaultTheme: 'light',
   defaultResumeSelection: 'single',
   defaultGroupId: '',
   defaultProfileId: '',
+  defaultModelId: '',
   defaultResumeDocxEnabled: true,
   defaultCoverLetterDocxEnabled: true,
   outputPathUsesJobTitle: true,
+  aiModels: [],
   googleSheetsSources: [],
 };
 
@@ -53,14 +56,15 @@ const KIND_CLASSES: Record<HighlightKind, string> = {
 function isEnabled(settings: PublicAppSettings, provider: AIProvider): boolean {
   if (provider === 'openai') return settings.openaiEnabled;
   if (provider === 'claude') return settings.claudeEnabled;
-  return settings.openrouterEnabled;
+  if (provider === 'openrouter') return settings.openrouterEnabled;
+  return settings.deepseekEnabled;
 }
 
 function pickDefaultProvider(settings: PublicAppSettings): AIProvider {
   if (settings.openrouterEnabled) return 'openrouter';
   if (settings.openaiEnabled) return 'openai';
   if (settings.claudeEnabled) return 'claude';
-  return 'openrouter';
+  return 'deepseek';
 }
 
 function normalizeTerm(value: string): string {
@@ -257,7 +261,11 @@ export default function TestPage() {
     }
   };
 
-  const hasAnyProvider = modelSettings.openaiEnabled || modelSettings.claudeEnabled || modelSettings.openrouterEnabled;
+  const hasAnyProvider =
+    modelSettings.openaiEnabled ||
+    modelSettings.claudeEnabled ||
+    modelSettings.openrouterEnabled ||
+    modelSettings.deepseekEnabled;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -298,6 +306,7 @@ export default function TestPage() {
               {modelSettings.openrouterEnabled && <option value="openrouter">OpenRouter</option>}
               {modelSettings.openaiEnabled && <option value="openai">OpenAI</option>}
               {modelSettings.claudeEnabled && <option value="claude">Claude</option>}
+              {modelSettings.deepseekEnabled && <option value="deepseek">DeepSeek</option>}
             </select>
           </label>
 

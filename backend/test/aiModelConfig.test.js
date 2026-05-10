@@ -12,10 +12,12 @@ test('app settings persist entirely in JSON', async () => {
   process.env.OPENAI_API_KEY = '';
   process.env.ANTHROPIC_API_KEY = '';
   process.env.OPENROUTER_API_KEY = '';
+  process.env.DEEPSEEK_API_KEY = '';
   const config = loadFresh('../dist/config/aiModelConfig');
 
   const defaults = await config.getAdminAppSettings();
   assert.equal(defaults.openaiEnabled, true);
+  assert.equal(defaults.deepseekEnabled, true);
   assert.equal(defaults.defaultMode, 'preview');
   assert.equal(fs.existsSync(path.join(dataDir, 'config', 'ai-models.json')), false);
 
@@ -23,6 +25,7 @@ test('app settings persist entirely in JSON', async () => {
     openaiEnabled: false,
     claudeEnabled: true,
     openrouterEnabled: false,
+    deepseekEnabled: true,
     defaultMode: 'generate',
     defaultTheme: 'dark',
     defaultResumeSelection: 'group',
@@ -49,6 +52,7 @@ test('app settings persist entirely in JSON', async () => {
 
   assert.equal(updated.openaiEnabled, false);
   assert.equal(updated.claudeEnabled, true);
+  assert.equal(updated.deepseekEnabled, true);
   assert.equal(updated.defaultMode, 'generate');
   assert.equal(updated.defaultTheme, 'dark');
   assert.equal(updated.outputBaseDir, outputDir);
@@ -72,6 +76,7 @@ test('reading settings does not rewrite an existing settings file', async () => 
   "openaiEnabled": true,
   "claudeEnabled": true,
   "openrouterEnabled": true,
+  "deepseekEnabled": true,
   "defaultMode": "preview",
   "defaultTheme": "light",
   "defaultResumeSelection": "single",
@@ -85,7 +90,8 @@ test('reading settings does not rewrite an existing settings file', async () => 
   "apiKeys": {
     "openai": { "activeKeyId": "", "entries": [] },
     "claude": { "activeKeyId": "", "entries": [] },
-    "openrouter": { "activeKeyId": "", "entries": [] }
+    "openrouter": { "activeKeyId": "", "entries": [] },
+    "deepseek": { "activeKeyId": "", "entries": [] }
   }
 }`;
 
@@ -96,6 +102,7 @@ test('reading settings does not rewrite an existing settings file', async () => 
   process.env.OPENAI_API_KEY = '';
   process.env.ANTHROPIC_API_KEY = '';
   process.env.OPENROUTER_API_KEY = '';
+  process.env.DEEPSEEK_API_KEY = '';
   const config = loadFresh('../dist/config/aiModelConfig');
 
   const loaded = await config.getAdminAppSettings();
@@ -116,6 +123,7 @@ test('invalid settings JSON is reported and never overwritten with defaults', as
   process.env.OPENAI_API_KEY = '';
   process.env.ANTHROPIC_API_KEY = '';
   process.env.OPENROUTER_API_KEY = '';
+  process.env.DEEPSEEK_API_KEY = '';
   const config = loadFresh('../dist/config/aiModelConfig');
 
   await assert.rejects(
@@ -132,6 +140,7 @@ test('app settings preserve at least one enabled provider and can fall back to e
   process.env.OPENAI_API_KEY = 'openai-env-secret';
   process.env.ANTHROPIC_API_KEY = '';
   process.env.OPENROUTER_API_KEY = '';
+  process.env.DEEPSEEK_API_KEY = '';
   const config = loadFresh('../dist/config/aiModelConfig');
 
   await assert.rejects(
@@ -139,6 +148,7 @@ test('app settings preserve at least one enabled provider and can fall back to e
       openaiEnabled: false,
       claudeEnabled: false,
       openrouterEnabled: false,
+      deepseekEnabled: false,
     }),
     /At least one AI model must remain enabled/
   );
