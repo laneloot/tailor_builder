@@ -173,6 +173,35 @@ test('prompt validation rejects unknown variables', async () => {
   );
 });
 
+test('feature-linked prompts derive variables from prompt content', async () => {
+  const dataDir = makeTempDataDir('prompts-feature-variables');
+  process.env.TAILOR_DATA_DIR = dataDir;
+  writePrompt(dataDir, 'tailor-resume', 'Tailor [[profileJson]] for [[jobAnalysisJson]] with [[customNote]]');
+
+  const promptService = loadFresh('../dist/services/promptService');
+  const prompt = await promptService.getPromptById('tailor-resume');
+
+  assert.deepEqual(
+    prompt.allowedVariables.map((variable) => variable.name),
+    ['profileJson', 'jobAnalysisJson', 'customNote']
+  );
+  assert.deepEqual(prompt.validation, {
+    usedVariables: ['profileJson', 'jobAnalysisJson', 'customNote'],
+    unknownVariables: [],
+  });
+
+  const variant = await promptService.createPrompt({
+    name: 'Tailor Variant',
+    featureKey: 'tailor-resume',
+    content: 'Variant [[profileJson]] [[jobAnalysisJson]] [[customNote]]',
+  });
+
+  assert.deepEqual(
+    variant.allowedVariables.map((variable) => variable.name),
+    ['profileJson', 'jobAnalysisJson', 'customNote']
+  );
+});
+
 test('built-in prompts persist optional model overrides alongside content', async () => {
   const dataDir = makeTempDataDir('prompts-built-in-model');
   process.env.TAILOR_DATA_DIR = dataDir;

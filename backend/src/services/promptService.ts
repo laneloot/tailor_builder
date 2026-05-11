@@ -410,6 +410,25 @@ export function validatePromptContent(
   };
 }
 
+function resolveFeatureAllowedVariables(
+  content: string,
+  knownVariables: PromptVariableDefinition[]
+): PromptVariableDefinition[] {
+  const knownByName = new Map(
+    knownVariables.map((variable) => [variable.name, variable] as const)
+  );
+
+  return extractPromptVariables(content).map((name) => {
+    const known = knownByName.get(name);
+    return known
+      ? { ...known }
+      : {
+          name,
+          sampleValue: buildSampleValue(name),
+        };
+  });
+}
+
 function buildSampleValue(variableName: string): string {
   switch (variableName) {
     case 'jobDescription':
@@ -680,6 +699,7 @@ async function readBuiltInPromptRecord(definition: PromptFeatureDefinition): Pro
     stored.parsed.modelProvider ?? definition.modelProvider,
     stored.parsed.modelName ?? definition.modelName
   );
+  const allowedVariables = resolveFeatureAllowedVariables(stored.content, definition.allowedVariables);
 
   return {
     id: definition.id,
@@ -690,8 +710,8 @@ async function readBuiltInPromptRecord(definition: PromptFeatureDefinition): Pro
     responseFormat: definition.responseFormat,
     modelProvider: modelSelection?.provider,
     modelName: modelSelection?.modelName,
-    allowedVariables: cloneAllowedVariables(definition.allowedVariables),
-    validation: validatePromptContent(stored.content, definition.allowedVariables),
+    allowedVariables,
+    validation: validatePromptContent(stored.content, allowedVariables),
     isBuiltIn: true,
     isActiveForFeature: false,
     usage: definition.usage,
@@ -714,7 +734,7 @@ async function readCustomPromptFile(id: string): Promise<(StoredPromptMeta & { c
   const feature = featureKey ? getPromptFeatureDefinition(featureKey) : null;
   const modelSelection = normalizePromptModelSelection(parsed.modelProvider, parsed.modelName);
   const allowedVariables = feature
-    ? cloneAllowedVariables(feature.allowedVariables)
+    ? resolveFeatureAllowedVariables(stored.content, feature.allowedVariables)
     : normalizeAllowedVariables(Array.isArray(parsed.allowedVariables) ? parsed.allowedVariables : []);
 
   return {
@@ -888,7 +908,11 @@ export async function createPrompt(input: PromptCreateInput): Promise<PromptReco
     throw new Error('Prompt content is required');
   }
 
-  assertValidPromptDraft(content, draftContext.allowedVariables);
+  const allowedVariables = draftContext.featureKey
+    ? resolveFeatureAllowedVariables(content, draftContext.allowedVariables)
+    : draftContext.allowedVariables;
+
+  assertValidPromptDraft(content, allowedVariables);
 
   const id = await generateCustomPromptId(name, draftContext.featureKey);
   const now = new Date().toISOString();
@@ -900,7 +924,7 @@ export async function createPrompt(input: PromptCreateInput): Promise<PromptReco
     responseFormat: draftContext.responseFormat,
     modelProvider: modelSelection?.provider,
     modelName: modelSelection?.modelName,
-    allowedVariables: draftContext.allowedVariables,
+    allowedVariables,
     createdAt: now,
     updatedAt: now,
     content,
@@ -952,8 +976,9 @@ export async function updatePrompt(id: string, input: PromptUpdateInput): Promis
     const feature = getPromptFeatureDefinitionById(id);
     if (!feature) return null;
     const modelSelection = normalizePromptModelSelection(input.modelProvider, input.modelName);
+    const allowedVariables = resolveFeatureAllowedVariables(content, feature.allowedVariables);
 
-    assertValidPromptDraft(content, feature.allowedVariables);
+    assertValidPromptDraft(content, allowedVariables);
     const existing = await readPromptJson(id);
     await writePromptJson(id, {
       id,
@@ -984,7 +1009,11 @@ export async function updatePrompt(id: string, input: PromptUpdateInput): Promis
     throw new Error('Prompt name is required');
   }
 
-  assertValidPromptDraft(content, draftContext.allowedVariables);
+  const allowedVariables = draftContext.featureKey
+    ? resolveFeatureAllowedVariables(content, draftContext.allowedVariables)
+    : draftContext.allowedVariables;
+
+  assertValidPromptDraft(content, allowedVariables);
 
   const nextPrompt: StoredPromptMeta & { content: string } = {
     ...current,
@@ -994,7 +1023,7 @@ export async function updatePrompt(id: string, input: PromptUpdateInput): Promis
     responseFormat: draftContext.responseFormat,
     modelProvider: modelSelection?.provider,
     modelName: modelSelection?.modelName,
-    allowedVariables: draftContext.allowedVariables,
+    allowedVariables,
     updatedAt: new Date().toISOString(),
     content,
   };
@@ -1053,10 +1082,11 @@ function resolveDraftSource(
   input: PromptPreviewInput
 ): { content: string; allowedVariables: PromptVariableDefinition[] } {
   if (record) {
+    const content = input.content ? normalizePromptContent(input.content) : record.content;
     return {
-      content: input.content ? normalizePromptContent(input.content) : record.content,
+      content,
       allowedVariables: record.featureKey
-        ? cloneAllowedVariables(getPromptFeatureDefinition(record.featureKey).allowedVariables)
+        ? resolveFeatureAllowedVariables(content, getPromptFeatureDefinition(record.featureKey).allowedVariables)
         : record.isBuiltIn
           ? record.allowedVariables
           : normalizeAllowedVariables(input.allowedVariables ?? record.allowedVariables),

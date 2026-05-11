@@ -517,9 +517,6 @@ export default function PromptsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Prompt Library</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Choose a feature, review all prompt variants available for that feature, then save which one should run live.
-        </p>
       </div>
 
       {error && (
@@ -534,7 +531,7 @@ export default function PromptsPage() {
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,420px)_minmax(0,1fr)]">
+      <div className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="overflow-hidden rounded-xl border border-gray-200 bg-white">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
             <h2 className="font-semibold text-gray-900">Features</h2>
@@ -545,89 +542,67 @@ export default function PromptsPage() {
               <button
                 key={group.key}
                 onClick={() => void handleSelectFeature(group.key)}
-                className={`w-full border-b border-gray-100 px-4 py-4 text-left hover:bg-gray-50 ${
+                className={`w-full border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50 ${
                   selectedFeatureKey === group.key ? 'bg-blue-50' : ''
                 }`}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="font-medium text-gray-900">{group.label}</div>
-                    <div className="mt-1 text-xs text-gray-500">{group.prompts.length} prompt variant(s)</div>
-                  </div>
-                  {group.activePrompt && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                      Active
+                <div className="flex items-center justify-between gap-3">
+                  <div className="truncate font-medium text-gray-900">{group.label}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                      {group.prompts.length}
                     </span>
-                  )}
-                </div>
-                <div className="mt-2 text-sm text-gray-600">
-                  {group.activePrompt ? `Current: ${group.activePrompt.name}` : 'No active prompt selected'}
+                    {group.activePrompt && <span className="h-2 w-2 rounded-full bg-emerald-500"></span>}
+                  </div>
                 </div>
               </button>
             ))}
           </div>
         </aside>
 
-        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <div className="border-b border-gray-200 px-4 py-4">
-            <h2 className="font-semibold text-gray-900">
-              {selectedFeatureGroup ? selectedFeatureGroup.label : 'Prompt Variants'}
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-              {selectedFeatureGroup
-                ? 'Select which prompt this feature should use, then save the active selection.'
-                : 'Pick a feature to manage its prompt variants.'}
-            </p>
-          </div>
-
-          {!selectedFeatureGroup ? (
-            <div className="p-6 text-sm text-gray-500">No feature selected.</div>
-          ) : (
-            <div className="space-y-4 p-4">
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-gray-900">Active Prompt</div>
-                    <div className="mt-1 text-sm text-gray-600">
-                      {selectedFeatureGroup.activePrompt
-                        ? selectedFeatureGroup.activePrompt.name
-                        : 'No active prompt selected'}
-                    </div>
-                  </div>
+        <section className="space-y-6">
+          <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-4">
+              <h2 className="font-semibold text-gray-900">
+                {selectedFeatureGroup ? selectedFeatureGroup.label : 'Prompt List'}
+              </h2>
+              {selectedFeatureGroup && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleNewVariant}
+                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                  >
+                    New Variant
+                  </button>
+                  <button
+                    onClick={handleDuplicate}
+                    disabled={!draft}
+                    className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                  >
+                    Duplicate
+                  </button>
+                  <button
+                    onClick={() => void refreshPrompts(selectedFeatureGroup.key, selectedId)}
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Reload
+                  </button>
                   <button
                     type="button"
                     onClick={() => void handleSaveSelectedPrompt()}
                     disabled={!activeCandidateId || !selectedFeatureHasPendingChange}
                     className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-300"
                   >
-                    Save Selected Prompt
+                    Save Active
                   </button>
                 </div>
-              </div>
+              )}
+            </div>
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={handleNewVariant}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-                >
-                  New Variant
-                </button>
-                <button
-                  onClick={handleDuplicate}
-                  disabled={!draft}
-                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
-                >
-                  Duplicate Current
-                </button>
-                <button
-                  onClick={() => void refreshPrompts(selectedFeatureGroup.key, selectedId)}
-                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Reload
-                </button>
-              </div>
-
-              <div className="space-y-3">
+            {!selectedFeatureGroup ? (
+              <div className="p-6 text-sm text-gray-500">No feature selected.</div>
+            ) : (
+              <div className="space-y-3 p-4">
                 {selectedFeatureGroup.prompts.map((prompt) => (
                   <label
                     key={prompt.id}
@@ -659,33 +634,31 @@ export default function PromptsPage() {
                           </span>
                           {prompt.isActiveForFeature && (
                             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                              Live Now
+                              Live
                             </span>
                           )}
                         </div>
-                        <div className="mt-1 text-sm text-gray-600">{prompt.description}</div>
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
-                          <span>ID: {prompt.id}</span>
-                          {prompt.modelProvider && prompt.modelName && (
-                            <span>
-                              Model: {getAIProviderLabel(prompt.modelProvider)} / {prompt.modelName}
-                            </span>
-                          )}
-                        </div>
+                        {prompt.description && (
+                          <div className="mt-1 text-sm text-gray-600">{prompt.description}</div>
+                        )}
+                        {prompt.modelProvider && prompt.modelName && (
+                          <div className="mt-2 text-xs text-gray-500">
+                            {getAIProviderLabel(prompt.modelProvider)} / {prompt.modelName}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </label>
                 ))}
               </div>
-            </div>
-          )}
-        </section>
+            )}
+          </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white">
-          {!draft ? (
-            <div className="p-8 text-sm text-gray-500">Select a prompt variant to edit.</div>
-          ) : (
-            <div className="space-y-6 p-6">
+          <section className="rounded-xl border border-gray-200 bg-white">
+            {!draft ? (
+              <div className="p-8 text-sm text-gray-500">Select a prompt variant.</div>
+            ) : (
+              <div className="space-y-6 p-6">
               <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -704,14 +677,9 @@ export default function PromptsPage() {
                     <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
                       {draft.responseFormat.toUpperCase()}
                     </span>
-                    {draft.featureLabel && (
-                      <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700">
-                        {draft.featureLabel}
-                      </span>
-                    )}
                     {draft.isActiveForFeature && (
                       <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                        Active Variant
+                        Live
                       </span>
                     )}
                     {isDirty && (
@@ -723,9 +691,6 @@ export default function PromptsPage() {
                   <div className="mt-2 text-xs text-gray-500">
                     {draft.id ? `ID: ${draft.id}` : 'ID will be generated on save'}
                   </div>
-                  {draft.usage && (
-                    <div className="mt-2 text-sm text-gray-600">{draft.usage}</div>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -813,9 +778,6 @@ export default function PromptsPage() {
                     </option>
                   ))}
                 </select>
-                <p className="mt-2 text-sm text-gray-600">
-                  Set the model this prompt variant should use when it becomes the active prompt for its feature.
-                </p>
                 {draft.modelProvider && draft.modelName && (
                   <p className="mt-1 text-xs text-gray-500">
                     Saved override: {draft.modelProvider} / {draft.modelName}
@@ -834,10 +796,6 @@ export default function PromptsPage() {
                   }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 disabled:bg-gray-100"
                 />
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                Feature-linked prompts use backend-managed variables so every variant remains compatible with that feature.
               </div>
 
               <div className="space-y-2">
@@ -962,7 +920,7 @@ export default function PromptsPage() {
 
                 <div className="space-y-3 rounded-xl border border-gray-200 p-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-900">Rendered Preview</h3>
+                    <h3 className="text-sm font-semibold text-gray-900">Preview</h3>
                     {preview && (
                       <span className="text-xs text-gray-500">
                         {Object.keys(preview.sampleValues).length} sample values injected
@@ -974,8 +932,9 @@ export default function PromptsPage() {
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+              </div>
+            )}
+          </section>
         </section>
       </div>
     </div>

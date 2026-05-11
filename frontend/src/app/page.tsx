@@ -238,7 +238,7 @@ export default function Home() {
 
     if (sheetsTargetMode === 'all') {
       if (!profiles.length) {
-        throw new Error('No profiles available for batch generation.');
+        throw new Error('No profiles available for multi-profile generation.');
       }
       return profiles;
     }
@@ -349,33 +349,6 @@ export default function Home() {
     resolvedRole: string;
     tailoredContentByProfileId?: Map<string, TailoredContent | undefined>;
   }) => {
-    if (!tailoredContentByProfileId) {
-      updateGenerationProgress(
-        targetProfiles.length,
-        0,
-        'Submitting batch resume generation',
-        undefined,
-        targetCompanyName
-      );
-
-      const result = await resumeApi.generateAll({
-        profileIds: targetProfiles.map((profile) => profile.id),
-        jobDescription,
-        jobAnalysis: analysis,
-        companyName: targetCompanyName,
-        role: resolvedRole,
-        ...getDefaultGenerationOptions(),
-      });
-      updateGenerationProgress(
-        targetProfiles.length,
-        targetProfiles.length,
-        'Batch resume generation completed',
-        undefined,
-        targetCompanyName
-      );
-      return result;
-    }
-
     const failures: GenerationFailure[] = [];
     const unconfirmedHardMap = new Map<string, string>();
     const unconfirmedSoftMap = new Map<string, string>();
@@ -449,90 +422,74 @@ export default function Home() {
 
     const failures: string[] = [];
     const failedCompanies = new Set<string>();
+    const unconfirmedHardMap = new Map<string, string>();
+    const unconfirmedSoftMap = new Map<string, string>();
     const totalBuilds = selectedProfiles.length * normalizedJobs.length;
     let completedBuilds = 0;
-    const jobsToGenerate: Array<{
-      companyName: string;
-      role: string;
-      jobDescription: string;
-      jobAnalysis?: JobAnalysis;
-      sourceRowNumber: number;
-    }> = [];
+    let failedBuilds = 0;
+    let hasSetJobAnalysis = false;
 
     try {
       updateGenerationProgress(totalBuilds, 0, 'Preparing imported jobs');
-      setGenerationStep(`Analyzing ${normalizedJobs.length} imported job(s)`);
-      updateGenerationProgress(totalBuilds, completedBuilds, 'Analyzing imported jobs');
-
-      const analysisResult = await resumeApi.analyzeMultiJob({
-        jobs: normalizedJobs.map((job) => ({
-          companyName: job.companyName.trim(),
-          jobDescription: job.jobDescription.trim(),
-          sourceRowNumber: job.sourceRowNumber,
-        })),
-      });
-
-      const analysisByRow = new Map<number, JobAnalysis>();
-      for (const item of analysisResult.analyses) {
-        if (typeof item.sourceRowNumber === 'number') {
-          analysisByRow.set(item.sourceRowNumber, item.analysis);
-        }
-      }
-
-      for (const failure of analysisResult.failures) {
-        failedCompanies.add(failure.companyName.trim());
-        failures.push(
-          `Row ${failure.sourceRowNumber ?? '?'} / ${failure.companyName}: ${failure.error}`
-        );
-        completedBuilds += selectedProfiles.length;
-      }
-
-      const firstSuccessfulAnalysis = analysisResult.analyses[0]?.analysis;
-      if (firstSuccessfulAnalysis) {
-        setJobAnalysis(firstSuccessfulAnalysis);
-      }
-
-      for (const job of normalizedJobs) {
+      for (const [jobIndex, job] of normalizedJobs.entries()) {
         const trimmedJobDescription = job.jobDescription.trim();
-        const analysis = analysisByRow.get(job.sourceRowNumber);
-        if (!analysis) {
-          continue;
-        }
+        const normalizedCompanyName = job.companyName.trim();
 
-        jobsToGenerate.push({
-          companyName: job.companyName.trim(),
-          role: shouldShowRoleInput ? job.jobTitle.trim() : (job.jobTitle.trim() || getAnalysisJobTitle(analysis) || ''),
-          jobDescription: trimmedJobDescription,
-          jobAnalysis: analysis,
-          sourceRowNumber: job.sourceRowNumber,
-        });
+        setGenerationStep(`Analyzing job ${jobIndex + 1}/${normalizedJobs.length}: ${normalizedCompanyName}`);
+        updateGenerationProgress(totalBuilds, completedBuilds, 'Analyzing job description', undefined, normalizedCompanyName);
+
+        try {
+          const analysis = await resumeApi.analyze(trimmedJobDescription);
+          if (!hasSetJobAnalysis) {
+            setJobAnalysis(analysis);
+            hasSetJobAnalysis = true;
+          }
+
+          const resolvedRole = shouldShowRoleInput
+            ? job.jobTitle.trim()
+            : (job.jobTitle.trim() || getAnalysisJobTitle(analysis) || '');
+
+          for (const profile of selectedProfiles) {
+            setGenerationStep(`Generating ${completedBuilds + 1}/${totalBuilds}: ${profile.name} x ${normalizedCompanyName}`);
+            updateGenerationProgress(totalBuilds, completedBuilds, 'Building resumes', profile.name, normalizedCompanyName);
+
+            try {
+              const result = await resumeApi.generate({
+                profileId: profile.id,
+                templateId: profile.preferredTemplate || 'default',
+                jobDescription: trimmedJobDescription,
+                jobAnalysis: analysis,
+                companyName: normalizedCompanyName,
+                role: resolvedRole,
+                ...getDefaultGenerationOptions(),
+              });
+              collectUnconfirmedFromGenerateResult(unconfirmedHardMap, unconfirmedSoftMap, result);
+            } catch (err) {
+              failedCompanies.add(normalizedCompanyName);
+              failedBuilds += 1;
+              failures.push(
+                `${normalizedCompanyName} / ${profile.name}: ${err instanceof Error ? err.message : 'Generation failed'}`
+              );
+            } finally {
+              completedBuilds += 1;
+              updateGenerationProgress(totalBuilds, completedBuilds, 'Building resumes', profile.name, normalizedCompanyName);
+            }
+          }
+        } catch (err) {
+          failedCompanies.add(normalizedCompanyName);
+          failedBuilds += selectedProfiles.length;
+          failures.push(
+            `Row ${job.sourceRowNumber} / ${normalizedCompanyName}: ${err instanceof Error ? err.message : 'Analysis failed'}`
+          );
+          completedBuilds += selectedProfiles.length;
+          updateGenerationProgress(totalBuilds, completedBuilds, 'Analyzing job description', undefined, normalizedCompanyName);
+        }
       }
 
-      if (jobsToGenerate.length > 0) {
-        setGenerationStep(
-          `Generating ${completedBuilds + 1}-${totalBuilds}: ${selectedProfiles.length} profile(s) x ${jobsToGenerate.length} imported job(s)`
-        );
-        updateGenerationProgress(totalBuilds, completedBuilds, 'Submitting batch resume generation');
+      setUnconfirmedHardSkills(toUnconfirmedItems(Array.from(unconfirmedHardMap.values())));
+      setUnconfirmedSoftSkills(toUnconfirmedItems(Array.from(unconfirmedSoftMap.values())));
 
-        const result = await resumeApi.generateMultiJob({
-          profileIds: selectedProfiles.map((profile) => profile.id),
-          jobs: jobsToGenerate,
-          ...getDefaultGenerationOptions(),
-        });
-
-        completedBuilds = totalBuilds;
-        updateGenerationProgress(totalBuilds, completedBuilds, 'Batch resume generation completed');
-        result.failedCompanies.forEach((company) => failedCompanies.add(company));
-
-        for (const failure of result.failures) {
-          failures.push(`${failure.companyName} / ${failure.profileName}: ${failure.error}`);
-        }
-
-        setUnconfirmedHardSkills(toUnconfirmedItems(result.unconfirmedHardSkills ?? []));
-        setUnconfirmedSoftSkills(toUnconfirmedItems(result.unconfirmedSoftSkills ?? []));
-      }
-
-      const generatedCount = totalBuilds - failures.length;
+      const generatedCount = totalBuilds - failedBuilds;
       const skippedNote = meta.skippedRows
         ? ` Skipped ${meta.skippedRows} imported row(s) with missing required values.`
         : '';
@@ -543,7 +500,7 @@ export default function Home() {
       if (failures.length) {
         const failedCompanySummary = formatCompanySummary(Array.from(failedCompanies));
         setError(
-          `Some builds failed (${failures.length}/${totalBuilds}). Failed companies: ${failedCompanySummary || 'Unknown'}. ${failures.slice(0, 3).join(' | ')}${failures.length > 3 ? ' | ...' : ''}`
+          `Some builds failed (${failedBuilds}/${totalBuilds}). Failed companies: ${failedCompanySummary || 'Unknown'}. ${failures.slice(0, 3).join(' | ')}${failures.length > 3 ? ' | ...' : ''}`
         );
       }
     } finally {

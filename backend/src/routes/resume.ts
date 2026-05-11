@@ -3,12 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import {
   analyzeJobDescription,
-  batchAnalyzeJobDescriptions,
-  batchCreatePromptCompletions,
-  buildTailorResumePromptValues,
-  canUseAnthropicBatchForPrompt,
   generateCoverLetter,
-  parseTailoredResumeContent,
   tailorResume,
 } from '../services/claude';
 import { generateResumePDF, generatePreviewHTML, getGeneratedPDFPath } from '../generators/pdfGenerator';
@@ -149,16 +144,6 @@ router.post('/analyze-multi-job', async (req: Request, res: Response) => {
       });
     }
 
-    const analysesByCustomId = await batchAnalyzeJobDescriptions({
-      items: validJobs.map((job) => ({
-        customId: job.customId,
-        jobDescription: job.jobDescription,
-      })),
-      provider: selectedModel.provider,
-      modelName: selectedModel.modelName,
-      anthropicCacheTtl: '1h',
-    });
-
     const analyses: Array<{
       companyName: string;
       sourceRowNumber?: number;
@@ -167,22 +152,26 @@ router.post('/analyze-multi-job', async (req: Request, res: Response) => {
     }> = [];
 
     for (const job of validJobs) {
-      const result = analysesByCustomId.get(job.customId);
-      if (!result?.analysis) {
+      try {
+        const analysis = await analyzeJobDescription(
+          job.jobDescription,
+          selectedModel.provider,
+          selectedModel.modelName
+        );
+
+        analyses.push({
+          companyName: job.companyName,
+          sourceRowNumber: job.sourceRowNumber,
+          jobDescription: job.jobDescription,
+          analysis,
+        });
+      } catch (error) {
         failures.push({
           companyName: job.companyName,
           sourceRowNumber: job.sourceRowNumber,
-          error: result?.error || 'Analysis failed',
+          error: error instanceof Error ? error.message : 'Analysis failed',
         });
-        continue;
       }
-
-      analyses.push({
-        companyName: job.companyName,
-        sourceRowNumber: job.sourceRowNumber,
-        jobDescription: job.jobDescription,
-        analysis: result.analysis,
-      });
     }
 
     res.json({
@@ -245,121 +234,6 @@ function collectUnconfirmedSkillMaps(
   }
 }
 
-function toAnthropicBatchCustomId(profileId: string, index: number): string {
-  const sanitized = profileId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48) || `profile_${index + 1}`;
-  return `resume_${index + 1}_${sanitized}`.slice(0, 64);
-}
-
-type TailorBatchItem<TMeta> = {
-  customId: string;
-  profile: Profile;
-  analysis: JobAnalysis;
-  meta: TMeta;
-};
-
-async function tailorResumesForBatchItems<TMeta>(
-  items: TailorBatchItem<TMeta>[],
-  provider: AIProvider,
-  modelName?: string
-): Promise<{
-  tailoredByCustomId: Map<string, TailoredContent>;
-  failures: Array<{ customId: string; profileId: string; profileName: string; error: string; meta: TMeta }>;
-  unconfirmedHardSkills: string[];
-  unconfirmedSoftSkills: string[];
-}> {
-  const tailoredByCustomId = new Map<string, TailoredContent>();
-  const failures: Array<{ customId: string; profileId: string; profileName: string; error: string; meta: TMeta }> = [];
-  const itemByCustomId = new Map(items.map((item) => [item.customId, item] as const));
-  const unconfirmedHardMap = new Map<string, string>();
-  const unconfirmedSoftMap = new Map<string, string>();
-
-  const shouldUseAnthropicBatch = items.length > 1
-    && await canUseAnthropicBatchForPrompt('tailor-resume', provider, modelName);
-
-  if (shouldUseAnthropicBatch) {
-    const batchResults = await batchCreatePromptCompletions({
-      promptId: 'tailor-resume',
-      items: items.map((item) => ({
-        customId: item.customId,
-        values: buildTailorResumePromptValues(item.profile, item.analysis),
-      })),
-      fallbackProvider: provider,
-      fallbackModelName: modelName,
-      maxTokens: 11000,
-      temperature: 0.2,
-      responseFormat: 'json',
-      anthropicCacheTtl: '1h',
-    });
-
-    for (const [customId, result] of batchResults.entries()) {
-      const item = itemByCustomId.get(customId);
-      if (!item) continue;
-
-      if (!result.content) {
-        failures.push({
-          customId,
-          profileId: item.profile.id,
-          profileName: item.profile.name,
-          error: result.error || 'Tailoring request failed',
-          meta: item.meta,
-        });
-        continue;
-      }
-
-      try {
-        const tailored = parseTailoredResumeContent(result.content, item.profile, item.analysis);
-        tailoredByCustomId.set(customId, tailored);
-        collectUnconfirmedSkillMaps(tailored, unconfirmedHardMap, unconfirmedSoftMap);
-      } catch (error) {
-        failures.push({
-          customId,
-          profileId: item.profile.id,
-          profileName: item.profile.name,
-          error: error instanceof Error ? error.message : 'Failed to parse tailored resume response',
-          meta: item.meta,
-        });
-      }
-    }
-
-    for (const item of items) {
-      if (tailoredByCustomId.has(item.customId) || failures.some((failure) => failure.customId === item.customId)) {
-        continue;
-      }
-
-      failures.push({
-        customId: item.customId,
-        profileId: item.profile.id,
-        profileName: item.profile.name,
-        error: 'No Anthropic batch result returned for this request',
-        meta: item.meta,
-      });
-    }
-  } else {
-    for (const item of items) {
-      try {
-        const tailored = await tailorResume(item.profile, item.analysis, provider, modelName);
-        tailoredByCustomId.set(item.customId, tailored);
-        collectUnconfirmedSkillMaps(tailored, unconfirmedHardMap, unconfirmedSoftMap);
-      } catch (error) {
-        failures.push({
-          customId: item.customId,
-          profileId: item.profile.id,
-          profileName: item.profile.name,
-          error: error instanceof Error ? error.message : 'Failed to tailor resume',
-          meta: item.meta,
-        });
-      }
-    }
-  }
-
-  return {
-    tailoredByCustomId,
-    failures,
-    unconfirmedHardSkills: Array.from(unconfirmedHardMap.values()),
-    unconfirmedSoftSkills: Array.from(unconfirmedSoftMap.values()),
-  };
-}
-
 async function tailorResumesForProfiles(
   profiles: Profile[],
   analysis: JobAnalysis,
@@ -371,31 +245,30 @@ async function tailorResumesForProfiles(
   unconfirmedHardSkills: string[];
   unconfirmedSoftSkills: string[];
 }> {
-  const items = profiles.map((profile, index) => ({
-    customId: toAnthropicBatchCustomId(profile.id, index),
-    profile,
-    analysis,
-    meta: { profileId: profile.id },
-  }));
-  const batchResult = await tailorResumesForBatchItems(items, provider, modelName);
   const tailoredByProfileId = new Map<string, TailoredContent>();
+  const failures: Array<{ profileId: string; profileName: string; error: string }> = [];
+  const unconfirmedHardMap = new Map<string, string>();
+  const unconfirmedSoftMap = new Map<string, string>();
 
-  for (const item of items) {
-    const tailored = batchResult.tailoredByCustomId.get(item.customId);
-    if (tailored) {
-      tailoredByProfileId.set(item.profile.id, tailored);
+  for (const profile of profiles) {
+    try {
+      const tailored = await tailorResume(profile, analysis, provider, modelName);
+      tailoredByProfileId.set(profile.id, tailored);
+      collectUnconfirmedSkillMaps(tailored, unconfirmedHardMap, unconfirmedSoftMap);
+    } catch (error) {
+      failures.push({
+        profileId: profile.id,
+        profileName: profile.name,
+        error: error instanceof Error ? error.message : 'Failed to tailor resume',
+      });
     }
   }
 
   return {
     tailoredByProfileId,
-    failures: batchResult.failures.map((failure) => ({
-      profileId: failure.profileId,
-      profileName: failure.profileName,
-      error: failure.error,
-    })),
-    unconfirmedHardSkills: batchResult.unconfirmedHardSkills,
-    unconfirmedSoftSkills: batchResult.unconfirmedSoftSkills,
+    failures,
+    unconfirmedHardSkills: Array.from(unconfirmedHardMap.values()),
+    unconfirmedSoftSkills: Array.from(unconfirmedSoftMap.values()),
   };
 }
 
@@ -456,10 +329,7 @@ router.post('/generate-all', async (req: Request, res: Response) => {
     const unconfirmedSoftMap = new Map<string, string>();
     const formatNorm = (format as string) === 'both' ? 'both' : format === 'docx' ? 'docx' : 'pdf';
     const generateCoverLetterDocx = shouldGenerateCoverLetterDocx(includeCoverLetterDocx);
-    const shouldUseBulkTailoring = analysis
-      ? await canUseAnthropicBatchForPrompt('tailor-resume', selectedModel.provider, selectedModel.modelName)
-      : false;
-    const bulkTailoring = shouldUseBulkTailoring && analysis
+    const bulkTailoring = analysis
       ? await tailorResumesForProfiles(profiles, analysis, selectedModel.provider, selectedModel.modelName)
       : null;
 
@@ -473,9 +343,9 @@ router.post('/generate-all', async (req: Request, res: Response) => {
           throw new Error('Default template not available');
         }
 
-        const batchFailure = bulkTailoring?.failures.find((item) => item.profileId === profile.id);
-        if (batchFailure) {
-          throw new Error(batchFailure.error);
+        const tailoringFailure = bulkTailoring?.failures.find((item) => item.profileId === profile.id);
+        if (tailoringFailure) {
+          throw new Error(tailoringFailure.error);
         }
 
         let tailoredContent: TailoredContent | undefined;
@@ -617,26 +487,6 @@ router.post('/generate-multi-job', async (req: Request, res: Response) => {
       };
     });
 
-    const batchItems: TailorBatchItem<{ jobIndex: number }>[] = [];
-    for (const [jobIndex, job] of normalizedJobs.entries()) {
-      if (!job.analysis) {
-        continue;
-      }
-
-      for (const [profileIndex, profile] of profiles.entries()) {
-        batchItems.push({
-          customId: toAnthropicBatchCustomId(`${profile.id}_${jobIndex + 1}`, jobIndex * profiles.length + profileIndex),
-          profile,
-          analysis: job.analysis,
-          meta: { jobIndex },
-        });
-      }
-    }
-
-    const bulkTailoring = batchItems.length > 0
-      ? await tailorResumesForBatchItems(batchItems, selectedModel.provider, selectedModel.modelName)
-      : null;
-
     const formatNorm = (format as string) === 'both' ? 'both' : format === 'docx' ? 'docx' : 'pdf';
     const generateCoverLetterDocx = shouldGenerateCoverLetterDocx(includeCoverLetterDocx);
     const results: Array<{
@@ -666,18 +516,12 @@ router.post('/generate-multi-job', async (req: Request, res: Response) => {
 
           let tailoredContent: TailoredContent | undefined;
           if (job.analysis) {
-            const customId = batchItems.find((item) => item.profile.id === profile.id && item.meta.jobIndex === jobIndex)?.customId;
-            const batchFailure = customId
-              ? bulkTailoring?.failures.find((failure) => failure.customId === customId)
-              : undefined;
-
-            if (batchFailure) {
-              throw new Error(batchFailure.error);
-            }
-
-            tailoredContent = customId
-              ? bulkTailoring?.tailoredByCustomId.get(customId)
-              : await tailorResume(profile, job.analysis, selectedModel.provider, selectedModel.modelName);
+            tailoredContent = await tailorResume(
+              profile,
+              job.analysis,
+              selectedModel.provider,
+              selectedModel.modelName
+            );
           }
           collectUnconfirmedSkillMaps(tailoredContent, unconfirmedHardMap, unconfirmedSoftMap);
 
@@ -747,9 +591,9 @@ router.post('/generate-multi-job', async (req: Request, res: Response) => {
       results,
       failures,
       failedCompanies: Array.from(failedCompanies),
-      tailored: batchItems.length > 0,
-      unconfirmedHardSkills: bulkTailoring?.unconfirmedHardSkills ?? Array.from(unconfirmedHardMap.values()),
-      unconfirmedSoftSkills: bulkTailoring?.unconfirmedSoftSkills ?? Array.from(unconfirmedSoftMap.values()),
+      tailored: normalizedJobs.some((job) => Boolean(job.analysis)),
+      unconfirmedHardSkills: Array.from(unconfirmedHardMap.values()),
+      unconfirmedSoftSkills: Array.from(unconfirmedSoftMap.values()),
     });
   } catch (error) {
     console.error('Error generating resumes for multiple jobs:', error);
@@ -805,10 +649,7 @@ router.post('/preview-all', async (req: Request, res: Response) => {
     }> = [];
     const unconfirmedHardMap = new Map<string, string>();
     const unconfirmedSoftMap = new Map<string, string>();
-    const shouldUseBulkTailoring = analysis
-      ? await canUseAnthropicBatchForPrompt('tailor-resume', selectedModel.provider, selectedModel.modelName)
-      : false;
-    const bulkTailoring = shouldUseBulkTailoring && analysis
+    const bulkTailoring = analysis
       ? await tailorResumesForProfiles(profiles, analysis, selectedModel.provider, selectedModel.modelName)
       : null;
 

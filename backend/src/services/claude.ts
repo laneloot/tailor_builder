@@ -39,7 +39,6 @@ let openaiClient: OpenAI | null = null;
 let openaiClientKey = '';
 let deepseekClient: OpenAI | null = null;
 let deepseekClientKey = '';
-let anthropicCacheUsageWarningShown = false;
 
 function extractTechSkills(text: string): string[] {
   return technicalSkills.filter((item: string) => {
@@ -224,17 +223,10 @@ type HardSkillCategory =
   | 'tools-methodologies'
   | 'other';
 type CompletionResponseFormat = 'json' | 'text';
-type AnthropicCacheTtl = '5m' | '1h';
-
-type AnthropicCacheControl = {
-  type: 'ephemeral';
-  ttl?: '1h';
-};
 
 type AnthropicTextBlock = {
   type: 'text';
   text: string;
-  cache_control?: AnthropicCacheControl;
 };
 
 type AnthropicMessageParam = {
@@ -255,33 +247,6 @@ type AnthropicMessageResponse = {
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
-    cache_creation_input_tokens?: number;
-    cache_read_input_tokens?: number;
-  };
-};
-
-type AnthropicMessageBatchResponse = {
-  id: string;
-  processing_status: 'in_progress' | 'canceling' | 'ended';
-  request_counts?: {
-    processing?: number;
-    succeeded?: number;
-    errored?: number;
-    canceled?: number;
-    expired?: number;
-  };
-  results_url?: string | null;
-};
-
-type AnthropicBatchResultLine = {
-  custom_id: string;
-  result: {
-    type: 'succeeded' | 'errored' | 'canceled' | 'expired';
-    message?: AnthropicMessageResponse;
-    error?: {
-      type?: string;
-      message?: string;
-    };
   };
 };
 
@@ -643,7 +608,6 @@ const HARD_SKILL_CATEGORY_WEIGHT: Record<HardSkillCategory, number> = {
   other: 7,
 };
 const JSON_ONLY_SYSTEM_PROMPT = 'You are a strict JSON generator. Return valid JSON only, with no markdown fences or extra text.';
-const TAILOR_RESUME_PROMPT_ID = 'tailor-resume';
 
 export function resolveAIProvider(model?: string): AIProvider {
   if (model === 'openai' || model?.startsWith('gpt-')) {
@@ -831,15 +795,11 @@ async function createAnthropicMessage(
           content: prompt,
         },
       ],
-    },
-    { logCacheUsage: false }
+    }
   );
 }
 
-async function createAnthropicStructuredMessage(
-  request: AnthropicMessageRequestParams,
-  options?: { logCacheUsage?: boolean }
-): Promise<string> {
+async function createAnthropicStructuredMessage(request: AnthropicMessageRequestParams): Promise<string> {
   const apiKey = await getProviderApiKey('claude');
   if (!apiKey) {
     throw new Error('Claude API key is not set');
@@ -895,13 +855,6 @@ async function createAnthropicStructuredMessage(
         throw new Error('Unexpected response from Anthropic');
       }
 
-      if (options?.logCacheUsage && data.usage && !anthropicCacheUsageWarningShown) {
-        anthropicCacheUsageWarningShown = true;
-        console.info(
-          `Anthropic prompt caching usage: read=${data.usage.cache_read_input_tokens ?? 0}, created=${data.usage.cache_creation_input_tokens ?? 0}, uncached=${data.usage.input_tokens ?? 0}`
-        );
-      }
-
       return textBlock.text;
     } catch (error) {
       const maybeError = error instanceof Error ? error : new Error(String(error));
@@ -926,132 +879,6 @@ async function createAnthropicStructuredMessage(
   throw lastError ?? new Error('Anthropic request failed');
 }
 
-function toAnthropicCacheControl(ttl?: AnthropicCacheTtl): AnthropicCacheControl | undefined {
-  if (!ttl) return undefined;
-  return ttl === '1h'
-    ? { type: 'ephemeral', ttl: '1h' }
-    : { type: 'ephemeral' };
-}
-
-async function getPromptContentOrThrow(promptId: string): Promise<string> {
-  const prompt = await resolvePromptByRuntimeId(promptId);
-  const content = prompt?.content?.trim();
-  if (!content) {
-    throw new Error(`Prompt "${promptId}" was not found or has no content.`);
-  }
-  return content;
-}
-
-function getPromptValue(values: Record<string, string>, key: string, fallback: string): string {
-  const value = values[key];
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
-}
-
-function buildTailorResumeCandidateProfileBlock(values: Record<string, string>): string {
-  return [
-    'CANDIDATE PROFILE:',
-    getPromptValue(values, 'profileJson', '{}'),
-  ].join('\n');
-}
-
-function buildTailorResumeUserMessage(values: Record<string, string>): string {
-  return [
-    'JOB ANALYSIS:',
-    getPromptValue(values, 'jobAnalysisJson', '{}'),
-    '',
-    'HARD_SKILLS:',
-    getPromptValue(values, 'hardSkillsJSON', '[]'),
-    '',
-    'KEYWORDS:',
-    getPromptValue(values, 'keywordsJson', '[]'),
-    '',
-    'KEY_RESPONSIBILITIES:',
-    getPromptValue(values, 'keyResponsibilitiesJson', '[]'),
-    '',
-    'DOMAIN_KNOWLEDGE:',
-    getPromptValue(values, 'domainKnowledge', '[]'),
-    '',
-    'SOFT_SKILLS:',
-    getPromptValue(values, 'softSkillsJSON', '[]'),
-  ].join('\n');
-}
-
-async function buildTailorResumeChatMessages(
-  values: Record<string, string>,
-  responseFormat: CompletionResponseFormat
-): Promise<ProviderChatMessage[]> {
-  const messages: ProviderChatMessage[] = [];
-
-  if (responseFormat === 'json') {
-    messages.push({
-      role: 'system',
-      content: JSON_ONLY_SYSTEM_PROMPT,
-    });
-  }
-
-  messages.push({
-    role: 'system',
-    content: await getPromptContentOrThrow(TAILOR_RESUME_PROMPT_ID),
-  });
-  messages.push({
-    role: 'system',
-    content: buildTailorResumeCandidateProfileBlock(values),
-  });
-  messages.push({
-    role: 'user',
-    content: buildTailorResumeUserMessage(values),
-  });
-
-  return messages;
-}
-
-async function buildAnthropicTailorResumePromptRequest(input: {
-  values: Record<string, string>;
-  maxTokens: number;
-  temperature: number;
-  responseFormat: CompletionResponseFormat;
-  modelName: string;
-  cacheTtl?: AnthropicCacheTtl;
-}): Promise<AnthropicMessageRequestParams> {
-  const systemBlocks: AnthropicTextBlock[] = [];
-
-  if (input.responseFormat === 'json') {
-    systemBlocks.push({
-      type: 'text',
-      text: JSON_ONLY_SYSTEM_PROMPT,
-    });
-  }
-
-  systemBlocks.push({
-    type: 'text',
-    text: await getPromptContentOrThrow(TAILOR_RESUME_PROMPT_ID),
-    cache_control: toAnthropicCacheControl(input.cacheTtl),
-  });
-  systemBlocks.push({
-    type: 'text',
-    text: buildTailorResumeCandidateProfileBlock(input.values),
-    cache_control: toAnthropicCacheControl(input.cacheTtl),
-  });
-
-  return {
-    model: input.modelName,
-    max_tokens: input.maxTokens,
-    temperature: input.temperature,
-    system: systemBlocks,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: buildTailorResumeUserMessage(input.values),
-          },
-        ],
-      },
-    ],
-  };
-}
-
 async function buildAnthropicPromptRequest(input: {
   promptId: string;
   values: Record<string, string>;
@@ -1059,12 +886,7 @@ async function buildAnthropicPromptRequest(input: {
   temperature: number;
   responseFormat: CompletionResponseFormat;
   modelName: string;
-  cacheTtl?: AnthropicCacheTtl;
 }): Promise<AnthropicMessageRequestParams> {
-  if (input.promptId === TAILOR_RESUME_PROMPT_ID) {
-    return buildAnthropicTailorResumePromptRequest(input);
-  }
-
   const segments = await renderPromptSegments(input.promptId, input.values);
   const systemBlocks: AnthropicTextBlock[] = [];
 
@@ -1086,7 +908,6 @@ async function buildAnthropicPromptRequest(input: {
     systemBlocks.push({
       type: 'text',
       text: leadingLiteralText,
-      cache_control: toAnthropicCacheControl(input.cacheTtl),
     });
   }
 
@@ -1097,7 +918,7 @@ async function buildAnthropicPromptRequest(input: {
     }
 
     const previous = userBlocks[userBlocks.length - 1];
-    if (previous && !previous.cache_control) {
+    if (previous) {
       previous.text += segment.text;
     } else {
       userBlocks.push({
@@ -1135,7 +956,6 @@ async function createAnthropicPromptCompletion(input: {
   temperature?: number;
   responseFormat?: CompletionResponseFormat;
   modelName?: string;
-  cacheTtl?: AnthropicCacheTtl;
 }): Promise<string> {
   const request = await buildAnthropicPromptRequest({
     promptId: input.promptId,
@@ -1144,100 +964,9 @@ async function createAnthropicPromptCompletion(input: {
     temperature: input.temperature ?? 0,
     responseFormat: input.responseFormat ?? 'json',
     modelName: input.modelName || DEFAULT_CLAUDE_MODEL,
-    cacheTtl: input.cacheTtl,
   });
 
-  return createAnthropicStructuredMessage(request, { logCacheUsage: Boolean(input.cacheTtl) });
-}
-
-async function createAnthropicMessageBatch(
-  requests: Array<{ custom_id: string; params: AnthropicMessageRequestParams }>
-): Promise<AnthropicMessageBatchResponse> {
-  const apiKey = await getProviderApiKey('claude');
-  if (!apiKey) {
-    throw new Error('Claude API key is not set');
-  }
-
-  const response = await fetch('https://api.anthropic.com/v1/messages/batches', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({ requests }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Anthropic batch create failed (${response.status}): ${await response.text()}`);
-  }
-
-  return response.json() as Promise<AnthropicMessageBatchResponse>;
-}
-
-async function retrieveAnthropicMessageBatch(batchId: string): Promise<AnthropicMessageBatchResponse> {
-  const apiKey = await getProviderApiKey('claude');
-  if (!apiKey) {
-    throw new Error('Claude API key is not set');
-  }
-
-  const response = await fetch(`https://api.anthropic.com/v1/messages/batches/${batchId}`, {
-    method: 'GET',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Anthropic batch retrieve failed (${response.status}): ${await response.text()}`);
-  }
-
-  return response.json() as Promise<AnthropicMessageBatchResponse>;
-}
-
-async function waitForAnthropicMessageBatch(
-  batchId: string,
-  pollIntervalMs = 5000,
-  maxWaitMs = 20 * 60 * 1000
-): Promise<AnthropicMessageBatchResponse> {
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt < maxWaitMs) {
-    const batch = await retrieveAnthropicMessageBatch(batchId);
-    if (batch.processing_status === 'ended') {
-      return batch;
-    }
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-  }
-
-  throw new Error(`Anthropic batch ${batchId} did not finish within ${Math.round(maxWaitMs / 60000)} minutes`);
-}
-
-async function readAnthropicMessageBatchResults(resultsUrl: string): Promise<AnthropicBatchResultLine[]> {
-  const apiKey = await getProviderApiKey('claude');
-  if (!apiKey) {
-    throw new Error('Claude API key is not set');
-  }
-
-  const response = await fetch(resultsUrl, {
-    method: 'GET',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Anthropic batch results download failed (${response.status}): ${await response.text()}`);
-  }
-
-  const jsonl = await response.text();
-  return jsonl
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as AnthropicBatchResultLine);
+  return createAnthropicStructuredMessage(request);
 }
 
 export async function createTextCompletion(
@@ -1343,36 +1072,6 @@ export async function resolvePromptExecutionConfig(
   };
 }
 
-function isAnthropicOptimizedModel(modelName?: string): boolean {
-  return typeof modelName === 'string' && modelName.trim() === DEFAULT_CLAUDE_MODEL;
-}
-
-export async function shouldUseAnthropicOptimizationsForPrompt(
-  promptId: string,
-  requestedProvider: AIProvider,
-  requestedModelName?: string
-): Promise<boolean> {
-  if (requestedProvider !== 'claude') {
-    return false;
-  }
-
-  const executionConfig = await resolvePromptExecutionConfig(
-    promptId,
-    requestedProvider,
-    requestedModelName
-  );
-  if (executionConfig.provider !== 'claude') {
-    return false;
-  }
-
-  const settings = await getAIModelSettings();
-  if (!isProviderEnabled('claude', settings)) {
-    return false;
-  }
-
-  return isAnthropicOptimizedModel(executionConfig.modelName || DEFAULT_CLAUDE_MODEL);
-}
-
 export async function createPromptCompletion(input: {
   promptId: string;
   prompt: string;
@@ -1382,7 +1081,6 @@ export async function createPromptCompletion(input: {
   maxTokens?: number;
   temperature?: number;
   responseFormat?: CompletionResponseFormat;
-  anthropicCacheTtl?: AnthropicCacheTtl;
 }): Promise<string> {
   const executionConfig = await resolvePromptExecutionConfig(
     input.promptId,
@@ -1394,55 +1092,6 @@ export async function createPromptCompletion(input: {
     throw new Error(`Selected AI model provider '${executionConfig.provider}' is disabled by admin.`);
   }
 
-  if (input.promptId === TAILOR_RESUME_PROMPT_ID && input.promptValues) {
-    if (executionConfig.provider === 'claude') {
-      return createAnthropicPromptCompletion({
-        promptId: input.promptId,
-        values: input.promptValues,
-        maxTokens: input.maxTokens,
-        temperature: input.temperature,
-        responseFormat: input.responseFormat,
-        modelName: executionConfig.modelName,
-        cacheTtl: input.anthropicCacheTtl,
-      });
-    }
-
-    const messages = await buildTailorResumeChatMessages(
-      input.promptValues,
-      input.responseFormat ?? 'json'
-    );
-
-    if (executionConfig.provider === 'openai') {
-      return createOpenAIChatCompletion({
-        model: executionConfig.modelName || DEFAULT_OPENAI_MODEL,
-        maxTokens: input.maxTokens ?? 4000,
-        temperature: input.temperature ?? 0,
-        responseFormat: input.responseFormat ?? 'json',
-        messages,
-      });
-    }
-
-    if (executionConfig.provider === 'openrouter') {
-      return createOpenRouterCompletion({
-        model: executionConfig.modelName || DEFAULT_OPENROUTER_MODEL,
-        maxTokens: input.maxTokens ?? 4000,
-        temperature: input.temperature ?? 0,
-        responseFormat: input.responseFormat ?? 'json',
-        messages,
-      });
-    }
-
-    if (executionConfig.provider === 'deepseek') {
-      return createDeepSeekChatCompletion({
-        model: executionConfig.modelName || DEFAULT_DEEPSEEK_MODEL,
-        maxTokens: input.maxTokens ?? 4000,
-        temperature: input.temperature ?? 0,
-        responseFormat: input.responseFormat ?? 'json',
-        messages,
-      });
-    }
-  }
-
   if (executionConfig.provider === 'claude' && input.promptValues) {
     return createAnthropicPromptCompletion({
       promptId: input.promptId,
@@ -1451,7 +1100,6 @@ export async function createPromptCompletion(input: {
       temperature: input.temperature,
       responseFormat: input.responseFormat,
       modelName: executionConfig.modelName,
-      cacheTtl: input.anthropicCacheTtl,
     });
   }
 
@@ -1463,97 +1111,6 @@ export async function createPromptCompletion(input: {
     input.responseFormat,
     executionConfig.modelName
   );
-}
-
-export async function canUseAnthropicBatchForPrompt(
-  promptId: string,
-  fallbackProvider: AIProvider,
-  fallbackModelName?: string
-): Promise<boolean> {
-  return shouldUseAnthropicOptimizationsForPrompt(promptId, fallbackProvider, fallbackModelName);
-}
-
-export async function batchCreatePromptCompletions(input: {
-  promptId: string;
-  items: Array<{
-    customId: string;
-    values: Record<string, string>;
-  }>;
-  fallbackProvider?: AIProvider;
-  fallbackModelName?: string;
-  maxTokens?: number;
-  temperature?: number;
-  responseFormat?: CompletionResponseFormat;
-  anthropicCacheTtl?: AnthropicCacheTtl;
-}): Promise<Map<string, { content?: string; error?: string }>> {
-  const executionConfig = await resolvePromptExecutionConfig(
-    input.promptId,
-    input.fallbackProvider || DEFAULT_PROVIDER,
-    input.fallbackModelName
-  );
-  const settings = await getAIModelSettings();
-  if (!isProviderEnabled(executionConfig.provider, settings)) {
-    throw new Error(`Selected AI model provider '${executionConfig.provider}' is disabled by admin.`);
-  }
-
-  if (executionConfig.provider !== 'claude') {
-    throw new Error(`Prompt "${input.promptId}" is not configured to run on Anthropic.`);
-  }
-
-  const requests = await Promise.all(
-    input.items.map(async (item) => ({
-      custom_id: item.customId,
-      params: await buildAnthropicPromptRequest({
-        promptId: input.promptId,
-        values: item.values,
-        maxTokens: input.maxTokens ?? 4000,
-        temperature: input.temperature ?? 0,
-        responseFormat: input.responseFormat ?? 'json',
-        modelName: executionConfig.modelName || DEFAULT_CLAUDE_MODEL,
-        cacheTtl: input.anthropicCacheTtl,
-      }),
-    }))
-  );
-
-  const createdBatch = await createAnthropicMessageBatch(requests);
-  const finishedBatch = createdBatch.processing_status === 'ended'
-    ? createdBatch
-    : await waitForAnthropicMessageBatch(createdBatch.id);
-
-  if (!finishedBatch.results_url) {
-    throw new Error(`Anthropic batch ${finishedBatch.id} completed without a results URL.`);
-  }
-
-  const results = await readAnthropicMessageBatchResults(finishedBatch.results_url);
-  const resultMap = new Map<string, { content?: string; error?: string }>();
-
-  for (const item of results) {
-    if (item.result.type !== 'succeeded') {
-      const failureReason = item.result.error?.message || `Anthropic batch request ${item.result.type}`;
-      resultMap.set(item.custom_id, { error: failureReason });
-      continue;
-    }
-
-    const textBlock = item.result.message?.content?.find(
-      (block) => block.type === 'text' && typeof block.text === 'string'
-    );
-
-    if (!textBlock?.text) {
-      resultMap.set(item.custom_id, { error: 'Anthropic batch request returned no text content.' });
-      continue;
-    }
-
-    resultMap.set(item.custom_id, { content: textBlock.text });
-  }
-
-  if (input.anthropicCacheTtl && !anthropicCacheUsageWarningShown) {
-    anthropicCacheUsageWarningShown = true;
-    console.info(
-      `Anthropic prompt caching enabled for batch prompt "${input.promptId}" with TTL ${input.anthropicCacheTtl}. Inspect Anthropic usage metrics to confirm cache hit rates in your workspace.`
-    );
-  }
-
-  return resultMap;
 }
 
 function normalizeSkillsList(skills: string[] | undefined): string[] {
@@ -2381,7 +1938,6 @@ export async function analyzeJobDescription(
     maxTokens: 7000,
     temperature: 0,
     responseFormat: 'json',
-    anthropicCacheTtl: '5m',
   });
 
   return parseJobAnalysisContent(content, jobDescription);
@@ -2402,71 +1958,6 @@ export function parseJobAnalysisContent(content: string, jobDescription: string)
     console.error('Failed to parse model response:', error, content);
     throw new Error('Failed to parse job analysis response');
   }
-}
-
-export async function batchAnalyzeJobDescriptions(input: {
-  items: Array<{
-    customId: string;
-    jobDescription: string;
-  }>;
-  provider?: AIProvider;
-  modelName?: string;
-  anthropicCacheTtl?: AnthropicCacheTtl;
-}): Promise<Map<string, { analysis?: JobAnalysis; error?: string }>> {
-  const provider = input.provider || DEFAULT_PROVIDER;
-  const canUseAnthropicBatch = input.items.length > 1
-    && await canUseAnthropicBatchForPrompt('analyze-job-description', provider, input.modelName);
-
-  if (!canUseAnthropicBatch) {
-    const resultMap = new Map<string, { analysis?: JobAnalysis; error?: string }>();
-    for (const item of input.items) {
-      try {
-        const analysis = await analyzeJobDescription(item.jobDescription, provider, input.modelName);
-        resultMap.set(item.customId, { analysis });
-      } catch (error) {
-        resultMap.set(item.customId, {
-          error: error instanceof Error ? error.message : 'Failed to analyze job description',
-        });
-      }
-    }
-    return resultMap;
-  }
-
-  const batchResults = await batchCreatePromptCompletions({
-    promptId: 'analyze-job-description',
-    items: input.items.map((item) => ({
-      customId: item.customId,
-      values: buildAnalyzeJobDescriptionPromptValues(item.jobDescription),
-    })),
-    fallbackProvider: provider,
-    fallbackModelName: input.modelName,
-    maxTokens: 7000,
-    temperature: 0,
-    responseFormat: 'json',
-    anthropicCacheTtl: input.anthropicCacheTtl ?? '1h',
-  });
-
-  const resultMap = new Map<string, { analysis?: JobAnalysis; error?: string }>();
-  for (const item of input.items) {
-    const result = batchResults.get(item.customId);
-    if (!result?.content) {
-      resultMap.set(item.customId, {
-        error: result?.error || 'Analysis request failed',
-      });
-      continue;
-    }
-
-    try {
-      const analysis = parseJobAnalysisContent(result.content, item.jobDescription);
-      resultMap.set(item.customId, { analysis });
-    } catch (error) {
-      resultMap.set(item.customId, {
-        error: error instanceof Error ? error.message : 'Failed to parse job analysis response',
-      });
-    }
-  }
-
-  return resultMap;
 }
 
 export function buildTailorResumePromptValues(
@@ -2548,11 +2039,6 @@ export async function tailorResume(
 ): Promise<TailoredContent> {
   const promptValues = buildTailorResumePromptValues(profile, jobAnalysis);
   const prompt = await renderPrompt('tailor-resume', promptValues);
-  const shouldUseAnthropicOptimizations = await shouldUseAnthropicOptimizationsForPrompt(
-    'tailor-resume',
-    provider,
-    modelName
-  );
   const content = await createPromptCompletion({
     promptId: 'tailor-resume',
     prompt,
@@ -2562,7 +2048,6 @@ export async function tailorResume(
     maxTokens: 11000,
     temperature: 0.2,
     responseFormat: 'json',
-    anthropicCacheTtl: shouldUseAnthropicOptimizations ? '5m' : undefined,
   });
 
   try {
@@ -2603,7 +2088,6 @@ export async function generateCoverLetter(
     maxTokens: 1500,
     temperature: 0.7,
     responseFormat: 'text',
-    anthropicCacheTtl: '5m',
   });
   return content.trim();
 }
@@ -2629,7 +2113,6 @@ export async function extractTemplateFromPDF(
     maxTokens: 8000,
     temperature: 0,
     responseFormat: 'json',
-    anthropicCacheTtl: '5m',
   });
 
   try {
@@ -2659,7 +2142,6 @@ export async function extractProfileFromResume(
     maxTokens: 4000,
     temperature: 0,
     responseFormat: 'json',
-    anthropicCacheTtl: '5m',
   });
 
   try {

@@ -613,6 +613,10 @@
       "priority": 3
     },
     {
+      "skill": "NoSQL",
+      "priority": 3
+    },
+    {
       "skill": "Oracle Database",
       "priority": 3
     },
@@ -2965,6 +2969,10 @@
       "priority": 5
     },
     {
+      "skill": "Front-end",
+      "priority": 5
+    },
+    {
       "skill": "FTP",
       "priority": 5
     },
@@ -3050,6 +3058,10 @@
     },
     {
       "skill": "GKE",
+      "priority": 5
+    },
+    {
+      "skill": "GNU Make",
       "priority": 5
     },
     {
@@ -3689,10 +3701,6 @@
       "priority": 5
     },
     {
-      "skill": "Make",
-      "priority": 5
-    },
-    {
       "skill": "Makefile",
       "priority": 5
     },
@@ -3994,10 +4002,6 @@
     },
     {
       "skill": "Nomad",
-      "priority": 5
-    },
-    {
-      "skill": "NoSQL",
       "priority": 5
     },
     {
@@ -5840,6 +5844,7 @@
     "Analytical tradeoff evaluation",
     "Analytical troubleshooting",
     "Approachability",
+    "Articulate",
     "Assertiveness",
     "Asynchronous collaboration",
     "Attention to detail",
@@ -6472,6 +6477,7 @@
     "Metrics-driven Thinking",
     "Milestone tracking",
     "Mindfulness",
+    "Mission driven",
     "Moderation",
     "Moral Reasoning",
     "Morale building",
