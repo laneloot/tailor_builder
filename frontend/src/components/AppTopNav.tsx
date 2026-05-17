@@ -10,6 +10,7 @@ type Props = {
 
 const NAV_ITEMS = [
   { href: '/', label: 'Builder' },
+  { href: '/calendar', label: 'Calendar' },
   { href: '/jobs', label: 'LinkedIn Jobs' },
   { href: '/jobs/filter', label: 'Job Filter' },
   { href: '/test', label: 'Test' },
