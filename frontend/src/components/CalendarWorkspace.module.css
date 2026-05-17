@@ -466,6 +466,20 @@
   margin-top: 0.7rem;
 }
 
+.availabilityTimeRange {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  grid-column: 1 / -1;
+}
+
+.availabilityControlRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  grid-column: 1 / -1;
+}
+
 .availabilityUsers {
   margin-top: 0.75rem;
 }
@@ -552,6 +566,40 @@
   font-weight: 700;
 }
 
+.availabilityTextBlock {
+  border: 1px solid var(--border-color);
+  background: var(--background);
+  padding: 0.7rem;
+}
+
+.availabilityTextHeader {
+  margin: 0 0 0.45rem;
+  color: var(--foreground);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.availabilityTextLine {
+  margin: 0.22rem 0 0;
+  color: var(--foreground);
+  font-size: 0.73rem;
+  line-height: 1.45;
+}
+
+.availabilityFooter {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.availabilityCopyStatus {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
 @media (prefers-color-scheme: dark) {
   :global(html.dark) .legendItemActive {
     background: rgba(30, 41, 59, 0.72);
@@ -583,6 +631,8 @@
   :global(html.dark) .dayCardHeader,
   :global(html.dark) .agendaDayTitle,
   :global(html.dark) .availabilityDayTitle,
+  :global(html.dark) .availabilityTextHeader,
+  :global(html.dark) .availabilityTextLine,
   :global(html.dark) .detailsHeading,
   :global(html.dark) .detailsMeta strong {
     color: #f8fafc;
@@ -630,7 +680,9 @@
   }
 
   .availabilityFields,
-  .availabilityUserList {
+  .availabilityUserList,
+  .availabilityTimeRange,
+  .availabilityControlRow {
     grid-template-columns: 1fr;
   }
 

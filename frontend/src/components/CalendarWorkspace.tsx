@@ -22,6 +22,14 @@ type RgbColor = { r: number; g: number; b: number };
 type EventSlotColor = { color: string; name: string };
 type AvailabilityWindow = { startMinutes: number; endMinutes: number };
 type AvailabilityDay = { dayKey: string; date: Date; windows: AvailabilityWindow[] };
+type CalendarDateParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
 
 const TIME_INPUT_OPTIONS = Array.from({ length: 48 }, (_, index) => {
   const hours = Math.floor(index / 2);
@@ -33,6 +41,21 @@ const TIME_INPUT_OPTIONS = Array.from({ length: 48 }, (_, index) => {
 
   return { label, value };
 });
+const PREPARE_TIME_OPTIONS = [
+  { label: '0', value: 0 },
+  { label: '5 mins', value: 5 },
+  { label: '10 mins', value: 10 },
+  { label: '15 mins', value: 15 },
+  { label: '20 mins', value: 20 },
+  { label: '30 mins', value: 30 },
+] as const;
+const MINIMUM_TIME_OPTIONS = [
+  { label: '0 mins', value: 0 },
+  { label: '15 mins', value: 15 },
+  { label: '30 mins', value: 30 },
+  { label: '45 mins', value: 45 },
+  { label: '1 hour', value: 60 },
+] as const;
 
 function parseShareId(value: string): string {
   if (!value) return '';
@@ -62,32 +85,49 @@ function toApiDate(date: Date, endOfDay = false): string {
 }
 
 function parseEventDate(value: string): Date {
-  return new Date(value.replace(' ', 'T'));
+  const [datePart, timePart = '00:00:00'] = value.split(' ');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute, second] = timePart.split(':').map(Number);
+
+  return new Date(Date.UTC(year, month - 1, day, hour, minute, second || 0));
 }
 
-function formatMonthLabel(date: Date, timeZone: string): string {
+function parseCalendarDateParts(value: string): CalendarDateParts {
+  const [datePart, timePart = '00:00:00'] = value.split(' ');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute, second] = timePart.split(':').map(Number);
+
+  return {
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second: second || 0,
+  };
+}
+
+function formatMonthLabel(date: Date): string {
   return new Intl.DateTimeFormat('en-US', {
     month: 'long',
     year: 'numeric',
-    timeZone,
-  }).format(date);
+  }).format(new Date(date.getFullYear(), date.getMonth(), 15));
 }
 
-function formatDayLabel(date: Date, timeZone: string): string {
+function formatDayLabel(date: Date): string {
   return new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
-    timeZone,
+    timeZone: 'UTC',
   }).format(date);
 }
 
-function formatEventTime(value: string, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone,
-  }).format(parseEventDate(value));
+function formatEventTime(value: string): string {
+  const { hour, minute } = parseCalendarDateParts(value);
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
 function startOfMonth(date: Date): Date {
@@ -104,12 +144,18 @@ function addDays(date: Date, amount: number): Date {
   return next;
 }
 
+function parseDateKey(value: string): { year: number; month: number; day: number } {
+  const [year, month, day] = value.split('-').map(Number);
+  return { year, month, day };
+}
+
 function toDateInputValue(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function parseDateInput(value: string): Date {
-  return new Date(`${value}T00:00:00`);
+function utcDateFromDayKey(value: string): Date {
+  const { year, month, day } = parseDateKey(value);
+  return new Date(Date.UTC(year, month - 1, day));
 }
 
 function parseTimeInput(value: string): number {
@@ -125,16 +171,50 @@ function formatMinutes(minutes: number): string {
   return `${displayHour}:${String(remainder).padStart(2, '0')} ${suffix}`;
 }
 
-function enumerateDays(start: Date, end: Date): Date[] {
-  const dates: Date[] = [];
-  const cursor = new Date(start);
+function formatCompactMinutes(minutes: number): string {
+  const normalizedHours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  const suffix = normalizedHours >= 12 ? 'pm' : 'am';
+  const displayHour = normalizedHours % 12 === 0 ? 12 : normalizedHours % 12;
+  if (remainder === 0) {
+    return `${displayHour}${suffix}`;
+  }
 
-  while (cursor <= end) {
-    dates.push(new Date(cursor));
-    cursor.setDate(cursor.getDate() + 1);
+  return `${displayHour}:${String(remainder).padStart(2, '0')} ${suffix}`;
+}
+
+function formatAvailabilityDayText(date: Date): string {
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'UTC',
+  }).format(date);
+}
+
+function enumerateDayKeys(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const cursor = utcDateFromDayKey(start);
+  const endDate = utcDateFromDayKey(end);
+
+  while (cursor <= endDate) {
+    dates.push(
+      `${cursor.getUTCFullYear()}-${pad(cursor.getUTCMonth() + 1)}-${pad(cursor.getUTCDate())}`
+    );
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
   return dates;
+}
+
+function wallClockTimestampForValue(value: string): number {
+  const { year, month, day, hour, minute, second } = parseCalendarDateParts(value);
+  return Date.UTC(year, month - 1, day, hour, minute, second);
+}
+
+function wallClockTimestampForDayKey(dayKey: string, minutes: number): number {
+  const { year, month, day } = parseDateKey(dayKey);
+  return Date.UTC(year, month - 1, day, Math.floor(minutes / 60), minutes % 60, 0);
 }
 
 function hexToRgb(color: string): RgbColor | null {
@@ -251,13 +331,8 @@ function reorderWeekdayLabels(firstWeekday: number): string[] {
   return WEEKDAY_LABELS.slice(firstWeekday).concat(WEEKDAY_LABELS.slice(0, firstWeekday));
 }
 
-function resolveSupportedTimeZone(timeZone?: string | null): SupportedTimeZone {
-  const matched = TIME_ZONE_OPTIONS.find((option) => option.value === timeZone);
-  return matched?.value ?? 'America/New_York';
-}
-
 function getTimeZoneLabel(timeZone: SupportedTimeZone): string {
-  return TIME_ZONE_OPTIONS.find((option) => option.value === timeZone)?.label ?? 'ET';
+  return TIME_ZONE_OPTIONS.find((option) => option.value === timeZone)?.label ?? 'PT';
 }
 
 export default function CalendarWorkspace() {
@@ -275,20 +350,24 @@ export default function CalendarWorkspace() {
   const [currentView, setCurrentView] = useState<'month' | 'agenda'>('month');
   const [currentMonth, setCurrentMonth] = useState(DEFAULT_FIXTURE_MONTH);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [selectedTimeZone, setSelectedTimeZone] = useState<SupportedTimeZone>('America/New_York');
+  const [selectedTimeZone, setSelectedTimeZone] = useState<SupportedTimeZone>('America/Los_Angeles');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeSubCalendars, setActiveSubCalendars] = useState<Set<number>>(new Set());
   const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
-  const [availabilityTimeZone, setAvailabilityTimeZone] = useState<SupportedTimeZone>('America/New_York');
+  const [availabilityTimeZone, setAvailabilityTimeZone] = useState<SupportedTimeZone>('America/Los_Angeles');
   const [availabilityFromDate, setAvailabilityFromDate] = useState(defaultAvailabilityStart);
   const [availabilityToDate, setAvailabilityToDate] = useState(defaultAvailabilityEnd);
   const [availabilityFromTime, setAvailabilityFromTime] = useState('09:00');
   const [availabilityToTime, setAvailabilityToTime] = useState('17:00');
+  const [availabilityPrepareMinutes, setAvailabilityPrepareMinutes] = useState(0);
+  const [availabilityMinimumMinutes, setAvailabilityMinimumMinutes] = useState(0);
   const [availabilityUserIds, setAvailabilityUserIds] = useState<Set<number>>(new Set());
   const [availabilityResults, setAvailabilityResults] = useState<AvailabilityDay[]>([]);
   const [availabilityError, setAvailabilityError] = useState('');
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [hasAvailabilitySearched, setHasAvailabilitySearched] = useState(false);
+  const [availabilityViewMode, setAvailabilityViewMode] = useState<'list' | 'text'>('text');
+  const [availabilityCopyState, setAvailabilityCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   useEffect(() => {
     let cancelled = false;
@@ -308,8 +387,6 @@ export default function CalendarWorkspace() {
         if (!cancelled) {
           setMetadata(payload.data);
           setActiveSubCalendars(new Set(payload.data.subCalendars.map((item) => item.id)));
-          setSelectedTimeZone(resolveSupportedTimeZone(payload.data.timeZone));
-          setAvailabilityTimeZone(resolveSupportedTimeZone(payload.data.timeZone));
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -448,6 +525,19 @@ export default function CalendarWorkspace() {
       .map((item) => item.name);
   }, [availabilityUserIds, metadata]);
 
+  const availabilityTextOutput = useMemo(() => {
+    if (availabilityResults.length === 0) return '';
+
+    return [
+      `All times in ${getTimeZoneLabel(availabilityTimeZone)}`,
+      ...availabilityResults.map((day) =>
+        `${formatAvailabilityDayText(day.date)}: ${day.windows
+          .map((window) => `${formatCompactMinutes(window.startMinutes)} - ${formatCompactMinutes(window.endMinutes)}`)
+          .join(', ')}`
+      ),
+    ].join('\n');
+  }, [availabilityResults, availabilityTimeZone]);
+
   function submitShareId(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextShareId = parseShareId(shareInput);
@@ -476,6 +566,7 @@ export default function CalendarWorkspace() {
   }
 
   function toggleAvailabilityUser(id: number) {
+    setAvailabilityCopyState('idle');
     setAvailabilityUserIds((current) => {
       const next = new Set(current);
       if (next.has(id)) {
@@ -487,8 +578,20 @@ export default function CalendarWorkspace() {
     });
   }
 
+  async function copyAvailability() {
+    if (!availabilityTextOutput) return;
+
+    try {
+      await navigator.clipboard.writeText(availabilityTextOutput);
+      setAvailabilityCopyState('copied');
+    } catch {
+      setAvailabilityCopyState('failed');
+    }
+  }
+
   async function findAvailability() {
     if (!metadata) return;
+    setAvailabilityCopyState('idle');
 
     if (availabilityUserIds.size === 0) {
       setAvailabilityError('Select at least one user.');
@@ -504,12 +607,10 @@ export default function CalendarWorkspace() {
       return;
     }
 
-    const rangeStart = parseDateInput(availabilityFromDate);
-    const rangeEnd = parseDateInput(availabilityToDate);
     const fromMinutes = parseTimeInput(availabilityFromTime);
     const toMinutes = parseTimeInput(availabilityToTime);
 
-    if (rangeStart > rangeEnd) {
+    if (availabilityFromDate > availabilityToDate) {
       setAvailabilityError('From Day must be on or before To Day.');
       setAvailabilityResults([]);
       setHasAvailabilitySearched(false);
@@ -543,27 +644,26 @@ export default function CalendarWorkspace() {
       const selectedIds = availabilityUserIds;
       const relevantEvents = payload.data.filter((event) => event.subCalendars.some((id) => selectedIds.has(id)));
 
-      const nextResults = enumerateDays(rangeStart, rangeEnd).map((day) => {
-        const dayStart = new Date(day);
-        const windowStart = new Date(dayStart);
-        windowStart.setHours(Math.floor(fromMinutes / 60), fromMinutes % 60, 0, 0);
-        const windowEnd = new Date(dayStart);
-        windowEnd.setHours(Math.floor(toMinutes / 60), toMinutes % 60, 0, 0);
+      const nextResults = enumerateDayKeys(availabilityFromDate, availabilityToDate).map((dayKey) => {
+        const dayDate = utcDateFromDayKey(dayKey);
+        const dayStartTimestamp = wallClockTimestampForDayKey(dayKey, 0);
+        const windowStartTimestamp = wallClockTimestampForDayKey(dayKey, fromMinutes);
+        const windowEndTimestamp = wallClockTimestampForDayKey(dayKey, toMinutes);
 
         const busyWindows = relevantEvents
           .map((event) => {
-            const eventStart = parseEventDate(event.start_date);
-            const eventEnd = parseEventDate(event.end_date);
-            const overlapStart = new Date(Math.max(eventStart.getTime(), windowStart.getTime()));
-            const overlapEnd = new Date(Math.min(eventEnd.getTime(), windowEnd.getTime()));
+            const eventStartTimestamp = wallClockTimestampForValue(event.start_date);
+            const eventEndTimestamp = wallClockTimestampForValue(event.end_date);
+            const overlapStart = Math.max(eventStartTimestamp, windowStartTimestamp);
+            const overlapEnd = Math.min(eventEndTimestamp, windowEndTimestamp);
 
             if (overlapStart >= overlapEnd) {
               return null;
             }
 
             return {
-              startMinutes: overlapStart.getHours() * 60 + overlapStart.getMinutes(),
-              endMinutes: overlapEnd.getHours() * 60 + overlapEnd.getMinutes(),
+              startMinutes: Math.round((overlapStart - dayStartTimestamp) / 60000),
+              endMinutes: Math.round((overlapEnd - dayStartTimestamp) / 60000),
             };
           })
           .filter((window): window is AvailabilityWindow => Boolean(window))
@@ -595,10 +695,27 @@ export default function CalendarWorkspace() {
           freeWindows.push({ startMinutes: cursor, endMinutes: toMinutes });
         }
 
+        const adjustedWindows = freeWindows
+          .map((window) => {
+            const touchesRangeStart = window.startMinutes === fromMinutes;
+            const touchesRangeEnd = window.endMinutes === toMinutes;
+
+            return {
+              startMinutes: touchesRangeStart
+                ? window.startMinutes
+                : window.startMinutes + availabilityPrepareMinutes,
+              endMinutes: touchesRangeEnd
+                ? window.endMinutes
+                : window.endMinutes - availabilityPrepareMinutes,
+            };
+          })
+          .filter((window) => window.startMinutes < window.endMinutes)
+          .filter((window) => window.endMinutes - window.startMinutes >= availabilityMinimumMinutes);
+
         return {
-          dayKey: toDateInputValue(day),
-          date: day,
-          windows: freeWindows,
+          dayKey,
+          date: dayDate,
+          windows: adjustedWindows,
         };
       }).filter((day) => day.windows.length > 0);
 
@@ -769,7 +886,7 @@ export default function CalendarWorkspace() {
             </div>
 
             <div className={styles.toolbarTitle}>
-              <h2>{formatMonthLabel(currentMonth, selectedTimeZone)}</h2>
+              <h2>{formatMonthLabel(currentMonth)}</h2>
               <span>{isLoadingEvents ? 'Refreshing events...' : `${visibleEvents.length} visible events`}</span>
             </div>
 
@@ -816,9 +933,9 @@ export default function CalendarWorkspace() {
                           type="button"
                           onClick={() => setSelectedEvent(event)}
                           style={eventStyle(event)}
-                          title={`${formatEventTime(event.start_date, selectedTimeZone)} ${event.title}`}
+                          title={`${formatEventTime(event.start_date)} ${event.title}`}
                         >
-                          <strong>{formatEventTime(event.start_date, selectedTimeZone)}</strong>
+                          <strong>{formatEventTime(event.start_date)}</strong>
                           <span>{event.title}</span>
                         </button>
                       ))}
@@ -831,7 +948,7 @@ export default function CalendarWorkspace() {
             <div className={styles.agendaList}>
               {agendaGroups.map((group) => (
                 <section key={group.day} className={styles.agendaDay}>
-                  <div className={styles.agendaDayTitle}>{formatDayLabel(group.date, selectedTimeZone)}</div>
+                  <div className={styles.agendaDayTitle}>{formatDayLabel(group.date)}</div>
                   <div className={styles.agendaDayEvents}>
                     {group.events.map((event) => (
                       <button
@@ -840,11 +957,11 @@ export default function CalendarWorkspace() {
                         type="button"
                         onClick={() => setSelectedEvent(event)}
                         style={eventStyle(event)}
-                        title={`${formatEventTime(event.start_date, selectedTimeZone)} - ${formatEventTime(event.end_date, selectedTimeZone)} ${event.title}`}
+                        title={`${formatEventTime(event.start_date)} - ${formatEventTime(event.end_date)} ${event.title}`}
                       >
                         <div className={styles.agendaEventContent}>
                           <div className={styles.agendaEventTime}>
-                            {formatEventTime(event.start_date, selectedTimeZone)} - {formatEventTime(event.end_date, selectedTimeZone)}
+                            {formatEventTime(event.start_date)} - {formatEventTime(event.end_date)}
                           </div>
                           <div className={styles.agendaEventTitle}>{event.title}</div>
                           {event.who || event.where ? (
@@ -883,9 +1000,9 @@ export default function CalendarWorkspace() {
             />
             <h3 className={styles.detailsHeading} id="calendar-event-title">{selectedEvent.title}</h3>
             <p className={styles.detailsTime}>
-              {formatDayLabel(parseEventDate(selectedEvent.start_date), selectedTimeZone)} ·{' '}
-              {formatEventTime(selectedEvent.start_date, selectedTimeZone)} -{' '}
-              {formatEventTime(selectedEvent.end_date, selectedTimeZone)}
+              {formatDayLabel(parseEventDate(selectedEvent.start_date))} ·{' '}
+              {formatEventTime(selectedEvent.start_date)} -{' '}
+              {formatEventTime(selectedEvent.end_date)}
             </p>
             <p className={styles.detailsMeta}><strong>Time Zone:</strong> {getTimeZoneLabel(selectedTimeZone)}</p>
             {selectedEvent.who ? <p className={styles.detailsMeta}><strong>Who:</strong> {selectedEvent.who}</p> : null}
@@ -919,7 +1036,10 @@ export default function CalendarWorkspace() {
                   className={styles.input}
                   type="date"
                   value={availabilityFromDate}
-                  onChange={(event) => setAvailabilityFromDate(event.target.value)}
+                  onChange={(event) => {
+                    setAvailabilityFromDate(event.target.value);
+                    setAvailabilityCopyState('idle');
+                  }}
                 />
               </div>
               <div>
@@ -929,18 +1049,62 @@ export default function CalendarWorkspace() {
                   className={styles.input}
                   type="date"
                   value={availabilityToDate}
-                  onChange={(event) => setAvailabilityToDate(event.target.value)}
+                  onChange={(event) => {
+                    setAvailabilityToDate(event.target.value);
+                    setAvailabilityCopyState('idle');
+                  }}
                 />
               </div>
+              <div className={styles.availabilityTimeRange}>
+                <div>
+                  <label className={styles.shareLabel} htmlFor="availability-from-time">From Time</label>
+                  <select
+                    id="availability-from-time"
+                    className={styles.select}
+                    value={availabilityFromTime}
+                    onChange={(event) => {
+                      setAvailabilityFromTime(event.target.value);
+                      setAvailabilityCopyState('idle');
+                    }}
+                  >
+                    {TIME_INPUT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={styles.shareLabel} htmlFor="availability-to-time">To Time</label>
+                  <select
+                    id="availability-to-time"
+                    className={styles.select}
+                    value={availabilityToTime}
+                    onChange={(event) => {
+                      setAvailabilityToTime(event.target.value);
+                      setAvailabilityCopyState('idle');
+                    }}
+                  >
+                    {TIME_INPUT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div>
-                <label className={styles.shareLabel} htmlFor="availability-time-zone">Time Zone</label>
+                <label className={styles.shareLabel} htmlFor="availability-prepare-time">Prepare Time</label>
                 <select
-                  id="availability-time-zone"
+                  id="availability-prepare-time"
                   className={styles.select}
-                  value={availabilityTimeZone}
-                  onChange={(event) => setAvailabilityTimeZone(event.target.value as SupportedTimeZone)}
+                  value={String(availabilityPrepareMinutes)}
+                  onChange={(event) => {
+                    setAvailabilityPrepareMinutes(Number(event.target.value));
+                    setAvailabilityCopyState('idle');
+                  }}
                 >
-                  {TIME_ZONE_OPTIONS.map((option) => (
+                  {PREPARE_TIME_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -948,34 +1112,57 @@ export default function CalendarWorkspace() {
                 </select>
               </div>
               <div>
-                <label className={styles.shareLabel} htmlFor="availability-from-time">From Time</label>
+                <label className={styles.shareLabel} htmlFor="availability-minimum-time">Minimum Time</label>
                 <select
-                  id="availability-from-time"
+                  id="availability-minimum-time"
                   className={styles.select}
-                  value={availabilityFromTime}
-                  onChange={(event) => setAvailabilityFromTime(event.target.value)}
+                  value={String(availabilityMinimumMinutes)}
+                  onChange={(event) => {
+                    setAvailabilityMinimumMinutes(Number(event.target.value));
+                    setAvailabilityCopyState('idle');
+                  }}
                 >
-                  {TIME_INPUT_OPTIONS.map((option) => (
+                  {MINIMUM_TIME_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label className={styles.shareLabel} htmlFor="availability-to-time">To Time</label>
-                <select
-                  id="availability-to-time"
-                  className={styles.select}
-                  value={availabilityToTime}
-                  onChange={(event) => setAvailabilityToTime(event.target.value)}
-                >
-                  {TIME_INPUT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <div className={styles.availabilityControlRow}>
+                <div>
+                  <label className={styles.shareLabel} htmlFor="availability-time-zone">Time Zone</label>
+                  <select
+                    id="availability-time-zone"
+                    className={styles.select}
+                    value={availabilityTimeZone}
+                    onChange={(event) => {
+                      setAvailabilityTimeZone(event.target.value as SupportedTimeZone);
+                      setAvailabilityCopyState('idle');
+                    }}
+                  >
+                    {TIME_ZONE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={styles.shareLabel} htmlFor="availability-view-mode">View</label>
+                  <select
+                    id="availability-view-mode"
+                    className={styles.select}
+                    value={availabilityViewMode}
+                    onChange={(event) => {
+                      setAvailabilityViewMode(event.target.value as 'list' | 'text');
+                      setAvailabilityCopyState('idle');
+                    }}
+                  >
+                    <option value="list">List style</option>
+                    <option value="text">Text style</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -985,7 +1172,10 @@ export default function CalendarWorkspace() {
                 <button
                   className={styles.ghostButton}
                   type="button"
-                  onClick={() => setAvailabilityUserIds(new Set(metadata?.subCalendars.map((item) => item.id) ?? []))}
+                  onClick={() => {
+                    setAvailabilityUserIds(new Set(metadata?.subCalendars.map((item) => item.id) ?? []));
+                    setAvailabilityCopyState('idle');
+                  }}
                 >
                   Select All
                 </button>
@@ -1014,7 +1204,7 @@ export default function CalendarWorkspace() {
                 {isLoadingAvailability ? 'Checking...' : 'Find Availability'}
               </button>
               <span className={styles.availabilitySummary}>
-                {availabilityFromDate} - {availabilityToDate} · {getTimeZoneLabel(availabilityTimeZone)} · {formatMinutes(parseTimeInput(availabilityFromTime))} - {formatMinutes(parseTimeInput(availabilityToTime))}
+                {availabilityFromDate} - {availabilityToDate} · {getTimeZoneLabel(availabilityTimeZone)} · {formatMinutes(parseTimeInput(availabilityFromTime))} - {formatMinutes(parseTimeInput(availabilityToTime))} · Prep {availabilityPrepareMinutes} min · Min {availabilityMinimumMinutes} min
               </span>
             </div>
 
@@ -1027,21 +1217,46 @@ export default function CalendarWorkspace() {
               {availabilityResults.length === 0 && !isLoadingAvailability && !availabilityError && !hasAvailabilitySearched ? (
                 <p className={styles.emptyState}>Select users and click Find Availability.</p>
               ) : null}
-              {availabilityResults.map((day) => (
-                <section key={day.dayKey} className={styles.availabilityDay}>
-                  <h3 className={styles.availabilityDayTitle}>{formatDayLabel(day.date, availabilityTimeZone)}</h3>
-                  <div className={styles.availabilityWindowList}>
-                    {day.windows.map((window) => (
-                      <span key={`${day.dayKey}-${window.startMinutes}-${window.endMinutes}`} className={styles.availabilityWindow}>
-                        {formatMinutes(window.startMinutes)} - {formatMinutes(window.endMinutes)}
-                      </span>
-                    ))}
-                  </div>
-                </section>
-              ))}
+              {availabilityViewMode === 'list'
+                ? availabilityResults.map((day) => (
+                    <section key={day.dayKey} className={styles.availabilityDay}>
+                      <h3 className={styles.availabilityDayTitle}>{formatDayLabel(day.date)}</h3>
+                      <div className={styles.availabilityWindowList}>
+                        {day.windows.map((window) => (
+                          <span key={`${day.dayKey}-${window.startMinutes}-${window.endMinutes}`} className={styles.availabilityWindow}>
+                            {formatMinutes(window.startMinutes)} - {formatMinutes(window.endMinutes)}
+                          </span>
+                        ))}
+                      </div>
+                    </section>
+                  ))
+                : null}
+              {availabilityViewMode === 'text' && availabilityResults.length > 0 ? (
+                <div className={styles.availabilityTextBlock}>
+                  <p className={styles.availabilityTextHeader}>All times in {getTimeZoneLabel(availabilityTimeZone)}</p>
+                  {availabilityResults.map((day) => (
+                    <p key={day.dayKey} className={styles.availabilityTextLine}>
+                      {formatAvailabilityDayText(day.date)}: {day.windows.map((window) => `${formatCompactMinutes(window.startMinutes)} - ${formatCompactMinutes(window.endMinutes)}`).join(', ')}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
               {availabilityResults.length === 0 && !isLoadingAvailability && availabilityUserNames.length > 0 && !availabilityError && hasAvailabilitySearched ? (
                 <p className={styles.emptyState}>No shared availability found for the selected range.</p>
               ) : null}
+            </div>
+
+            <div className={styles.availabilityFooter}>
+              {availabilityCopyState === 'copied' ? <span className={styles.availabilityCopyStatus}>Copied</span> : null}
+              {availabilityCopyState === 'failed' ? <span className={styles.availabilityCopyStatus}>Copy failed</span> : null}
+              <button
+                className={styles.secondaryButton}
+                type="button"
+                onClick={copyAvailability}
+                disabled={!availabilityTextOutput}
+              >
+                Copy Availability
+              </button>
             </div>
           </section>
         </div>
